@@ -1,0 +1,15 @@
+export const ROUTERS_PATH = {
+  ROOT_PATH: "/",
+  ERROR: "/error",
+  SENDOTP: "/send-otp",
+  VERIFYOTP: "/verify-otp",
+  USERPROFILE: "/user-profile",
+  BUSINESSREGISTRATION: "/business-registration",
+  DASHBOARD: "/dashboard",
+  ALLUSERS: "/admin/users",
+  EMPLOYEES: "/admin/employees",
+  BUSINESSPROFILE: "/admin/business-profile",
+  EMPLOYEEPROFILE: "/admin/employee-profile",
+  CUSTOMERPROFILE: "/customer-profile",
+  QUEUEUSERS: "/admin/queue-users",
+}

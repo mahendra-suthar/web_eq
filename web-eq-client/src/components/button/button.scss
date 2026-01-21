@@ -1,0 +1,118 @@
+@use "sass:color";
+@use "../../variables.scss" as *;
+
+.button {
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: "Noto Sans Hebrew", serif;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &.button--loading {
+    opacity: 0.7;
+    cursor: wait;
+  }
+}
+
+.button--blue {
+  background-color: $primary;
+  color: white;
+
+  &:hover:not(:disabled) {
+    background-color: color.adjust($primary, $lightness: -10%);
+  }
+}
+
+.button--green {
+  background-color: #4caf50;
+  color: white;
+
+  &:hover:not(:disabled) {
+    background-color: color.adjust(#4caf50, $lightness: -10%);
+  }
+}
+
+.button--green-small {
+  background-color: #4caf50;
+  color: white;
+  padding: 8px 16px;
+  font-size: 12px;
+
+  &:hover:not(:disabled) {
+    background-color: color.adjust(#4caf50, $lightness: -10%);
+  }
+}
+
+.button--red {
+  background-color: #f44336;
+  color: white;
+
+  &:hover:not(:disabled) {
+    background-color: color.adjust(#f44336, $lightness: -10%);
+  }
+}
+
+.button--black {
+  background-color: #333;
+  color: white;
+
+  &:hover:not(:disabled) {
+    background-color: color.adjust(#333, $lightness: -10%);
+  }
+}
+
+.button--orange {
+  background-color: #ff9800;
+  color: white;
+
+  &:hover:not(:disabled) {
+    background-color: color.adjust(#ff9800, $lightness: -10%);
+  }
+}
+
+.button--transparent {
+  background-color: transparent;
+  color: $primary;
+  border: 1px solid $primary;
+
+  &:hover:not(:disabled) {
+    background-color: rgba($primary, 0.1);
+  }
+}
+
+.button--outline-blue {
+  background-color: transparent;
+  color: $primary;
+  border: 1px solid $primary;
+
+  &:hover:not(:disabled) {
+    background-color: rgba($primary, 0.1);
+  }
+}
+
+.button--sm {
+  padding: 8px 16px;
+  font-size: 12px;
+  height: 32px;
+  line-height: 1;
+}
+
+.button--md {
+  padding: 12px 24px;
+  font-size: 14px;
+}
+
+.button--lg {
+  padding: 16px 32px;
+  font-size: 16px;
+}

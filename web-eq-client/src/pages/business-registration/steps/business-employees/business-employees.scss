@@ -1,0 +1,263 @@
+@use "../../../../variables.scss" as *;
+
+.business-employees-page {
+  padding: 48px 56px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+
+  @media screen and (max-width: 768px) {
+    padding: 32px 24px;
+  }
+}
+
+.business-employees-header {
+  margin-bottom: 40px;
+  position: relative;
+
+  .back-button {
+    position: absolute;
+    left: 0;
+    top: 0;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: $primary-dark;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      opacity: 0.7;
+    }
+  }
+
+  .header-content {
+    text-align: center;
+  }
+
+  .business-employees-title {
+    color: $primary;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 40px;
+    margin: 0 0 8px 0;
+  }
+
+  .business-employees-subtitle {
+    color: #637381;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 20px;
+    margin: 0;
+  }
+}
+
+.business-employees-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.business-employees-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.employee-card {
+  padding: 24px;
+  background: rgba(145, 158, 171, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(145, 158, 171, 0.2);
+  transition: all 0.2s ease;
+
+  &:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border-color: rgba(145, 158, 171, 0.3);
+  }
+}
+
+.employee-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+
+  h3 {
+    color: $primary-dark;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .remove-button {
+    background: transparent;
+    border: 1px solid #FF5630;
+    color: #FF5630;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(255, 86, 48, 0.1);
+    }
+  }
+}
+
+.employee-fields {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+
+  @media screen and (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .form-field-wrapper {
+    &:nth-child(3) {
+      grid-column: 1 / -1;
+    }
+  }
+}
+
+.form-field-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-label {
+  color: $primary-dark;
+  font-family: "Noto Sans Hebrew", serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  margin: 0;
+}
+
+.form-field {
+  position: relative;
+
+  input {
+    width: 100%;
+    border-radius: 8px;
+    background: rgba(145, 158, 171, 0.08);
+    height: 53px;
+    padding: 0px 12px;
+    border: 2px solid transparent;
+    color: $primary-dark;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 15px;
+    line-height: 22px;
+    transition: all 0.2s ease;
+
+    &:focus {
+      outline: none;
+      border-color: $primary;
+      background: rgba(145, 158, 171, 0.12);
+    }
+
+    &::placeholder {
+      color: #919EAB;
+    }
+  }
+
+  .file-input {
+    padding: 8px;
+    height: auto;
+  }
+
+  &.error {
+    input {
+      background-color: rgba(255, 86, 48, 0.08);
+      border-color: #FF5630;
+      color: #FF5630;
+    }
+  }
+
+  .error-text {
+    color: #FF5630;
+    font-size: 12px;
+    font-weight: 500;
+    margin-top: 4px;
+  }
+
+  .image-preview {
+    margin-top: 12px;
+
+    img {
+      max-width: 200px;
+      max-height: 200px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+  }
+}
+
+.add-employee-button {
+  width: 100%;
+  padding: 12px 24px;
+  background: rgba(145, 158, 171, 0.08);
+  border: 2px solid rgba(145, 158, 171, 0.3);
+  border-radius: 8px;
+  color: $primary-dark;
+  font-family: "Noto Sans Hebrew", serif;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: $primary;
+    background: rgba($primary, 0.1);
+  }
+}
+
+.business-employees-form-action {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  padding-top: 40px;
+  margin-top: 16px;
+
+  .button {
+    min-width: 120px;
+    max-width: 200px;
+    padding: 14px 32px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 8px;
+    text-transform: none;
+
+    @media screen and (max-width: 768px) {
+      flex: 1;
+      min-width: auto;
+      max-width: none;
+      padding: 14px 24px;
+    }
+
+    &.button--blue {
+      background-color: $primary;
+      color: white;
+      border: none;
+    }
+
+    &.button--transparent {
+      background: transparent;
+      color: $primary;
+      border: 2px solid $primary;
+    }
+  }
+}

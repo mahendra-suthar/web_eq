@@ -1,0 +1,48 @@
+services:
+  postgres_db:
+    image: postgres:15-alpine
+    container_name: web-eq-db
+    environment:
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+      - POSTGRES_DB=${DB_NAME:-web_eq_db}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: web-eq-api
+    environment:
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_HOST=postgres_db
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME:-web_eq_db}
+    ports:
+      - "8008:8008"
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    networks:
+      - app-network
+    volumes:
+      - ../:/app
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+

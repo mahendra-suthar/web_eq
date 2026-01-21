@@ -1,0 +1,240 @@
+@use "../../variables.scss" as *;
+
+.verify-otp-page {
+  background: #fff;
+  padding: 40px 32px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 420px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  margin: 0 auto;
+}
+
+.verify-otp-header {
+  margin-bottom: 32px;
+  position: relative;
+
+  .back-button {
+    position: absolute;
+    left: 0;
+    top: 0;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: $primary-dark;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      opacity: 0.7;
+    }
+  }
+
+  .header-content {
+    text-align: center;
+  }
+
+  .verify-otp-title {
+    color: $primary;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 40px;
+    margin: 0 0 8px 0;
+  }
+
+  .verify-otp-subtitle {
+    color: #637381;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 20px;
+    margin: 0;
+  }
+}
+
+.verify-otp-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.verify-otp-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.phone-info-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+
+  .phone-display {
+    color: $primary-dark;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 24px;
+    margin: 0;
+  }
+}
+
+.otp-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.otp-info-text {
+  color: $primary-dark;
+  font-family: "Noto Sans Hebrew", serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  margin: 0;
+  text-align: center;
+}
+
+.otp-container {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  direction: ltr;
+
+  &.invalid {
+    .otp-box .otp-slot {
+      background-color: rgba(255, 86, 48, 0.1);
+      border-color: #FF5630;
+
+      .otp-char.filled {
+        color: #FF5630;
+      }
+
+      .otp-char.placeholder {
+        color: rgba(255, 86, 48, 0.5);
+      }
+    }
+  }
+}
+
+.otp-box {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.otp-slot {
+  height: 53px;
+  width: 53px;
+  border-radius: 8px;
+  font-size: 24px;
+  font-weight: bold;
+  background-color: rgba(145, 158, 171, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid transparent;
+  transition: all 0.2s ease-in-out;
+
+  &.active {
+    background-color: rgba(145, 158, 171, 0.16);
+    border-color: $primary;
+  }
+}
+
+.otp-char {
+  font-weight: bold;
+  font-size: 24px;
+  text-align: center;
+
+  &.placeholder {
+    color: #B0B0B0;
+    font-size: 32px;
+  }
+
+  &.filled {
+    color: $primary-dark;
+  }
+}
+
+.otp-validation-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding-top: 16px;
+
+  .error-text {
+    color: #FF5630;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+  }
+}
+
+.resend-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.resend-button {
+  background-color: transparent;
+  color: $primary;
+  border: 1px solid $primary;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: "Noto Sans Hebrew", serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(.disabled) {
+    background-color: rgba($primary, 0.1);
+  }
+
+  &.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: rgba(145, 158, 171, 0.08);
+    color: $text-secondary;
+    border-color: rgba(145, 158, 171, 0.3);
+  }
+}
+
+.countdown-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: $primary-dark;
+  font-family: "Noto Sans Hebrew", serif;
+  margin: 0;
+}
+
+.verify-otp-form-action {
+  display: flex;
+  justify-content: center;
+  padding-top: 32px;
+  margin-top: 8px;
+  
+  .button {
+    width: 100%;
+    padding: 14px 24px;
+    font-size: 16px;
+    font-weight: 600;
+    background-color: $primary;
+    border-radius: 8px;
+    text-transform: none;
+    color: white;
+    border: none;
+  }
+}
+

@@ -1,0 +1,68 @@
+// Reuse employees page styles
+@import '../employees/employees.scss';
+
+.queue-users-page {
+    .filter-row {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+
+        .filter-input {
+            flex: 1;
+        }
+    }
+
+    .user-details {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        font-size: 0.875rem;
+        color: #64748b;
+
+        span {
+            display: block;
+        }
+    }
+
+    .status-badge {
+        &.registered {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+
+        &.in-progress {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+
+        &.completed {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+
+        &.failed {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        &.cancelled {
+            background-color: #f3f4f6;
+            color: #374151;
+        }
+
+        &.priority {
+            background-color: #fce7f3;
+            color: #9f1239;
+        }
+
+        &.normal {
+            background-color: #f3f4f6;
+            color: #6b7280;
+        }
+
+        &.unknown {
+            background-color: #f3f4f6;
+            color: #6b7280;
+        }
+    }
+}

@@ -1,0 +1,93 @@
+# Root .gitignore for the monorepo (web-eq-client + web-eq-server)
+
+########################################
+# OS / Editor
+########################################
+.DS_Store
+Thumbs.db
+
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*.swn
+
+########################################
+# Logs
+########################################
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+########################################
+# Environment files / secrets
+########################################
+.env
+.env.*
+!.envrc
+
+########################################
+# Node / Frontend (Vite, etc.)
+########################################
+**/node_modules/
+**/.npm/
+**/.yarn/
+**/.pnpm-store/
+**/.cache/
+**/.vite/
+
+**/dist/
+**/dist-ssr/
+**/build/
+**/*.local
+
+########################################
+# Python
+########################################
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual envs
+.venv/
+venv/
+ENV/
+env/
+
+# Tooling caches / coverage
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.pyright/
+coverage.xml
+htmlcov/
+.coverage
+*.cover
+
+########################################
+# Python / local DB / notebooks
+########################################
+*.sqlite3
+*.db
+*.pkl
+.ipynb_checkpoints/
+
+########################################
+# Docker (optional local overrides)
+########################################
+docker-compose.override.yml
+
+########################################
+# Repo-specific (ignore other packages/files in this workspace)
+########################################
+eq_backend/
+shoonit-bot-client/
+shoonit-bot-server/
+index.html
+pyrightconfig.json

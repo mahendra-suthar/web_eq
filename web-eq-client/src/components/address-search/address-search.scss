@@ -1,0 +1,162 @@
+@use "../../variables.scss" as *;
+
+.address-search-container {
+  grid-column: 1 / -1; // Span full width in grid layout
+  margin-bottom: 32px;
+  padding: 24px;
+  background: linear-gradient(135deg, rgba($primary, 0.08) 0%, rgba($primary, 0.04) 100%);
+  border-radius: 12px;
+  border: 2px solid rgba($primary, 0.2);
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: rgba($primary, 0.4);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+}
+
+.address-search-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+
+  .form-label {
+    margin: 0;
+  }
+
+  .toggle-map-button {
+    padding: 8px 16px;
+    background: rgba($primary, 0.1);
+    border: 1px solid rgba($primary, 0.3);
+    border-radius: 6px;
+    color: $primary;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba($primary, 0.2);
+      border-color: $primary;
+    }
+  }
+}
+
+.address-search-input-wrapper {
+  position: relative;
+  margin-top: 12px;
+
+  .address-search-input {
+    width: 100%;
+    border-radius: 8px;
+    background: #fff;
+    height: 53px;
+    padding: 0px 45px 0px 16px;
+    border: 2px solid rgba(145, 158, 171, 0.3);
+    color: $primary-dark;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 15px;
+    line-height: 22px;
+    transition: all 0.2s ease;
+
+    &:focus {
+      outline: none;
+      border-color: $primary;
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba($primary, 0.1);
+    }
+
+    &:disabled {
+      background: rgba(145, 158, 171, 0.08);
+      cursor: not-allowed;
+    }
+
+    &::placeholder {
+      color: #919EAB;
+    }
+  }
+
+  .search-icon {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 18px;
+    color: #919EAB;
+    pointer-events: none;
+  }
+}
+
+// Address suggestions dropdown styling
+.address-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(145, 158, 171, 0.2);
+  margin-top: 4px;
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: "Noto Sans Hebrew", serif;
+
+  .suggestion-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    border-top: 1px solid rgba(145, 158, 171, 0.1);
+    transition: background-color 0.2s ease;
+
+    &:first-child {
+      border-top: none;
+      border-radius: 8px 8px 0 0;
+    }
+
+    &:last-child {
+      border-radius: 0 0 8px 8px;
+    }
+
+    &:hover {
+      background-color: rgba($primary, 0.1);
+    }
+
+    .suggestion-text {
+      color: $primary-dark;
+      font-size: 15px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .suggestion-address {
+      color: #637381;
+      font-size: 13px;
+      font-weight: 400;
+    }
+  }
+}
+
+.address-search-hint {
+  margin: 12px 0 0 0;
+  color: #637381;
+  font-family: "Noto Sans Hebrew", serif;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.address-search-error {
+  margin: 8px 0 0 0;
+  color: #FF5630;
+  font-family: "Noto Sans Hebrew", serif;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  padding: 8px 12px;
+  background: rgba(255, 86, 48, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 86, 48, 0.2);
+}

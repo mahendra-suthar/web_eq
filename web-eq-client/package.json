@@ -1,0 +1,37 @@
+{
+  "name": "web-eq-client",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "vite --port 3000 --open --host",
+    "dev": "vite --port 3000 --open",
+    "build": "vite build",
+    "serve": "vite preview --open",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^7.1.0",
+    "@mui/material": "^7.1.0",
+    "axios": "^1.7.9",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "input-otp": "^1.4.2",
+    "react-i18next": "^15.4.1",
+    "react-router-dom": "^7.1.1",
+    "react-toastify": "^11.0.5",
+    "sass": "^1.84.0",
+    "stylis": "^4.3.6",
+    "zustand": "^5.0.4"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "sass-embedded": "^1.83.4",
+    "typescript": "^5.0.0",
+    "vite": "^6.1.0"
+  }
+}
+
