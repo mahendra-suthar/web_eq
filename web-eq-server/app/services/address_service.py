@@ -1,5 +1,5 @@
 from uuid import UUID
-from typing import List
+from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.models.address import Address, EntityType
@@ -30,5 +30,34 @@ class AddressService:
             ).all()
 
             return addresses
+        except Exception as e:
+            raise e
+
+    def get_primary_address_by_entity(self, entity_type: EntityType, entity_id: UUID) -> Optional[Address]:
+        try:
+            address = self.db.query(Address).filter(
+                Address.entity_type == entity_type,
+                Address.entity_id == entity_id
+            ).first()
+
+            return address
+        except Exception as e:
+            raise e
+
+    def get_primary_addresses_by_entities(self, entity_type: EntityType, entity_ids: List[UUID]) -> dict[UUID, Optional[Address]]:
+        try:
+            if not entity_ids:
+                return {}
+            
+            addresses = self.db.query(Address).filter(
+                Address.entity_type == entity_type,
+                Address.entity_id.in_(entity_ids)
+            ).all()
+            
+            addresses_by_entity: dict[UUID, Optional[Address]] = {entity_id: None for entity_id in entity_ids}
+            for address in addresses:
+                addresses_by_entity[address.entity_id] = address
+            
+            return addresses_by_entity
         except Exception as e:
             raise e

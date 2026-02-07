@@ -10,6 +10,5 @@ export const ROUTERS_PATH = {
   EMPLOYEES: "/admin/employees",
   BUSINESSPROFILE: "/admin/business-profile",
   EMPLOYEEPROFILE: "/admin/employee-profile",
-  CUSTOMERPROFILE: "/customer-profile",
   QUEUEUSERS: "/admin/queue-users",
 }

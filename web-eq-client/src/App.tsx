@@ -11,7 +11,6 @@ import AllUsers from './pages/all-users';
 import Employees from './pages/employees';
 import BusinessProfile from './pages/business-profile';
 import EmployeeProfile from './pages/employee-profile';
-import CustomerProfile from './pages/customer-profile';
 import QueueUsers from './pages/queue-users';
 import AdminLayout from './layouts/admin-layout';
 
@@ -35,9 +34,6 @@ const App = () => {
           <Route path={ROUTERS_PATH.BUSINESSPROFILE} element={<BusinessProfile />} />
           <Route path={ROUTERS_PATH.EMPLOYEEPROFILE} element={<EmployeeProfile />} />
           <Route path={ROUTERS_PATH.QUEUEUSERS} element={<QueueUsers />} />
-        </Route>
-        <Route element={<MainLayout />}>
-          <Route path={ROUTERS_PATH.CUSTOMERPROFILE} element={<CustomerProfile />} />
         </Route>
       </Routes>
     </BrowserRouter>

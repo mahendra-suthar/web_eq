@@ -1,0 +1,88 @@
+@use "./variables.scss" as *;
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@100..900&display=swap');
+
+body {
+  margin: 0;
+  font-family: "Noto Sans Hebrew", serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  padding: 0 !important;
+  max-width: 100% !important;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+* {
+  box-sizing: border-box;
+  font-family: "Noto Sans Hebrew", serif !important;
+}
+
+div h1,
+div h2,
+div h3,
+div h4,
+div h5,
+div h6,
+div p {
+  margin: 0;
+  font-style: normal;
+}
+
+a,
+button {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+input:focus,
+textarea:focus {
+  outline-color: $primary;
+}
+
+// Form field CSS
+
+.form-field input {
+  border-radius: 8px;
+  background: rgba(145, 158, 171, 0.08);
+  height: 53px;
+  padding: 0px 12px 0px 10px;
+  border: none;
+  width: 100%;
+  color: $primary-dark;
+  font-family: "Noto Sans Hebrew", serif;
+  font-size: 15px;
+  line-height: 22px;
+
+  @media screen and (max-width: 600px) {
+    font-size: 14px;
+    line-height: 20px;
+    padding: 0px 8px 0px 8px;
+    height: 46px;
+  }
+}
+
+.form-field input::placeholder {
+  color: #919EAB;
+}
+
+// Error message CSS
+.error-message {
+  color: #d32f2f;
+  font-family: "Noto Sans Hebrew", serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  margin-top: 16px;
+  padding: 12px;
+  background-color: #ffebee;
+  border-radius: 8px;
+  border: 1px solid #ffcdd2;
+}
+
+body {
+  direction: ltr;
+  text-align: left;
+}

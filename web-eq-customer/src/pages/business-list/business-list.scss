@@ -1,0 +1,167 @@
+@use "../../variables.scss" as *;
+
+.business-list-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  min-height: 60vh;
+
+  .business-list-header {
+    margin-bottom: 24px;
+
+    .business-list-title {
+      color: $primary-dark;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 32px;
+      font-weight: 700;
+      margin: 0 0 8px 0;
+    }
+
+    .business-list-description {
+      color: $text-secondary;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 15px;
+      line-height: 1.5;
+      margin: 0 0 12px 0;
+      max-width: 640px;
+    }
+
+    .business-list-subtitle {
+      color: $text-secondary;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 14px;
+      margin: 0;
+      font-weight: 500;
+    }
+  }
+
+  // ── Service Filters ──────────────────────────────────────────────────
+
+  .service-filters {
+    margin-bottom: 28px;
+    padding: 16px 20px;
+    background: #f8f9fb;
+    border-radius: 12px;
+    border: 1px solid #e8eaed;
+
+    .service-filters-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+
+      .service-filters-label {
+        font-family: "Noto Sans Hebrew", serif;
+        font-size: 14px;
+        font-weight: 600;
+        color: $primary-dark;
+      }
+
+      .service-filters-clear {
+        font-family: "Noto Sans Hebrew", serif;
+        font-size: 13px;
+        font-weight: 500;
+        color: $primary;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 6px;
+        transition: background 0.15s;
+
+        &:hover {
+          background: rgba($primary, 0.08);
+        }
+      }
+    }
+
+    .service-filters-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+
+      .service-filter-btn {
+        font-family: "Noto Sans Hebrew", serif;
+        font-size: 13px;
+        font-weight: 500;
+        padding: 6px 16px;
+        border-radius: 20px;
+        border: 1.5px solid #d0d5dd;
+        background: #fff;
+        color: $text-secondary;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+
+        &:hover {
+          border-color: $primary;
+          color: $primary;
+          background: rgba($primary, 0.04);
+        }
+
+        &.active {
+          border-color: $primary;
+          background: $primary;
+          color: #fff;
+        }
+      }
+    }
+  }
+
+  // ── Error ────────────────────────────────────────────────────────────
+
+  .business-list-error {
+    padding: 24px 16px;
+    text-align: center;
+
+    p {
+      color: #d32f2f;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 15px;
+    }
+  }
+
+  // ── Empty State ──────────────────────────────────────────────────────
+
+  .business-list-empty {
+    padding: 64px 16px;
+    text-align: center;
+
+    p {
+      color: $text-secondary;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 16px;
+      margin-bottom: 16px;
+    }
+
+    .service-filters-clear {
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 14px;
+      font-weight: 500;
+      color: $primary;
+      background: none;
+      border: 1.5px solid $primary;
+      cursor: pointer;
+      padding: 8px 20px;
+      border-radius: 8px;
+      transition: all 0.15s;
+
+      &:hover {
+        background: rgba($primary, 0.06);
+      }
+    }
+  }
+
+  // ── Grid ─────────────────────────────────────────────────────────────
+
+  .business-list-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
+
+    @media screen and (max-width: 768px) {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+  }
+}

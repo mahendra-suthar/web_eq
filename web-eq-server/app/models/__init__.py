@@ -9,6 +9,7 @@ from app.models.employee import Employee
 from app.models.service import Service
 from app.models.queue import Queue, QueueUser, QueueService, QueueUserService
 from app.models.role import Role, UserRoles
+from app.models.review import Review
 
 __all__ = [
     "BaseModel",
@@ -25,6 +26,7 @@ __all__ = [
     "QueueService",
     "QueueUserService",
     "Role",
-    "UserRoles"
+    "UserRoles",
+    "Review"
 ]
 

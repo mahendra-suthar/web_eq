@@ -1,0 +1,60 @@
+@use "../../variables.scss" as *;
+
+.customer-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #E0F2F1;
+
+  .customer-appbar {
+    background-color: white;
+    color: $text-primary;
+    border-bottom: 1px solid #e0e0e0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .customer-toolbar {
+    padding: 0;
+    min-height: 64px;
+
+    .customer-toolbar-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      width: 100%;
+      padding: 0 24px;
+    }
+
+    .customer-brand {
+      font-weight: 700;
+      color: $primary;
+      font-size: 24px;
+      font-family: "Noto Sans Hebrew", serif;
+      cursor: pointer;
+      margin: 0;
+    }
+  }
+
+  .customer-main {
+    flex: 1;
+    display: block;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .customer-footer {
+    background-color: white;
+    border-top: 1px solid #e0e0e0;
+    padding: 24px 0;
+
+    .customer-footer-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      text-align: center;
+      padding: 0 24px;
+    }
+  }
+}

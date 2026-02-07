@@ -35,3 +35,10 @@ else:
     MOBILE_TOKEN_EXPIRE_DAYS = None  # Never expires by default for mobile
 
 WEB_TOKEN_EXPIRE_MINUTES = int(os.getenv("WEB_TOKEN_EXPIRE_MINUTES", "60"))
+
+# Redis configuration
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+# Queue configuration
+MAX_QUEUE_SIZE = int(os.getenv("MAX_QUEUE_SIZE", "50"))
+AVG_WAIT_TIME_PER_USER = int(os.getenv("AVG_WAIT_TIME_PER_USER", "5"))  # minutes

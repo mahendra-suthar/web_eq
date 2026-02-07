@@ -1,10 +1,17 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, contains_eager
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import func, case, and_, true
 from uuid import UUID
-from typing import Optional
+from typing import Optional, List, Tuple, Dict
+from collections import defaultdict
 
 from app.models.business import Business
-from app.core.constants import BUSINESS_DRAFT, BUSINESS_REGISTERED
+from app.models.queue import QueueService as QueueServiceModel
+from app.models.service import Service
+from app.models.address import Address, EntityType
+from app.models.schedule import Schedule, ScheduleEntityType
+from app.models.review import Review
+from app.core.constants import BUSINESS_DRAFT, BUSINESS_REGISTERED, BUSINESS_ACTIVE
 from app.schemas.business import BusinessBasicInfoInput
 
 
@@ -73,5 +80,92 @@ class BusinessService:
         except Exception:
             self.db.rollback()
             raise
+
+    def get_businesses_with_filters(self, category_id: Optional[UUID] = None, service_ids: Optional[List[UUID]] = None) -> List[Business]:
+        query = self.db.query(Business).options(joinedload(Business.category)).distinct()
+        
+        if category_id:
+            query = query.filter(Business.category_id == category_id)
+        
+        if service_ids:
+            query = (
+                query.join(QueueServiceModel, Business.uuid == QueueServiceModel.business_id)
+                .filter(QueueServiceModel.service_id.in_(service_ids))
+            )
+
+        return query.all()
+
+    def get_businesses_with_services_and_addresses(
+        self, 
+        category_id: Optional[UUID] = None, 
+        service_ids: Optional[List[UUID]] = None
+    ) -> List[Tuple[Business, Optional[QueueServiceModel], Optional[Service], Optional[Address]]]:
+        query = (
+            self.db.query(Business, QueueServiceModel, Service, Address)
+            .outerjoin(QueueServiceModel, Business.uuid == QueueServiceModel.business_id)
+            .outerjoin(Service, QueueServiceModel.service_id == Service.uuid)
+            .outerjoin(
+                Address,
+                and_(
+                    Address.entity_id == Business.uuid,
+                    Address.entity_type == EntityType.BUSINESS
+                )
+            )
+            .options(joinedload(Business.category))
+        )
+        
+        if category_id:
+            query = query.filter(Business.category_id == category_id)
+        
+        if service_ids:
+            query = query.filter(QueueServiceModel.service_id.in_(service_ids))
+        
+        return query.distinct().all()
+
+    def get_schedules_by_businesses(self, business_ids: List[UUID], day_of_week: int) -> Dict[UUID, Optional[Schedule]]:
+        """Get today's schedule for multiple businesses in a single query"""
+        if not business_ids:
+            return {}
+
+        schedules = (
+            self.db.query(Schedule)
+            .filter(
+                Schedule.entity_type == ScheduleEntityType.BUSINESS,
+                Schedule.entity_id.in_(business_ids),
+                Schedule.day_of_week == day_of_week
+            )
+            .all()
+        )
+
+        schedule_map: Dict[UUID, Optional[Schedule]] = {bid: None for bid in business_ids}
+        for schedule in schedules:
+            schedule_map[schedule.entity_id] = schedule
+
+        return schedule_map
+
+    def get_review_stats_by_businesses(self, business_ids: List[UUID]) -> Dict[UUID, Tuple[float, int]]:
+        """Get (avg_rating, review_count) for multiple businesses in a single query"""
+        if not business_ids:
+            return {}
+
+        results = (
+            self.db.query(
+                Review.business_id,
+                func.coalesce(func.avg(Review.rating), 0.0),
+                func.count(Review.uuid)
+            )
+            .filter(Review.business_id.in_(business_ids))
+            .group_by(Review.business_id)
+            .all()
+        )
+
+        stats: Dict[UUID, Tuple[float, int]] = {}
+        for business_id, avg_rating, count in results:
+            stats[business_id] = (round(float(avg_rating), 1), int(count))
+
+        return stats
+
+    def get_business_by_id(self, business_id: UUID) -> Optional[Business]:
+        return self.db.query(Business).options(joinedload(Business.category)).filter(Business.uuid == business_id).first()
 
 

@@ -1,7 +1,7 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from typing import List, Tuple, cast
+from typing import List, Tuple, cast, Optional
 from uuid import UUID
 
 from app.models.queue import Queue, QueueService as QueueServiceModel, QueueUser
@@ -92,11 +92,7 @@ class QueueService:
         except Exception:
             raise
 
-    def get_business_services(self, business_id: UUID) -> List[Tuple[QueueServiceModel, Service]]:  # type: ignore
-        """
-        Get all services for a business by joining queue_services with services table.
-        Returns a list of tuples (QueueService, Service) for each business service.
-        """
+    def get_business_services(self, business_id: UUID, service_ids: Optional[List[UUID]] = None) -> List[Tuple[QueueServiceModel, Service]]:  # type: ignore
         try:
             result = (
                 self.db.query(QueueServiceModel, Service)
@@ -105,6 +101,31 @@ class QueueService:
                 .all()
             )
             return cast(List[Tuple[QueueServiceModel, Service]], result)
+        except SQLAlchemyError:
+            raise
+        except Exception:
+            raise
+
+    def get_businesses_services(self, business_ids: List[UUID]) -> dict[UUID, List[Tuple[QueueServiceModel, Service]]]:  # type: ignore
+        try:
+            if not business_ids:
+                return {}
+            
+            result = (
+                self.db.query(QueueServiceModel, Service)
+                .join(Service, QueueServiceModel.service_id == Service.uuid)
+                .filter(QueueServiceModel.business_id.in_(business_ids))
+                .all()
+            )
+            
+            services_by_business: dict[UUID, List[Tuple[QueueServiceModel, Service]]] = {}
+            for queue_service, service in result:
+                business_id = queue_service.business_id
+                if business_id not in services_by_business:
+                    services_by_business[business_id] = []
+                services_by_business[business_id].append((queue_service, service))
+            
+            return services_by_business
         except SQLAlchemyError:
             raise
         except Exception:

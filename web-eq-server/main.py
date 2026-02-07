@@ -12,7 +12,7 @@ from app.models import (
     User, UserLogin, Business, Category,
     Address, Schedule, Employee, Service,
     Queue, QueueUser, QueueService, QueueUserService,
-    Role, UserRoles
+    Role, UserRoles, Review
 )  # noqa: F401
 
 # Create the database schema
@@ -30,6 +30,8 @@ origins = [
     "http://localhost:3001",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
 ]
 
 app.add_middleware(

@@ -12,7 +12,8 @@ export default function SendOTP() {
   const { t } = useLayoutContext();
   const navigate = useNavigate();
   const { ROUTERS_PATH } = RouterConstant;
-  const [userType, setUserType] = useState<string>("Customer");
+  // Always use "business" user type for web-eq-client
+  const userType = "Business";
   const [phone, setPhone] = useState<PhoneNumber>({
     countryCode: "+91",
     localNumber: ""
@@ -42,9 +43,8 @@ export default function SendOTP() {
     setError("");
 
     try {
-      const userTypeLower = userType.toLowerCase();
-      await otpService.sendOTP(phone.countryCode, phone.localNumber, userTypeLower);
-      navigate(ROUTERS_PATH.VERIFYOTP, { state: { phone: phone, userType: userType } });
+      await otpService.sendOTP(phone.countryCode, phone.localNumber, "business");
+      navigate(ROUTERS_PATH.VERIFYOTP, { state: { phone: phone, userType: "Business" } });
     } catch (err: any) {
       let errorMessage = t("errorSendingCode");
       if (err?.response?.data?.detail?.error_code) {
@@ -86,35 +86,6 @@ export default function SendOTP() {
 
       <form className="send-otp-form" onSubmit={handleSendOTP}>
         <div className="send-otp-form-fields">
-          {/* Account Type Selection - Radio Buttons */}
-          <div className="user-type-radio-container">
-            <p className="user-type-label">{t("selectAccountType")}</p>
-            <div className="user-type-radio-group">
-              <div className="user-type-radio-item">
-                <input
-                  type="radio"
-                  id="user-type-customer"
-                  name="userType"
-                  value="Customer"
-                  checked={userType === "Customer"}
-                  onChange={(e) => setUserType(e.target.value)}
-                />
-                <label htmlFor="user-type-customer">{t("customer")}</label>
-              </div>
-              <div className="user-type-radio-item">
-                <input
-                  type="radio"
-                  id="user-type-business"
-                  name="userType"
-                  value="Business"
-                  checked={userType === "Business"}
-                  onChange={(e) => setUserType(e.target.value)}
-                />
-                <label htmlFor="user-type-business">{t("business")}</label>
-              </div>
-            </div>
-          </div>
-
           {/* Phone Input */}
           <div className="phone-input-wrapper">
             <label className="phone-input-label">{t("phoneNumber")}</label>
@@ -147,7 +118,7 @@ export default function SendOTP() {
             text={t("sendOtp")}
             color="blue"
             onClick={handleSendOTP}
-            disabled={!userType || !isPhoneValid || loading}
+            disabled={!isPhoneValid || loading}
             loading={loading}
           />
         </div>

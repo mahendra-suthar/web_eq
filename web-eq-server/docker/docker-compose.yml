@@ -18,6 +18,22 @@ services:
     networks:
       - app-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: web-eq-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    command: redis-server --appendonly yes
+
   api:
     build:
       context: ..
@@ -29,10 +45,13 @@ services:
       - DB_HOST=postgres_db
       - DB_PORT=5432
       - DB_NAME=${DB_NAME:-web_eq_db}
+      - REDIS_URL=redis://redis:6379
     ports:
       - "8008:8008"
     depends_on:
       postgres_db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - app-network
@@ -45,4 +64,5 @@ networks:
 
 volumes:
   postgres_data:
+  redis_data:
 

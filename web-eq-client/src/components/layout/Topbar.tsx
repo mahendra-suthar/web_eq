@@ -4,13 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { RouterConstant } from '../../routers/index';
 import { useUserStore } from '../../utils/userStore';
 import { ProfileService } from '../../services/profile/profile.service';
+import { ProfileType } from '../../utils/constants';
 
 const Topbar = () => {
     const { t } = useTranslation();
     const location = useLocation();
     const navigate = useNavigate();
     const { ROUTERS_PATH } = RouterConstant;
-    const { userInfo, resetUser } = useUserStore();
+    const { userInfo, resetUser, profile, setProfile } = useUserStore();
+    const profileService = useMemo(() => new ProfileService(), []);
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -32,7 +34,6 @@ const Topbar = () => {
         return t("dashboard");
     }, [location.pathname, t, ROUTERS_PATH]);
 
-    // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -46,22 +47,24 @@ const Topbar = () => {
         };
     }, []);
 
-    // Close dropdown when route changes
     useEffect(() => {
         setShowDropdown(false);
     }, [location.pathname]);
 
     const handleProfileClick = async () => {
         try {
-            const profileService = new ProfileService();
-            const profile = await profileService.getProfile();
+            let currentProfile = profile;
+            if (!currentProfile) {
+                currentProfile = await profileService.getProfile();
+                setProfile(currentProfile);
+            }
             
-            if (profile.profile_type === "BUSINESS") {
+            if (currentProfile.profile_type === ProfileType.BUSINESS) {
                 navigate(ROUTERS_PATH.BUSINESSPROFILE);
-            } else if (profile.profile_type === "EMPLOYEE") {
+            } else if (currentProfile.profile_type === ProfileType.EMPLOYEE) {
                 navigate(ROUTERS_PATH.EMPLOYEEPROFILE);
-            } else if (profile.profile_type === "CUSTOMER") {
-                navigate(ROUTERS_PATH.CUSTOMERPROFILE);
+            } else if (currentProfile.profile_type === ProfileType.CUSTOMER) {
+                console.warn("Customer profile type detected. Please use the customer application.");
             }
         } catch (error) {
             console.error("Failed to fetch profile:", error);
@@ -78,7 +81,6 @@ const Topbar = () => {
     };
 
     const handleSettings = () => {
-        // Navigate to settings page (you can add a settings route later)
         console.log("Settings clicked");
         setShowDropdown(false);
     };

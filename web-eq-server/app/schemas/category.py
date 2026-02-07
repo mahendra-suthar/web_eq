@@ -1,7 +1,5 @@
-from typing import Optional, cast
-
-from pydantic import BaseModel
-
+from typing import Optional, cast, List, Dict
+from pydantic import BaseModel, Field
 from app.models.category import Category
 
 
@@ -26,3 +24,20 @@ class CategoryData(BaseModel):
             parent_category_id=str(parent_category_id) if parent_category_id is not None else None,
         )
 
+
+class CategoryWithServicesData(BaseModel):
+    uuid: str
+    name: str
+    description: Optional[str] = None
+    image: Optional[str] = None
+    services: List[Dict[str, str]] = Field(default_factory=list)
+
+    @classmethod
+    def from_category_with_services(cls, category: Category, services: List[Dict[str, str]]) -> "CategoryWithServicesData":
+        return cls(
+            uuid=str(category.uuid),
+            name=str(category.name),
+            description=cast(Optional[str], getattr(category, "description", None)),
+            image=cast(Optional[str], getattr(category, "image", None)),
+            services=services,
+        )

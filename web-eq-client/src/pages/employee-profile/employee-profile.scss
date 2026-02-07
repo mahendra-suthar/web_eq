@@ -1,5 +1,5 @@
 // Reuse business profile styles
-@import '../business-profile/business-profile.scss';
+@use '../business-profile/business-profile.scss' as *;
 
 .employee-profile-page {
   // Same styles as business-profile-page

@@ -1,0 +1,198 @@
+@use "../../variables.scss" as *;
+
+.business-card {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+  }
+
+  .business-card-image {
+    position: relative;
+    width: 100%;
+    height: 180px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .business-card-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 48px;
+      font-family: "Noto Sans Hebrew", serif;
+    }
+
+    // Gradient overlay at bottom for text readability
+    .business-card-image-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.3) 50%, transparent 100%);
+      pointer-events: none;
+    }
+
+    // Business name at bottom left
+    .business-card-name-overlay {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      color: white;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 16px;
+      font-weight: 600;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+      z-index: 2;
+      max-width: calc(100% - 100px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    // Rating at bottom right
+    .business-card-rating-overlay {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: white;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 15px;
+      font-weight: 600;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+      z-index: 2;
+
+      .business-card-star {
+        color: #4caf50;
+        font-size: 16px;
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+      }
+
+      .business-card-review-count {
+        font-size: 12px;
+        font-weight: 400;
+        opacity: 0.9;
+      }
+    }
+  }
+
+  .business-card-content {
+    padding: 10px 14px 14px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    // Open/Closed Status Row
+    .business-card-status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .business-card-status-badge {
+        font-family: "Noto Sans Hebrew", serif;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        flex-shrink: 0;
+
+        &.open {
+          background-color: #e8f5e9;
+          color: #2e7d32;
+        }
+
+        &.closed {
+          background-color: #ffebee;
+          color: #c62828;
+        }
+      }
+
+      .business-card-status-time {
+        color: $text-secondary;
+        font-family: "Noto Sans Hebrew", serif;
+        font-size: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+
+    // Services and Price Row
+    .business-card-services-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+
+      .business-card-services {
+        color: $text-secondary;
+        font-family: "Noto Sans Hebrew", serif;
+        font-size: 13px;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .business-card-price {
+        color: $text-secondary;
+        font-family: "Noto Sans Hebrew", serif;
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+    }
+
+    // Location and Distance Row
+    .business-card-location-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+
+      .business-card-location {
+        color: $text-secondary;
+        font-family: "Noto Sans Hebrew", serif;
+        font-size: 13px;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .business-card-distance {
+        color: $text-secondary;
+        font-family: "Noto Sans Hebrew", serif;
+        font-size: 13px;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+    }
+  }
+}

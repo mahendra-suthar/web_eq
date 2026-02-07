@@ -1,47 +1,90 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { QueueService, QueueUserData } from '../../services/queue/queue.service';
+import { ProfileService } from '../../services/profile/profile.service';
+import { useUserStore } from '../../utils/userStore';
 import { getInitials, getAvatarBackground } from '../../utils/utils';
+import { QueueUserStatus, DEFAULT_PAGE_LIMIT, DEFAULT_PAGE, DEFAULT_DEBOUNCE_DELAY_MS, ProfileType } from '../../utils/constants';
 import Pagination from '../../components/pagination';
 import "./queue-users.scss";
 
 const QueueUsers = () => {
     const { t } = useTranslation();
     const queueService = useMemo(() => new QueueService(), []);
+    const profileService = useMemo(() => new ProfileService(), []);
+    const { profile, setProfile, getBusinessId, getEmployeeId } = useUserStore();
     
     const [queueUsers, setQueueUsers] = useState<QueueUserData[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string>("");
     const [searchTerm, setSearchTerm] = useState<string>("");
-    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [currentPage, setCurrentPage] = useState<number>(DEFAULT_PAGE);
     const [totalPages, setTotalPages] = useState<number>(1);
-    const [limit] = useState<number>(10);
+    const [limit] = useState<number>(DEFAULT_PAGE_LIMIT);
     const [debouncedSearch, setDebouncedSearch] = useState<string>("");
     
-    // Filters
-    const [businessId, setBusinessId] = useState<string>("");
+    const businessId = getBusinessId() || "";
+    const defaultEmployeeId = getEmployeeId() || "";
     const [queueId, setQueueId] = useState<string>("");
-    const [employeeId, setEmployeeId] = useState<string>("");
+    const [employeeId, setEmployeeId] = useState<string>(defaultEmployeeId);
+    const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
+    
+    useEffect(() => {
+        if (defaultEmployeeId) {
+            setEmployeeId(defaultEmployeeId);
+        }
+    }, [defaultEmployeeId]);
+    
+    const isEmployee = !!defaultEmployeeId;
 
-    // Debounce search input
+    useEffect(() => {
+        const fetchProfileIfNeeded = async () => {
+            if (profile) {
+                return;
+            }
+
+            try {
+                setLoadingProfile(true);
+                const fetchedProfile = await profileService.getProfile();
+                setProfile(fetchedProfile);
+                
+                if (fetchedProfile.profile_type === ProfileType.BUSINESS && !fetchedProfile.business?.uuid) {
+                    setError(t("noBusinessFound") || "No business found for current user");
+                } else if (fetchedProfile.profile_type === ProfileType.EMPLOYEE && !fetchedProfile.employee?.business_id) {
+                    setError(t("noBusinessFound") || "No business found for current user");
+                }
+            } catch (err: any) {
+                console.error("Failed to fetch profile:", err);
+                setError(t("failedToLoadBusinessId") || "Failed to load business information");
+            } finally {
+                setLoadingProfile(false);
+            }
+        };
+
+        fetchProfileIfNeeded();
+    }, [profile, profileService, setProfile, t]);
+
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedSearch(searchTerm);
-            setCurrentPage(1); // Reset to first page when search changes
-        }, 500);
+            setCurrentPage(DEFAULT_PAGE);
+        }, DEFAULT_DEBOUNCE_DELAY_MS);
 
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    // Fetch queue users
     useEffect(() => {
+        if (loadingProfile || !businessId) {
+            return;
+        }
+
         const fetchQueueUsers = async () => {
             setLoading(true);
             setError("");
 
             try {
                 const data = await queueService.getQueueUsers(
-                    businessId || undefined,
+                    businessId,
                     queueId || undefined,
                     employeeId || undefined,
                     currentPage,
@@ -49,11 +92,10 @@ const QueueUsers = () => {
                     debouncedSearch || undefined
                 );
                 setQueueUsers(data);
-                // Estimate total pages based on returned data
                 if (data.length < limit) {
                     setTotalPages(currentPage);
                 } else {
-                    setTotalPages(currentPage + 1); // Estimate - adjust when backend returns total
+                    setTotalPages(currentPage + 1);
                 }
             } catch (err: any) {
                 console.error("Failed to fetch queue users:", err);
@@ -75,9 +117,8 @@ const QueueUsers = () => {
         };
 
         fetchQueueUsers();
-    }, [businessId, queueId, employeeId, currentPage, limit, debouncedSearch, queueService, t]);
+    }, [businessId, queueId, employeeId, currentPage, limit, debouncedSearch, queueService, t, loadingProfile]);
 
-    // Handle pagination
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
     };
@@ -92,28 +133,20 @@ const QueueUsers = () => {
     };
 
     const getStatusBadge = (status?: number) => {
-        // Queue user status constants
-        const QUEUE_USER_REGISTERED = 1;
-        const QUEUE_USER_IN_PROGRESS = 2;
-        const QUEUE_USER_COMPLETED = 3;
-        const QUEUE_USER_FAILED = 4;
-        const QUEUE_USER_CANCELLED = 5;
-        const QUEUE_USER_PRIORITY_REQUESTED = 6;
-
         if (!status) return <span className="status-badge unknown">{t("unknown")}</span>;
         
         switch (status) {
-            case QUEUE_USER_REGISTERED:
+            case QueueUserStatus.REGISTERED:
                 return <span className="status-badge registered">{t("registered")}</span>;
-            case QUEUE_USER_IN_PROGRESS:
+            case QueueUserStatus.IN_PROGRESS:
                 return <span className="status-badge in-progress">{t("inProgress")}</span>;
-            case QUEUE_USER_COMPLETED:
+            case QueueUserStatus.COMPLETED:
                 return <span className="status-badge completed">{t("completed")}</span>;
-            case QUEUE_USER_FAILED:
+            case QueueUserStatus.FAILED:
                 return <span className="status-badge failed">{t("failed")}</span>;
-            case QUEUE_USER_CANCELLED:
+            case QueueUserStatus.CANCELLED:
                 return <span className="status-badge cancelled">{t("cancelled")}</span>;
-            case QUEUE_USER_PRIORITY_REQUESTED:
+            case QueueUserStatus.PRIORITY_REQUESTED:
                 return <span className="status-badge priority">{t("priority")}</span>;
             default:
                 return <span className="status-badge unknown">{t("unknown")}</span>;
@@ -147,23 +180,12 @@ const QueueUsers = () => {
                         <input
                             type="text"
                             className="filter-input"
-                            placeholder={t("businessId") || "Business ID (optional)"}
-                            value={businessId}
-                            onChange={(e) => {
-                                setBusinessId(e.target.value);
-                                setCurrentPage(1);
-                            }}
-                            disabled={loading}
-                        />
-                        <input
-                            type="text"
-                            className="filter-input"
                             placeholder={t("queueId") || "Queue ID (optional)"}
                             value={queueId}
-                            onChange={(e) => {
-                                setQueueId(e.target.value);
-                                setCurrentPage(1);
-                            }}
+                                onChange={(e) => {
+                                    setQueueId(e.target.value);
+                                    setCurrentPage(DEFAULT_PAGE);
+                                }}
                             disabled={loading}
                         />
                         <input
@@ -173,9 +195,10 @@ const QueueUsers = () => {
                             value={employeeId}
                             onChange={(e) => {
                                 setEmployeeId(e.target.value);
-                                setCurrentPage(1);
+                                setCurrentPage(DEFAULT_PAGE);
                             }}
-                            disabled={loading}
+                            disabled={loading || isEmployee}
+                            title={isEmployee ? "Employee ID is auto-set for employees" : ""}
                         />
                     </div>
                 </div>
@@ -187,7 +210,11 @@ const QueueUsers = () => {
                 )}
 
                 <div className="data-table-container">
-                    {loading ? (
+                    {loadingProfile ? (
+                        <div className="loading-state" style={{ padding: "2rem", textAlign: "center" }}>
+                            {t("loading")}...
+                        </div>
+                    ) : loading ? (
                         <div className="loading-state" style={{ padding: "2rem", textAlign: "center" }}>
                             {t("loading")}...
                         </div>
@@ -203,6 +230,7 @@ const QueueUsers = () => {
                             <thead>
                                 <tr>
                                     <th>{t("user")}</th>
+                                    <th>{t("phoneNumber") || "Phone Number"}</th>
                                     <th>{t("tokenNumber")}</th>
                                     <th>{t("queueDate")}</th>
                                     <th>{t("enqueueTime")}</th>
@@ -224,13 +252,15 @@ const QueueUsers = () => {
                                                 </div>
                                                 <div className="user-info">
                                                     <div className="user-name">{queueUser.user.full_name || t("notAvailable")}</div>
-                                                    <div className="user-details">
-                                                        {queueUser.user.email && <span>{queueUser.user.email}</span>}
-                                                        <span>{queueUser.user.country_code} {queueUser.user.phone_number}</span>
-                                                    </div>
+                                                    {queueUser.user.email && (
+                                                        <div className="user-details">
+                                                            <span>{queueUser.user.email}</span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </td>
+                                        <td>{queueUser.user.country_code} {queueUser.user.phone_number}</td>
                                         <td>{queueUser.token_number || t("notAvailable")}</td>
                                         <td>{queueUser.queue_date || t("notAvailable")}</td>
                                         <td>{formatDate(queueUser.enqueue_time)}</td>

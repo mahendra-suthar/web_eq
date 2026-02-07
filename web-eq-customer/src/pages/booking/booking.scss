@@ -1,0 +1,539 @@
+@use "../../variables.scss" as *;
+
+.booking-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  min-height: 60vh;
+
+  &.booking-page-confirm {
+    max-width: 600px;
+  }
+
+  .booking-page-title {
+    color: $primary-dark;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 32px;
+    font-weight: 700;
+    margin: 0 0 32px 0;
+  }
+
+  .booking-section {
+    margin-bottom: 32px;
+
+    .booking-section-title {
+      color: $primary-dark;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0 0 16px 0;
+    }
+
+    .booking-empty-text {
+      color: $text-secondary;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 16px;
+      margin: 0 0 24px 0;
+    }
+  }
+
+  .booking-divider {
+    height: 1px;
+    background: #e0e0e0;
+    margin: 32px 0;
+  }
+
+  .booking-services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+
+    @media screen and (max-width: 768px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .booking-service-card {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+    .booking-service-card-name {
+      color: $primary-dark;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0 0 8px 0;
+    }
+
+    .booking-service-card-desc {
+      color: $text-secondary;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 14px;
+      margin: 0 0 12px 0;
+    }
+
+    .booking-service-card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+
+      span {
+        color: $text-secondary;
+        font-family: "Noto Sans Hebrew", serif;
+        font-size: 14px;
+      }
+
+      .booking-service-card-price {
+        color: $primary;
+        font-family: "Noto Sans Hebrew", serif;
+        font-size: 20px;
+        font-weight: 700;
+      }
+    }
+  }
+
+  .booking-dates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+
+    @media screen and (max-width: 768px) {
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    }
+  }
+
+  .booking-date-card {
+    background: white;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    &.selected {
+      border-color: $primary;
+      background-color: #e3f2fd;
+    }
+
+    .booking-date-day {
+      color: $primary-dark;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 20px;
+      font-weight: 400;
+      margin: 0 0 4px 0;
+    }
+
+    &.selected .booking-date-day {
+      font-weight: 600;
+    }
+
+    .booking-date-rest {
+      color: $text-secondary;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 14px;
+      margin: 0;
+    }
+  }
+
+  .booking-slots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+
+    @media screen and (max-width: 768px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .booking-slot-card {
+    background: white;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    &.selected {
+      border-color: $primary;
+      background-color: #e3f2fd;
+    }
+
+    .booking-slot-time,
+    .booking-slot-queue {
+      color: $primary-dark;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 20px;
+      font-weight: 400;
+      margin: 0 0 8px 0;
+    }
+
+    &.selected .booking-slot-time,
+    &.selected .booking-slot-queue {
+      font-weight: 600;
+    }
+
+    .booking-slot-service,
+    .booking-slot-details {
+      color: $text-secondary;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 14px;
+      margin: 0 0 4px 0;
+    }
+
+    .booking-slot-price {
+      color: $primary;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 20px;
+      font-weight: 700;
+      margin: 8px 0 0 0;
+    }
+  }
+
+  .booking-summary-card {
+    background: #e3f2fd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+
+    .booking-summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .booking-summary-label {
+      color: $primary-dark;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .booking-summary-amount {
+      color: $primary;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .booking-summary-details {
+      color: $text-secondary;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 14px;
+      margin: 0;
+    }
+  }
+
+  .booking-continue-button {
+    width: 100%;
+  }
+
+  .booking-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+    &.booking-card-total {
+      background: #e3f2fd;
+    }
+
+    .booking-card-title {
+      color: $primary-dark;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0 0 12px 0;
+    }
+
+    .booking-card-text {
+      color: $primary-dark;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 16px;
+      margin: 0 0 4px 0;
+    }
+
+    .booking-card-subtext {
+      color: $text-secondary;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 14px;
+      margin: 0;
+    }
+  }
+
+  .booking-service-item {
+    margin-bottom: 12px;
+
+    .booking-service-name {
+      color: $primary-dark;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 16px;
+      font-weight: 500;
+      margin: 0 0 4px 0;
+    }
+
+    .booking-service-details {
+      color: $text-secondary;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 14px;
+      margin: 0;
+    }
+  }
+
+  .booking-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .booking-total-label {
+    color: $primary-dark;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .booking-total-amount {
+    color: $primary;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .booking-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid #e0e0e0;
+  }
+
+  // Header with live status
+  .booking-header {
+    margin-bottom: 32px;
+    
+    .booking-business-name {
+      color: $text-secondary;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 16px;
+      margin: 8px 0 0 0;
+    }
+  }
+
+  .booking-ws-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-family: "Noto Sans Hebrew", serif;
+    padding: 4px 10px;
+    border-radius: 12px;
+    margin-top: 12px;
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    
+    &.connected {
+      background: #e8f5e9;
+      color: #2e7d32;
+      
+      .status-dot {
+        background: #4caf50;
+      }
+    }
+    
+    &.disconnected {
+      background: #fff3e0;
+      color: #ef6c00;
+      
+      .status-dot {
+        background: #ff9800;
+      }
+    }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  // Services summary
+  .booking-services-summary {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 14px;
+    color: $text-secondary;
+    
+    span:last-child {
+      font-weight: 600;
+      color: $primary;
+    }
+  }
+
+  // Section subtitle
+  .booking-section-subtitle {
+    color: $text-secondary;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 14px;
+    margin: -8px 0 16px 0;
+  }
+
+  // Loading and error states
+  .booking-loading-text,
+  .booking-loading {
+    color: $text-secondary;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 14px;
+    padding: 24px;
+    text-align: center;
+    background: #f5f5f5;
+    border-radius: 8px;
+  }
+
+  .booking-error {
+    background: #ffebee;
+    color: #c62828;
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-family: "Noto Sans Hebrew", serif;
+    
+    p {
+      margin: 0 0 12px 0;
+    }
+    
+    button {
+      margin-top: 8px;
+    }
+  }
+
+  // Enhanced slot card for real-time data
+  .booking-slot-card {
+    &.unavailable {
+      opacity: 0.6;
+      cursor: not-allowed;
+      
+      &:hover {
+        transform: none;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+    }
+
+    .booking-slot-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .booking-slot-status {
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      
+      &.available {
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+      
+      &.full {
+        background: #ffebee;
+        color: #c62828;
+      }
+    }
+
+    .booking-slot-details {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      
+      p {
+        display: flex;
+        justify-content: space-between;
+        margin: 0;
+        font-family: "Noto Sans Hebrew", serif;
+        font-size: 14px;
+        
+        .label {
+          color: $text-secondary;
+        }
+        
+        .value {
+          color: $primary-dark;
+          font-weight: 500;
+        }
+      }
+      
+      .booking-slot-position .value {
+        font-size: 18px;
+        font-weight: 700;
+        color: $primary;
+      }
+    }
+  }
+
+  // Refresh button
+  .booking-refresh-btn {
+    display: block;
+    margin: 16px auto 0;
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid #e0e0e0;
+    border-radius: 20px;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 13px;
+    color: $text-secondary;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      background: #f5f5f5;
+      border-color: $primary;
+      color: $primary;
+    }
+  }
+
+  // Summary with queue info
+  .booking-summary-queue {
+    color: $text-secondary;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 14px;
+    margin: 4px 0 0 0;
+  }
+}

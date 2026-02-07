@@ -50,7 +50,9 @@ class Business(Base):
 
     owner = relationship("User", foreign_keys=[owner_id], lazy="selectin")
     category = relationship("Category", foreign_keys=[category_id], lazy="selectin")
+    queue_services = relationship("QueueService", back_populates="business", lazy="selectin")
     parent_business = relationship("Business", remote_side=[uuid], foreign_keys=[parent_business_id], lazy="selectin")
+    reviews = relationship("Review", back_populates="business", lazy="noload")
 
     __table_args__ = (
         UniqueConstraint("owner_id", name="uq_business_owner"),

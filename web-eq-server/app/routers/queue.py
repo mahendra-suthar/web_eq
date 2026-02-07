@@ -1,12 +1,18 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from uuid import UUID
-from typing import List
+from typing import List, Optional
+from datetime import date
 
 from app.db.database import get_db
 from app.controllers.queue_controller import QueueController
-from app.schemas.queue import QueueCreate, QueueData, QueueUserData
+from app.schemas.queue import (
+    QueueCreate, QueueData, QueueUserData,
+    AvailableSlotData, BookingCreateInput, BookingData
+)
 from app.schemas.service import ServiceData
+from app.middleware.permissions import get_current_user
+from app.models.user import User
 
 
 queue_router = APIRouter()
@@ -46,5 +52,52 @@ async def get_queue_users(
         page=page,
         limit=limit,
         search=search,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Customer Booking Endpoints
+# ─────────────────────────────────────────────────────────────────────────────
+
+@queue_router.get("/available_slots/{business_id}", response_model=List[AvailableSlotData])
+async def get_available_slots(
+    business_id: UUID,
+    booking_date: date = Query(..., description="Date for booking (YYYY-MM-DD)"),
+    service_ids: Optional[List[UUID]] = Query(None, description="QueueService UUIDs to filter by"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get available booking slots for a business on a specific date.
+    
+    Returns all queues with their availability status, wait times, and capacity.
+    Optionally filter by service_ids to show only queues that offer those services.
+    """
+    controller = QueueController(db)
+    return await controller.get_available_slots(
+        business_id=business_id,
+        booking_date=booking_date,
+        service_ids=service_ids
+    )
+
+
+@queue_router.post("/book", response_model=BookingData)
+async def create_booking(
+    payload: BookingCreateInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Create a booking for the authenticated user.
+    
+    Requires authentication. After booking:
+    - User is added to the queue
+    - Token number is generated
+    - Position and wait time are calculated
+    - All connected WebSocket clients are notified
+    """
+    controller = QueueController(db)
+    return await controller.create_booking(
+        user_id=current_user.uuid,
+        data=payload
     )
 

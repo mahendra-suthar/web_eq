@@ -61,6 +61,9 @@ class QueueService(BaseModel):
     end_time = Column(Time, nullable=True)
     avg_service_time = Column(Integer, nullable=True)  # in minutes
 
+    business = relationship("Business", back_populates="queue_services", lazy="selectin")
+    service = relationship("Service", foreign_keys=[service_id], lazy="selectin")
+
 
 class QueueUserService(Base):
     """Junction table linking queue users to queue services"""

@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { useLayoutContext } from "../../../../layouts/general-layout";
 import Button from "../../../../components/button";
-import { DaySchedule } from "../../index";
+import { DaySchedule } from "../../../../utils/businessRegistrationStore";
 import { BusinessService, ScheduleInput } from "../../../../services/business/business.service";
-import { DayOfWeek, DAYS_IN_WEEK, DAYS_OF_WEEK } from "../../../../utils/scheduleConstants";
+import { DayOfWeek, DAYS_IN_WEEK, DAYS_OF_WEEK } from "../../../../utils/constants";
 import "./business-schedule.scss";
 
 interface BusinessScheduleProps {

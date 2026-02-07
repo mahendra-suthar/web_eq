@@ -1,0 +1,102 @@
+@use "../../variables.scss" as *;
+
+.landing-page {
+  width: 100%;
+}
+
+.landing-hero {
+  background: linear-gradient(135deg, #E0F2F1 0%, #B2DFDB 100%);
+  padding: 80px 24px;
+  text-align: center;
+
+  .landing-hero-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .landing-kicker {
+    color: $primary;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0 0 16px 0;
+  }
+
+  .landing-title {
+    color: $primary-dark;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 48px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0 0 24px 0;
+
+    @media screen and (max-width: 768px) {
+      font-size: 32px;
+    }
+  }
+
+  .landing-subtitle {
+    color: $text-secondary;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 18px;
+    line-height: 1.6;
+    margin: 0 0 32px 0;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+
+    @media screen and (max-width: 768px) {
+      font-size: 16px;
+    }
+  }
+
+  .landing-cta-row {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+}
+
+.landing-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 64px 24px;
+
+  .landing-section-header {
+    margin-bottom: 32px;
+    text-align: center;
+
+    .landing-section-title {
+      color: $primary-dark;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 32px;
+      font-weight: 700;
+      margin: 0 0 8px 0;
+
+      @media screen and (max-width: 768px) {
+        font-size: 24px;
+      }
+    }
+
+    .landing-section-subtitle {
+      color: $text-secondary;
+      font-family: "Noto Sans Hebrew", serif;
+      font-size: 16px;
+      margin: 0;
+    }
+  }
+
+  .landing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 24px;
+
+    @media screen and (max-width: 768px) {
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 16px;
+    }
+  }
+}

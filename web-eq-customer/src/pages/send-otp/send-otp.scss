@@ -1,0 +1,82 @@
+@use "../../variables.scss" as *;
+
+.send-otp-page {
+  background: #fff;
+  padding: 40px 32px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 420px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  margin: 0 auto;
+}
+
+.welcome-header {
+  text-align: center;
+  margin-bottom: 32px;
+
+  .welcome-title {
+    color: $primary;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 40px;
+    margin: 0 0 8px 0;
+  }
+
+  .welcome-subtitle {
+    color: #637381;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 20px;
+    margin: 0;
+  }
+}
+
+.send-otp-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.send-otp-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.phone-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+
+  .phone-input-label {
+    color: $primary-dark;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+    margin: 0 0 8px 0;
+  }
+}
+
+.send-otp-form-action {
+  display: flex;
+  justify-content: center;
+  padding-top: 32px;
+  margin-top: 8px;
+  
+  .button {
+    width: 100%;
+    padding: 14px 24px;
+    font-size: 16px;
+    font-weight: 600;
+    background-color: $primary;
+    border-radius: 8px;
+    text-transform: none;
+    color: white;
+    border: none;
+  }
+}

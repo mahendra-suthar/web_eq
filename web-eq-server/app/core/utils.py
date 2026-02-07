@@ -3,6 +3,8 @@ import hashlib
 from datetime import time as dt_time
 from typing import Optional
 
+from app.core.constants import TIME_FORMAT
+
 
 def hash_otp(otp: str) -> str:
     """Hash OTP using SHA256"""
@@ -20,4 +22,10 @@ def parse_time_string(time_str: Optional[str]) -> Optional[dt_time]:
     except (ValueError, IndexError):
         pass
     return None
+
+def format_time(t: Optional[dt_time]) -> Optional[str]:
+    """Format time object to 12-hour string like '09:00 AM'"""
+    if not t:
+        return None
+    return t.strftime(TIME_FORMAT)
 

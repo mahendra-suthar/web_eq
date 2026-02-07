@@ -1,5 +1,5 @@
 // Reuse employees page styles
-@import '../employees/employees.scss';
+@use '../employees/employees.scss' as *;
 
 .queue-users-page {
     .filter-row {

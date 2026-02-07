@@ -8,6 +8,7 @@ import Button from "../../components/button";
 import { OTPService } from "../../services/otp/otp.service";
 import { ProfileService } from "../../services/profile/profile.service";
 import { useUserStore } from "../../utils/userStore";
+import { OTP_COUNTDOWN_SECONDS, OTP_LENGTH, ProfileType, BusinessStatus, BUSINESS_REGISTRATION_MIN_STEP, BUSINESS_REGISTRATION_MAX_STEP } from "../../utils/constants";
 import "./verify-otp.scss";
 
 export default function VerifyOTP() {
@@ -15,17 +16,17 @@ export default function VerifyOTP() {
   const navigate = useNavigate();
   const location = useLocation();
   const { ROUTERS_PATH } = RouterConstant;
-  const { setUserInfo } = useUserStore();
+  const { setUserInfo, setProfile } = useUserStore();
 
   const phoneObj: PhoneNumber | undefined = location.state?.phone;
-  const userType = location.state?.userType || "";
+  const userType = "Business";
 
   const phone = phoneObj ? formatPhoneForDisplay(phoneObj) : "";
 
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [countdown, setCountdown] = useState(300);
+  const [countdown, setCountdown] = useState(OTP_COUNTDOWN_SECONDS);
   const [hasReachedLimit, setHasReachedLimit] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
 
@@ -53,11 +54,11 @@ export default function VerifyOTP() {
     setLoading(true);
     setError("");
 
-    if (otp.length !== 5) {
-      setError(t("incorrectCode"));
-      setLoading(false);
-      return;
-    }
+        if (otp.length !== OTP_LENGTH) {
+          setError(t("incorrectCode"));
+          setLoading(false);
+          return;
+        }
 
     if (!phoneObj) {
       setError(t("otpVerificationFailed"));
@@ -66,9 +67,8 @@ export default function VerifyOTP() {
     }
 
     try {
-      const userTypeLower = userType.toLowerCase();
       const response = await otpService.verifyOTP(
-        phoneObj.countryCode, phoneObj.localNumber, otp, userTypeLower, "web"
+        phoneObj.countryCode, phoneObj.localNumber, otp, "business", "web"
       );
 
       if (response.token && response.user) {
@@ -89,14 +89,15 @@ export default function VerifyOTP() {
         try {
           const profileService = new ProfileService();
           const profile = await profileService.getProfile();
-          const isBusinessUser = profile.profile_type === "BUSINESS" || userTypeLower === "business";
+          setProfile(profile);
+          const isBusinessUser = profile.profile_type === ProfileType.BUSINESS || true;
           if (isBusinessUser) {
             if (!profile.business) {
               navigate(ROUTERS_PATH.BUSINESSREGISTRATION, {
                 state: {
                   phone: phoneObj,
-                  userType: userType || "business",
-                  nextStep: 1,
+                  userType: "Business",
+                  nextStep: BUSINESS_REGISTRATION_MIN_STEP,
                 },
               });
               return;
@@ -104,12 +105,12 @@ export default function VerifyOTP() {
             
             const currentStep = profile.business.current_step;
             const businessStatus = Number(profile.business.status);
-            if (businessStatus === 1) {
+            if (businessStatus === BusinessStatus.REGISTERED) {
               navigate(ROUTERS_PATH.DASHBOARD);
               return;
             }
             
-            const nextStep = currentStep ? Math.min(Math.max(currentStep + 1, 1), 5) : 1;
+            const nextStep = currentStep ? Math.min(Math.max(currentStep + 1, BUSINESS_REGISTRATION_MIN_STEP), BUSINESS_REGISTRATION_MAX_STEP) : BUSINESS_REGISTRATION_MIN_STEP;
             navigate(ROUTERS_PATH.BUSINESSREGISTRATION, {
               state: {
                 phone: phoneObj,
@@ -122,14 +123,14 @@ export default function VerifyOTP() {
             return;
           }
         } catch (profileError) {
-          if (userTypeLower === "business") {
-            navigate(ROUTERS_PATH.BUSINESSREGISTRATION, {
-              state: {
-                phone: phoneObj,
-                userType: userType || "business",
-                nextStep: 1,
-              },
-            });
+          {
+              navigate(ROUTERS_PATH.BUSINESSREGISTRATION, {
+                state: {
+                  phone: phoneObj,
+                  userType: userType || "business",
+                  nextStep: BUSINESS_REGISTRATION_MIN_STEP,
+                },
+              });
             return;
           }
         }
@@ -179,16 +180,15 @@ export default function VerifyOTP() {
     setError("");
 
     try {
-      const userTypeLower = userType.toLowerCase();
       await otpService.sendOTP(
         phoneObj.countryCode,
         phoneObj.localNumber,
-        userTypeLower
+        "business"
       );
 
-      setCountdown(300);
-      setOtp("");
-      setHasReachedLimit(false);
+          setCountdown(OTP_COUNTDOWN_SECONDS);
+          setOtp("");
+          setHasReachedLimit(false);
     } catch (err: any) {
       let errorMessage = t("errorSendingCode");
 
@@ -227,7 +227,7 @@ export default function VerifyOTP() {
     if (error) {
       setError("");
     }
-    const numericValue = value.replace(/\D/g, '').slice(0, 5);
+    const numericValue = value.replace(/\D/g, '').slice(0, OTP_LENGTH);
     setOtp(numericValue);
   };
 
@@ -258,7 +258,7 @@ export default function VerifyOTP() {
           <div className="otp-input-section">
             <p className="otp-info-text">{t("enterReceivedCode")}</p>
             <OTPInput
-              maxLength={5}
+              maxLength={OTP_LENGTH}
               value={otp}
               onChange={handleOtpChange}
               containerClassName={`otp-container ${error ? 'invalid' : ''}`}
@@ -300,7 +300,7 @@ export default function VerifyOTP() {
             text={t("verify")}
             color="blue"
             onClick={handleVerifyOTP}
-            disabled={loading || otp.length !== 5 || hasReachedLimit}
+            disabled={loading || otp.length !== OTP_LENGTH || hasReachedLimit}
             loading={loading}
           />
         </div>
