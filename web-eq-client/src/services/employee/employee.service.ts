@@ -6,6 +6,8 @@ interface CreateEmployeesPayload {
     employees: {
         full_name: string;
         email?: string | null;
+        country_code?: string | null;
+        phone_number?: string | null;
         profile_picture?: string | null;
     }[];
 }
@@ -15,8 +17,17 @@ export interface EmployeeResponse {
     business_id: string;
     full_name: string;
     email?: string | null;
+    country_code?: string | null;
+    phone_number?: string | null;
     profile_picture?: string | null;
     is_verified: boolean;
+}
+
+export interface VerifyInvitationResponse {
+    token?: { access_token: string; token_type: string };
+    user?: unknown;
+    next_step?: string;
+    profile_type?: string;
 }
 
 export class EmployeeService extends HttpClient {
@@ -29,8 +40,12 @@ export class EmployeeService extends HttpClient {
             const payload: CreateEmployeesPayload = {
                 business_id: businessId,
                 employees: employees.map(emp => ({
-                    full_name: emp.full_name, email: emp.email || null, profile_picture: null
-                }))
+                    full_name: emp.full_name,
+                    email: emp.email || null,
+                    country_code: emp.country_code || null,
+                    phone_number: emp.phone_number || null,
+                    profile_picture: null,
+                })),
             };
             return await this.post<EmployeeData[]>(`/employee/create_employees`, payload);
         } catch (error: any) {
@@ -71,6 +86,23 @@ export class EmployeeService extends HttpClient {
             const customError: any = new Error(errorMessage);
             customError.errorCode = errorCode;
             throw customError;
+        }
+    }
+
+    /**
+     * Verify employee invitation code. After verification, backend returns next_step = dashboard.
+     */
+    async verifyInvitationCode(code: string): Promise<VerifyInvitationResponse> {
+        try {
+            return await this.post<VerifyInvitationResponse>("/auth/verify-invitation-code", {
+                code: code.trim(),
+            });
+        } catch (error: any) {
+            error.customMessage =
+                error?.response?.data?.detail?.message ||
+                error?.response?.data?.detail ||
+                "Failed to verify invitation code";
+            throw error;
         }
     }
 }

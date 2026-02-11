@@ -26,6 +26,13 @@ export interface BusinessInfo {
   status?: number | null;
 }
 
+export interface QueueInfo {
+  uuid: string;
+  business_id: string;
+  name: string;
+  status?: number | null;
+}
+
 export interface EmployeeInfo {
   uuid: string;
   business_id: string;
@@ -35,6 +42,8 @@ export interface EmployeeInfo {
   country_code?: string;
   profile_picture?: string;
   is_verified: boolean;
+  queue_id?: string | null;
+  queue?: QueueInfo | null;
 }
 
 export interface ScheduleData {
@@ -76,6 +85,15 @@ export interface UnifiedProfileResponse {
   schedule?: ScheduleInfo;
 }
 
+export interface BusinessProfileResponse {
+  owner: OwnerInfo;
+  business: BusinessInfo;
+  address?: AddressData;
+  schedule?: ScheduleInfo;
+  /** Present when profile is for an employee (employee with queue, business, address, schedule). */
+  employee?: EmployeeInfo;
+}
+
 export class ProfileService extends HttpClient {
   constructor() {
     super();
@@ -86,6 +104,16 @@ export class ProfileService extends HttpClient {
       return await this.get<UnifiedProfileResponse>("/auth/profile");
     } catch (error: any) {
       console.error("Failed to fetch profile:", error);
+      throw error;
+    }
+  }
+
+  /** Business profile: business details and owner. Used after next_step = dashboard. */
+  async getBusinessProfile(): Promise<BusinessProfileResponse> {
+    try {
+      return await this.get<BusinessProfileResponse>("/auth/profile/business");
+    } catch (error: any) {
+      console.error("Failed to fetch business profile:", error);
       throw error;
     }
   }

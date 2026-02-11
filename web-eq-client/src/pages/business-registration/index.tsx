@@ -9,6 +9,7 @@ import {
   useBusinessRegistrationStore,
   QueueData,
 } from "../../utils/businessRegistrationStore";
+import { useUserStore } from "../../utils/userStore";
 import { ProfileService } from "../../services/profile/profile.service";
 import BusinessBasicInfo from "./steps/business-basic-info";
 import BusinessSchedule from "./steps/business-schedule";
@@ -38,8 +39,9 @@ export default function BusinessRegistration() {
     setStep,
     setBusinessId,
     updateRegistrationData,
-    resetRegistration
+    resetRegistration,
   } = useBusinessRegistrationStore();
+  const { profile, setNextStep, setProfile } = useUserStore();
 
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
@@ -55,6 +57,37 @@ export default function BusinessRegistration() {
       updateRegistrationData({ category_id: categoryIdFromState });
     }
   }, [nextStepFromState, businessIdFromState, categoryIdFromState, setStep, setBusinessId, registrationData.category_id, updateRegistrationData]);
+
+  // Restore step and businessId from profile when returning after login (same or new device)
+  useEffect(() => {
+    const syncFromProfile = (
+      p: { business?: { uuid?: string; current_step?: number | null } },
+      storeStep: number,
+      storeBusinessId: string | null
+    ) => {
+      if (!p?.business?.uuid) return;
+      const stepFromBackend = p.business.current_step != null ? p.business.current_step + 1 : 1;
+      const stepToShow = Math.min(Math.max(stepFromBackend, 1), TOTAL_STEPS);
+      const resolvedStep = Math.max(storeStep, stepToShow);
+      if (!storeBusinessId && p.business.uuid) {
+        setBusinessId(p.business.uuid);
+      }
+      if (resolvedStep > storeStep) {
+        setStep(resolvedStep);
+      }
+    };
+
+    const store = useBusinessRegistrationStore.getState();
+    if (profile?.business) {
+      syncFromProfile(profile, store.currentStep, store.businessId);
+      return;
+    }
+    const profileService = new ProfileService();
+    profileService.getBusinessProfile().then((p) => {
+      const s = useBusinessRegistrationStore.getState();
+      syncFromProfile(p, s.currentStep, s.businessId);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const fetchCategoryId = async () => {
@@ -115,16 +148,22 @@ export default function BusinessRegistration() {
     setError("");
 
     try {
-      if (businessId) {
-        toast.success("Business registered successfully!");
-        resetRegistration();
-        navigate(ROUTERS_PATH.DASHBOARD);
-      } else {
+      if (!businessId) {
         toast.error("Business ID is missing. Please try again.");
         setError(t("businessRegistrationFailed"));
+        return;
       }
+
+      const profileService = new ProfileService();
+      const profile = await profileService.getProfile();
+      setProfile(profile);
+      setNextStep("dashboard");
+      resetRegistration();
+      toast.success("Business registered successfully!");
+      navigate(ROUTERS_PATH.DASHBOARD);
     } catch (err: any) {
       setError(err?.message || t("businessRegistrationFailed"));
+      toast.error(err?.message || t("businessRegistrationFailed"));
     } finally {
       setLoading(false);
     }

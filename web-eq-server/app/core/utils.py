@@ -1,9 +1,28 @@
 import secrets
 import hashlib
-from datetime import time as dt_time
+from datetime import datetime, time as dt_time, timezone
 from typing import Optional
 
 from app.core.constants import TIME_FORMAT
+
+ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def now_utc() -> datetime:
+    """Return current UTC time (timezone-aware)."""
+    return datetime.now(timezone.utc)
+    
+
+def generate_invitation_code(length: int = 8, expires_in_hours: Optional[int] = 48) -> str:
+    """Generate a random invitation code (no ambiguous chars: 0, 1, I, L, O).
+    expires_in_hours is for API consistency; callers can use it when storing/validating expiry.
+    """
+    return "".join(secrets.choice(ALPHABET) for _ in range(length))
+
+
+def generate_otp(length: int = 5) -> str:
+    """Generate a random numeric OTP of specified length"""
+    return ''.join(str(secrets.randbelow(10)) for _ in range(length))
 
 
 def hash_otp(otp: str) -> str:

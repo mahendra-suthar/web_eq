@@ -6,7 +6,8 @@ from uuid import UUID
 from app.db.database import get_db
 from app.controllers.review_controller import ReviewController
 from app.schemas.review import ReviewCreateInput, ReviewData, BusinessReviewSummary
-
+from app.middleware.permissions import get_current_user
+from app.schemas.user import UserData
 
 review_router = APIRouter()
 
@@ -14,7 +15,7 @@ review_router = APIRouter()
 @review_router.post("/create_review", response_model=ReviewData)
 async def create_review(
     payload: ReviewCreateInput,
-    current_user: UserData = Depends(get_current_user)
+    current_user: UserData = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> ReviewData:
     controller: ReviewController = ReviewController(db)

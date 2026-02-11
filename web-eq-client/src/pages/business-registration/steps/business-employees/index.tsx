@@ -30,10 +30,12 @@ export default function BusinessEmployees({
     return new Map(initialData?.map(e => [e.uuid, e]) || []);
   }, [initialData]);
 
-  const [errors, setErrors] = useState<{ [key: number]: { full_name?: string; email?: string; profile_picture?: string } }>({});
+  const [errors, setErrors] = useState<{
+    [key: number]: { full_name?: string; email?: string; phone_number?: string; profile_picture?: string };
+  }>({});
 
   const addEmployee = () => {
-    setEmployees([...employees, { full_name: "", email: "", preview: "" }]);
+    setEmployees([...employees, { full_name: "", email: "", country_code: "+91", phone_number: "", preview: "" }]);
   };
 
   const removeEmployee = (index: number) => {
@@ -73,7 +75,7 @@ export default function BusinessEmployees({
     let isValid = true;
 
     employees.forEach((emp, index) => {
-      const empErrors: { full_name?: string; email?: string; profile_picture?: string } = {};
+      const empErrors: { full_name?: string; email?: string; phone_number?: string; profile_picture?: string } = {};
 
       if (!emp.full_name || !emp.full_name.trim()) {
         empErrors.full_name = t("enterEmployeeName");
@@ -83,6 +85,14 @@ export default function BusinessEmployees({
       if (emp.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emp.email)) {
         empErrors.email = t("emailInvalid");
         isValid = false;
+      }
+
+      if (emp.phone_number && emp.phone_number.trim()) {
+        const digits = emp.phone_number.replace(/\D/g, "");
+        if (digits.length !== 10 || !/^[6789]/.test(digits)) {
+          empErrors.phone_number = t("invalidPhoneFormat") || "Invalid phone number";
+          isValid = false;
+        }
       }
 
       if (emp.profile_picture) {
@@ -126,6 +136,8 @@ export default function BusinessEmployees({
               const isModified = original && (
                 original.full_name !== empData.full_name ||
                 original.email !== empData.email ||
+                (empData.country_code ?? "") !== (original.country_code ?? "") ||
+                (empData.phone_number ?? "") !== (original.phone_number ?? "") ||
                 empData.profile_picture !== original.profile_picture
               );
               if (isModified) {
@@ -225,6 +237,36 @@ export default function BusinessEmployees({
                     {errors[index]?.email && (
                       <div className="error-text">{errors[index]?.email}</div>
                     )}
+                  </div>
+                </div>
+
+                <div className="form-field-wrapper form-field-row">
+                  <div className="form-field-half">
+                    <label className="form-label">{t("countryCode") || "Country code"}</label>
+                    <div className="form-field">
+                      <input
+                        type="text"
+                        placeholder="+91"
+                        value={employee.country_code ?? "+91"}
+                        onChange={(e) => updateEmployee(index, "country_code", e.target.value)}
+                        maxLength={5}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-field-half">
+                    <label className="form-label">{t("phoneNumber")}</label>
+                    <div className={`form-field ${errors[index]?.phone_number ? "error" : ""}`}>
+                      <input
+                        type="tel"
+                        placeholder={t("enterPhoneNumber") || "10-digit number"}
+                        value={employee.phone_number ?? ""}
+                        onChange={(e) => updateEmployee(index, "phone_number", e.target.value.replace(/\D/g, "").slice(0, 10))}
+                        maxLength={10}
+                      />
+                      {errors[index]?.phone_number && (
+                        <div className="error-text">{errors[index]?.phone_number}</div>
+                      )}
+                    </div>
                   </div>
                 </div>
 

@@ -26,7 +26,8 @@ export default function BusinessBasicInfo({
 }: BusinessBasicInfoProps) {
   const { t } = useLayoutContext();
   const businessService = new BusinessService();
-  const { userInfo } = useUserStore();
+  const { profile } = useUserStore();
+  const userInfo = profile?.user;
 
   const [businessName, setBusinessName] = useState<string>(initialData?.business_name || "");
   const [businessEmail, setBusinessEmail] = useState<string>(initialData?.business_email || "");

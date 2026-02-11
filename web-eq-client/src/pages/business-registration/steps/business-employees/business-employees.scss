@@ -126,9 +126,24 @@
   }
 
   .form-field-wrapper {
-    &:nth-child(3) {
+    &:nth-child(3),
+    &:nth-child(4) {
       grid-column: 1 / -1;
     }
+  }
+
+  .form-field-row {
+    display: flex;
+    gap: 16px;
+
+    @media screen and (max-width: 768px) {
+      flex-direction: column;
+    }
+  }
+
+  .form-field-half {
+    flex: 1;
+    min-width: 0;
   }
 }
 

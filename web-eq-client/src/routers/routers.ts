@@ -3,6 +3,7 @@ export const ROUTERS_PATH = {
   ERROR: "/error",
   SENDOTP: "/send-otp",
   VERIFYOTP: "/verify-otp",
+  INVITATION_CODE: "/invitation-code",
   USERPROFILE: "/user-profile",
   BUSINESSREGISTRATION: "/business-registration",
   DASHBOARD: "/dashboard",
@@ -11,4 +12,11 @@ export const ROUTERS_PATH = {
   BUSINESSPROFILE: "/admin/business-profile",
   EMPLOYEEPROFILE: "/admin/employee-profile",
   QUEUEUSERS: "/admin/queue-users",
-}
+} as const;
+
+/** Redirect path when user is authenticated but next_step is not dashboard */
+export const NEXT_STEP_REDIRECT: Record<string, string> = {
+  invitation_code: ROUTERS_PATH.INVITATION_CODE,
+  owner_info: ROUTERS_PATH.USERPROFILE,
+  business_registration: ROUTERS_PATH.BUSINESSREGISTRATION,
+};

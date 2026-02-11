@@ -1,6 +1,8 @@
 UNPROTECTED_ROUTE_PATHS = [
     "/api/auth/send-otp",
     "/api/auth/verify-otp",
+    "/api/auth/verify-otp-customer",
+    "/api/auth/business-verify-otp",
     "/api/category/get_categories",
     "/api/category/get_categories_with_services",
     "/api/business/get_businesses",

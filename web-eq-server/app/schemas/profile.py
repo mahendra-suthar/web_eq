@@ -58,6 +58,14 @@ class BusinessInfo(BaseModel):
         )
 
 
+class QueueInfo(BaseModel):
+    """Minimal queue info for profile responses."""
+    uuid: str
+    business_id: str
+    name: str
+    status: Optional[int] = None
+
+
 class EmployeeInfo(BaseModel):
     uuid: str
     business_id: str
@@ -67,9 +75,20 @@ class EmployeeInfo(BaseModel):
     country_code: Optional[str] = None
     profile_picture: Optional[str] = None
     is_verified: bool
+    queue_id: Optional[str] = None
+    queue: Optional[QueueInfo] = None
 
     @classmethod
-    def from_employee(cls, employee) -> "EmployeeInfo":
+    def from_employee(cls, employee, queue=None) -> "EmployeeInfo":
+        queue_id = getattr(employee, "queue_id", None)
+        queue_info = None
+        if queue is not None:
+            queue_info = QueueInfo(
+                uuid=str(queue.uuid),
+                business_id=str(queue.merchant_id),
+                name=queue.name,
+                status=queue.status,
+            )
         return cls(
             uuid=str(employee.uuid),  # type: ignore
             business_id=str(employee.business_id),  # type: ignore
@@ -78,7 +97,9 @@ class EmployeeInfo(BaseModel):
             phone_number=str(employee.phone_number) if employee.phone_number else None,  # type: ignore
             country_code=str(employee.country_code) if employee.country_code else None,  # type: ignore
             profile_picture=str(employee.profile_picture) if employee.profile_picture else None,  # type: ignore
-            is_verified=bool(employee.is_verified)  # type: ignore
+            is_verified=bool(employee.is_verified),  # type: ignore
+            queue_id=str(queue_id) if queue_id else None,
+            queue=queue_info,
         )
 
 
@@ -117,6 +138,22 @@ class AddressData(BaseModel):
             latitude=float(address.latitude) if address.latitude is not None else None,  # type: ignore
             longitude=float(address.longitude) if address.longitude is not None else None  # type: ignore
         )
+
+
+class CustomerProfileResponse(BaseModel):
+    """Customer profile: personal details only. No business or employee data."""
+    user: OwnerInfo
+    address: Optional[AddressData] = None
+
+
+class BusinessProfileResponse(BaseModel):
+    """Business profile: owner (userinfo), business, address, schedule.
+    When caller is employee: also includes single employee (with queue)."""
+    owner: OwnerInfo
+    business: BusinessInfo
+    address: Optional[AddressData] = None
+    schedule: Optional[ScheduleInfo] = None
+    employee: Optional[EmployeeInfo] = None  # present when profile is for an employee
 
 
 class UnifiedProfileResponse(BaseModel):

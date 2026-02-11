@@ -16,9 +16,9 @@ class EmployeeController:
 
     async def create_employees(self, data: BusinessEmployeesInput) -> list[EmployeeData]:
         try:
-            employees = self.employee_service.add_employees(data)
+            employees_list, _invitation_codes = self.employee_service.add_employees(data)
             self.business_service.update_registration_state(business_id=data.business_id, current_step=4)
-            return [EmployeeData.from_employee(emp) for emp in employees]
+            return [EmployeeData.from_employee(emp) for emp in employees_list]
         except SQLAlchemyError:
             self.db.rollback()
             raise HTTPException(status_code=500, detail="Database error")

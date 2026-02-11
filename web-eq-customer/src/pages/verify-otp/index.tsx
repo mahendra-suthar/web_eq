@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AuthService } from "../../services/auth/auth.service";
 import { useAuthStore } from "../../store/auth.store";
-import { OTP_COUNTDOWN_SECONDS, OTP_LENGTH, OTPErrorCode, ProfileType, DEFAULT_COUNTRY_CODE } from "../../utils/constants";
+import { OTP_COUNTDOWN_SECONDS, OTP_LENGTH, OTPErrorCode, DEFAULT_COUNTRY_CODE } from "../../utils/constants";
 import Button from "../../components/button";
 import "./verify-otp.scss";
 
@@ -64,7 +64,7 @@ export default function VerifyOTPPage() {
 
     try {
       const authService = new AuthService();
-      const response = await authService.verifyOTP(countryCode, phoneNumber, otp, ProfileType.CUSTOMER.toLowerCase(), "web");
+      const response = await authService.verifyOTPCustomer(countryCode, phoneNumber, otp, "web");
 
       if (response.token && response.user) {
         const userData = {
@@ -77,9 +77,26 @@ export default function VerifyOTPPage() {
         };
         setUserInfo(userData);
 
+        try {
+          const profile = await authService.getCustomerProfile();
+          if (profile?.user) {
+            const profileUser = {
+              ...profile.user,
+              date_of_birth: profile.user.date_of_birth
+                ? (typeof profile.user.date_of_birth === 'string'
+                  ? profile.user.date_of_birth
+                  : new Date(profile.user.date_of_birth).toISOString())
+                : null,
+            };
+            setUserInfo(profileUser);
+          }
+        } catch (_) {
+          // Keep login response user if profile fetch fails
+        }
+
         if (returnTo) {
           navigate(returnTo, {
-            state: {selectedServices, businessName},
+            state: { selectedServices, businessName },
           });
         } else {
           navigate("/");
@@ -129,7 +146,7 @@ export default function VerifyOTPPage() {
 
     try {
       const authService = new AuthService();
-      await authService.sendOTP(countryCode, phoneNumber, ProfileType.CUSTOMER.toLowerCase());
+      await authService.sendOTP(countryCode, phoneNumber, "customer");
       setCountdown(OTP_COUNTDOWN_SECONDS);
       setOtp("");
       alert(t("otpSentSuccessfully"));

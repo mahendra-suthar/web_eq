@@ -28,6 +28,8 @@ export interface EmployeeData {
     uuid?: string;
     full_name: string;
     email?: string;
+    country_code?: string;
+    phone_number?: string;
     profile_picture?: File; // Note: File objects don't persist well in localStorage
 }
 

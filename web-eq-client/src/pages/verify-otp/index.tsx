@@ -8,18 +8,24 @@ import Button from "../../components/button";
 import { OTPService } from "../../services/otp/otp.service";
 import { ProfileService } from "../../services/profile/profile.service";
 import { useUserStore } from "../../utils/userStore";
-import { OTP_COUNTDOWN_SECONDS, OTP_LENGTH, ProfileType, BusinessStatus, BUSINESS_REGISTRATION_MIN_STEP, BUSINESS_REGISTRATION_MAX_STEP } from "../../utils/constants";
+import { OTP_COUNTDOWN_SECONDS, OTP_LENGTH } from "../../utils/constants";
 import "./verify-otp.scss";
+
+const NEXT_STEP = {
+  DASHBOARD: "dashboard",
+  INVITATION_CODE: "invitation_code",
+  OWNER_INFO: "owner_info",
+  BUSINESS_REGISTRATION: "business_registration",
+} as const;
 
 export default function VerifyOTP() {
   const { t } = useLayoutContext();
   const navigate = useNavigate();
   const location = useLocation();
   const { ROUTERS_PATH } = RouterConstant;
-  const { setUserInfo, setProfile } = useUserStore();
+  const { setProfile, setNextStep } = useUserStore();
 
   const phoneObj: PhoneNumber | undefined = location.state?.phone;
-  const userType = "Business";
 
   const phone = phoneObj ? formatPhoneForDisplay(phoneObj) : "";
 
@@ -67,76 +73,80 @@ export default function VerifyOTP() {
     }
 
     try {
-      const response = await otpService.verifyOTP(
-        phoneObj.countryCode, phoneObj.localNumber, otp, "business", "web"
+      const response = await otpService.businessVerifyOTP(
+        phoneObj.countryCode,
+        phoneObj.localNumber,
+        otp,
+        "web"
       );
 
-      if (response.token && response.user) {
-        const userData = {
-          ...response.user,
-          date_of_birth: response.user.date_of_birth
-            ? (typeof response.user.date_of_birth === 'string'
-              ? response.user.date_of_birth
-              : new Date(response.user.date_of_birth).toISOString())
-            : null,
-        };
-        setUserInfo(userData);
-        if (!userData.full_name || userData.full_name.trim() === "") {
-          navigate(ROUTERS_PATH.USERPROFILE, { state: { phone: phoneObj, userType } });
-          return;
-        }
+      if (!response.token || !response.user) {
+        setError(t("otpVerificationFailed"));
+        return;
+      }
 
+      const nextStepFromBackend = response.next_step ?? null;
+      setNextStep(nextStepFromBackend);
+
+      const userAsOwner = {
+        uuid: response.user.uuid,
+        country_code: response.user.country_code ?? "",
+        phone_number: response.user.phone_number ?? "",
+        full_name: response.user.full_name ?? undefined,
+        email: response.user.email ?? undefined,
+        date_of_birth: response.user.date_of_birth
+          ? (typeof response.user.date_of_birth === "string"
+            ? response.user.date_of_birth
+            : new Date(response.user.date_of_birth).toISOString())
+          : undefined,
+        gender: response.user.gender ?? undefined,
+      };
+
+      if (nextStepFromBackend === NEXT_STEP.DASHBOARD) {
         try {
           const profileService = new ProfileService();
-          const profile = await profileService.getProfile();
-          setProfile(profile);
-          const isBusinessUser = profile.profile_type === ProfileType.BUSINESS || true;
-          if (isBusinessUser) {
-            if (!profile.business) {
-              navigate(ROUTERS_PATH.BUSINESSREGISTRATION, {
-                state: {
-                  phone: phoneObj,
-                  userType: "Business",
-                  nextStep: BUSINESS_REGISTRATION_MIN_STEP,
-                },
-              });
-              return;
-            }
-            
-            const currentStep = profile.business.current_step;
-            const businessStatus = Number(profile.business.status);
-            if (businessStatus === BusinessStatus.REGISTERED) {
-              navigate(ROUTERS_PATH.DASHBOARD);
-              return;
-            }
-            
-            const nextStep = currentStep ? Math.min(Math.max(currentStep + 1, BUSINESS_REGISTRATION_MIN_STEP), BUSINESS_REGISTRATION_MAX_STEP) : BUSINESS_REGISTRATION_MIN_STEP;
-            navigate(ROUTERS_PATH.BUSINESSREGISTRATION, {
-              state: {
-                phone: phoneObj,
-                userType: userType || "business",
-                businessId: profile.business.uuid,
-                nextStep: nextStep,
-                categoryId: profile.business.category_id,
-              },
-            });
-            return;
-          }
-        } catch (profileError) {
-          {
-              navigate(ROUTERS_PATH.BUSINESSREGISTRATION, {
-                state: {
-                  phone: phoneObj,
-                  userType: userType || "business",
-                  nextStep: BUSINESS_REGISTRATION_MIN_STEP,
-                },
-              });
-            return;
-          }
+          const profile = await profileService.getBusinessProfile();
+          setProfile({
+            profile_type: (response.profile_type as "BUSINESS" | "EMPLOYEE") ?? "BUSINESS",
+            user: profile.owner,
+            business: profile.business,
+            address: profile.address,
+            schedule: profile.schedule,
+            employee: profile.employee,
+          });
+        } catch (_) {
+          const unified = await new ProfileService().getProfile();
+          setProfile(unified);
         }
-
         navigate(ROUTERS_PATH.DASHBOARD);
+        return;
       }
+
+      setProfile({
+        profile_type: (response.profile_type as "BUSINESS" | "EMPLOYEE") ?? "BUSINESS",
+        user: userAsOwner,
+      });
+
+      if (nextStepFromBackend === NEXT_STEP.INVITATION_CODE) {
+        navigate(ROUTERS_PATH.INVITATION_CODE, { state: { phone: phoneObj } });
+        return;
+      }
+
+      if (nextStepFromBackend === NEXT_STEP.OWNER_INFO) {
+        navigate(ROUTERS_PATH.USERPROFILE, {
+          state: { phone: phoneObj, userType: (response.profile_type ?? "BUSINESS").toLowerCase() },
+        });
+        return;
+      }
+
+      if (nextStepFromBackend === NEXT_STEP.BUSINESS_REGISTRATION) {
+        navigate(ROUTERS_PATH.BUSINESSREGISTRATION, {
+          state: { phone: phoneObj },
+        });
+        return;
+      }
+
+      navigate(ROUTERS_PATH.DASHBOARD);
     } catch (err: any) {
       setOtp("");
       let errorMessage = t("otpVerificationFailed");

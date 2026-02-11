@@ -19,6 +19,8 @@ export interface UserData {
 export interface LoginResponse {
   token?: Token | null;
   user?: UserData | null;
+  next_step?: string | null;
+  profile_type?: string | null;
 }
 
 
@@ -47,26 +49,27 @@ export class OTPService extends HttpClient {
     }
   }
 
-  async verifyOTP(
+  /**
+   * Business/Employee OTP verification. Backend returns next_step and profile_type.
+   * Use this for web-eq-client; navigation must be driven by response.next_step.
+   */
+  async businessVerifyOTP(
     countryCode: string,
     phoneNumber: string,
     otp: string,
-    userType: string,
     clientType: string = "web"
   ): Promise<LoginResponse> {
     try {
-      const res = await this.post<LoginResponse>("/auth/verify-otp", {
+      return await this.post<LoginResponse>("/auth/business-verify-otp", {
         country_code: countryCode,
         phone_number: phoneNumber,
-        otp: otp,
-        user_type: userType.toLowerCase(),
-        client_type: clientType
+        otp,
+        client_type: clientType,
       }, {
         headers: {
           "Content-Type": "application/json",
         },
       });
-      return res;
     } catch (error: any) {
       error.customMessage =
         error?.response?.data?.detail?.message ||

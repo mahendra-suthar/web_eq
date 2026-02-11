@@ -3,6 +3,7 @@ import { useParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { EmployeeService, EmployeeResponse } from '../../services/employee/employee.service';
 import { useBusinessRegistrationStore } from '../../utils/businessRegistrationStore';
+import { useUserStore } from '../../utils/userStore';
 import { getInitials, getAvatarBackground } from '../../utils/utils';
 import Pagination from '../../components/pagination';
 import "./employees.scss";
@@ -12,13 +13,8 @@ const Employees = () => {
     const { businessId: routeBusinessId } = useParams<{ businessId?: string }>();
     const location = useLocation();
     const { businessId: storeBusinessId } = useBusinessRegistrationStore();
-    
-    // Get business_id from route params, location state, or store (in that order)
-    const businessId = useMemo(
-        () => routeBusinessId || location.state?.businessId || storeBusinessId,
-        [routeBusinessId, location.state?.businessId, storeBusinessId]
-    );
-    
+    const profileBusinessId = useUserStore((s) => s.getBusinessId());
+
     const employeeService = useMemo(() => new EmployeeService(), []);
     
     const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
@@ -40,10 +36,14 @@ const Employees = () => {
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    // Fetch employees
+    // Fetch employees: prefer route/state/registration store, fallback to user profile (e.g. after registration)
+    const resolvedBusinessId = useMemo(
+        () => routeBusinessId || location.state?.businessId || storeBusinessId || profileBusinessId,
+        [routeBusinessId, location.state?.businessId, storeBusinessId, profileBusinessId]
+    );
+
     useEffect(() => {
-        const businessId = "3fc39028-3aef-4a3d-89c9-5f49ee7fac4b"
-        if (!businessId) {
+        if (!resolvedBusinessId) {
             setError(t("businessIdRequired"));
             return;
         }
@@ -54,7 +54,7 @@ const Employees = () => {
 
             try {
                 const data = await employeeService.getEmployees(
-                    businessId,
+                    resolvedBusinessId,
                     currentPage,
                     limit,
                     debouncedSearch
@@ -88,25 +88,24 @@ const Employees = () => {
         };
 
         fetchEmployees();
-    }, [businessId, currentPage, limit, debouncedSearch, employeeService, t]);
+    }, [resolvedBusinessId, currentPage, limit, debouncedSearch, employeeService, t]);
 
     // Handle pagination
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
     };
 
-    // Early return if no business ID
-    // if (!businessId) {
-    //     return (
-    //         <div className="employees-page">
-    //             <div className="content-card">
-    //                 <div className="error-message">
-    //                     {t("businessIdRequired") || "Business ID is required to view employees."}
-    //                 </div>
-    //             </div>
-    //         </div>
-    //     );
-    // }
+    if (!resolvedBusinessId) {
+        return (
+            <div className="employees-page">
+                <div className="content-card">
+                    <div className="error-message">
+                        {t("businessIdRequired") || "Business ID is required to view employees."}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="employees-page">
@@ -156,29 +155,37 @@ const Employees = () => {
                     <table className="data-table">
                         <thead>
                             <tr>
-                                    <th>{t("employee")}</th>
-                                    <th>{t("email")}</th>
-                                    <th>{t("isVerified")}</th>
-                                    <th>{t("actions")}</th>
+                                <th>{t("employee")}</th>
+                                <th>{t("email")}</th>
+                                <th>{t("phoneNumber")}</th>
+                                <th>{t("isVerified")}</th>
+                                <th>{t("actions")}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {employees.map((emp) => (
-                                    <tr key={emp.uuid}>
+                                <tr key={emp.uuid}>
                                     <td>
                                         <div className="user-cell">
-                                                <div 
-                                                    className="user-avatar" 
-                                                    style={{ background: getAvatarBackground(emp.full_name) }}
-                                                >
-                                                    {getInitials(emp.full_name)}
+                                            <div
+                                                className="user-avatar"
+                                                style={{ background: getAvatarBackground(emp.full_name) }}
+                                            >
+                                                {getInitials(emp.full_name)}
                                             </div>
                                             <div className="user-info">
-                                                    <div className="user-name">{emp.full_name}</div>
+                                                <div className="user-name">{emp.full_name}</div>
                                             </div>
                                         </div>
                                     </td>
-                                        <td>{emp.email || t("notAvailable")}</td>
+                                    <td>{emp.email || t("notAvailable")}</td>
+                                    <td>
+                                        {emp.country_code && emp.phone_number
+                                            ? `${emp.country_code} ${emp.phone_number}`
+                                            : emp.phone_number
+                                                ? emp.phone_number
+                                                : t("notAvailable")}
+                                    </td>
                                     <td>
                                             <span className={`status-badge ${emp.is_verified ? 'active' : 'pending'}`}>
                                                 {emp.is_verified 

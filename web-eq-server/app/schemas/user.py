@@ -38,4 +38,6 @@ class UserData(BaseModel):
 class LoginResponse(BaseModel):
     token: Optional[Token] = None
     user: Optional[UserData] = None
+    next_step: Optional[str] = None  # e.g. "dashboard", "invitation_code", "owner_info", "business_registration"
+    profile_type: Optional[str] = None  # "CUSTOMER", "BUSINESS", "EMPLOYEE"
 

@@ -81,6 +81,18 @@ class OTPVerifyInput(BaseModel):
         return v
 
 
+class VerifyInvitationInput(BaseModel):
+    """Request body for verifying an employee invitation code."""
+
+    code: str
+
+    @field_validator("code")
+    @classmethod
+    def validate_code(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v or len(v) < 4 or len(v) > 32:
+            raise ValueError("Invitation code is required (4-32 characters)")
+        return v
 
 
 class UserRegistrationInput(BaseModel):

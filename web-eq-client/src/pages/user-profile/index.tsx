@@ -13,7 +13,7 @@ export default function UserProfile() {
   const navigate = useNavigate();
   const location = useLocation();
   const { ROUTERS_PATH } = RouterConstant;
-  const { setUserInfo } = useUserStore();
+  const { profile, setProfile, setNextStep } = useUserStore();
 
   const phoneObj: PhoneNumber | undefined = location.state?.phone;
   const userType = location.state?.userType || "";
@@ -197,20 +197,30 @@ export default function UserProfile() {
         "web"
       );
 
-      if (response.user) {
-        const userData = {...response.user, date_of_birth: normalizeDateOfBirth(response.user.date_of_birth)};
-        setUserInfo(userData);
+      if (response.user && profile) {
+        const userData = {
+          uuid: response.user.uuid,
+          country_code: response.user.country_code ?? "",
+          phone_number: response.user.phone_number ?? "",
+          full_name: response.user.full_name ?? undefined,
+          email: response.user.email ?? undefined,
+          date_of_birth: normalizeDateOfBirth(response.user.date_of_birth) ?? undefined,
+          gender: response.user.gender ?? undefined,
+        };
+        setProfile({ ...profile, user: userData });
       }
 
       // Navigate based on user type
       if (userType.toLowerCase() === "business") {
+        setNextStep("business_registration");
         navigate(ROUTERS_PATH.BUSINESSREGISTRATION, {
           state: {
             phone: phoneObj,
-            userType: userType
-          }
+            userType: userType,
+          },
         });
       } else {
+        setNextStep("dashboard");
         navigate(ROUTERS_PATH.DASHBOARD);
       }
     } catch (err: any) {

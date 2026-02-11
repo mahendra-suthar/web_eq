@@ -11,7 +11,7 @@ const Topbar = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const { ROUTERS_PATH } = RouterConstant;
-    const { userInfo, resetUser, profile, setProfile } = useUserStore();
+    const { resetUser, profile, setProfile } = useUserStore();
     const profileService = useMemo(() => new ProfileService(), []);
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);

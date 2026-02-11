@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, Response, Request
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.schemas.auth import OTPRequestInput, OTPRequestResponse, OTPVerifyInput, UserRegistrationInput
+from app.schemas.auth import OTPRequestInput, OTPRequestResponse, OTPVerifyInput, UserRegistrationInput, VerifyInvitationInput
 from app.schemas.user import LoginResponse, UserData
-from app.schemas.profile import UnifiedProfileResponse
+from app.schemas.profile import UnifiedProfileResponse, CustomerProfileResponse, BusinessProfileResponse
 from app.controllers.auth_controller import AuthController
 from app.models.user import User
 from app.middleware.permissions import get_current_user
@@ -23,6 +23,30 @@ async def send_otp(payload: OTPRequestInput, db: Session = Depends(get_db)):
 async def verify_otp(payload: OTPVerifyInput, response: Response, request: Request, db: Session = Depends(get_db)):
     controller = AuthController(db)
     return await controller.verify_otp(payload, response, request)
+
+
+@auth_router.post("/verify-otp-customer", response_model=LoginResponse)
+async def verify_otp_customer(payload: OTPVerifyInput, response: Response, request: Request, db: Session = Depends(get_db)):
+    controller = AuthController(db)
+    return await controller.verify_otp_customer(payload, response, request)
+
+
+@auth_router.post("/business-verify-otp", response_model=LoginResponse)
+async def business_verify_otp(payload: OTPVerifyInput, response: Response, request: Request, db: Session = Depends(get_db)):
+    controller = AuthController(db)
+    return await controller.business_verify_otp(payload, response, request)
+
+
+@auth_router.post("/verify-invitation-code", response_model=LoginResponse)
+async def verify_invitation_code(
+    payload: VerifyInvitationInput,
+    response: Response,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    controller = AuthController(db)
+    return await controller.verify_invitation_code(payload, response, request, user)
 
 
 @auth_router.post("/create-user", response_model=LoginResponse)
@@ -47,3 +71,15 @@ async def update_user_profile(payload: UserRegistrationInput, response: Response
 async def get_profile(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     controller = AuthController(db)
     return await controller.get_profile(user)
+
+
+@auth_router.get("/profile/customer", response_model=CustomerProfileResponse)
+async def get_customer_profile(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    controller = AuthController(db)
+    return await controller.get_customer_profile(user)
+
+
+@auth_router.get("/profile/business", response_model=BusinessProfileResponse)
+async def get_business_profile(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    controller = AuthController(db)
+    return await controller.get_business_profile(user)

@@ -1,14 +1,8 @@
 import uuid
-import secrets
-from sqlalchemy import Column, String, ForeignKey, Boolean
+from sqlalchemy import Column, String, ForeignKey, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.models.base import BaseModel
-
-
-def generate_secret_code():
-    """Generate a random secret code for employees"""
-    return secrets.token_urlsafe(16)
 
 
 class Employee(BaseModel):
@@ -23,6 +17,7 @@ class Employee(BaseModel):
     phone_number = Column(String, nullable=True)
     country_code = Column(String, nullable=True)
     profile_picture = Column(String, nullable=True)
-    secret_code = Column(String, nullable=False, default=lambda: generate_secret_code())
     is_verified = Column(Boolean, default=False, nullable=False)
+    invitation_code = Column(String(32), unique=True, nullable=True, index=True)
+    invitation_code_expires_at = Column(DateTime(timezone=True), nullable=True)
 

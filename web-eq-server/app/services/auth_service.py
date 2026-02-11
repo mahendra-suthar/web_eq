@@ -28,14 +28,20 @@ class AuthService:
         )
 
     async def generate_auth_response(
-        self, user: User, response: Response, client_type: str = "web", user_type: Optional[str] = None
+        self,
+        user: User,
+        response: Response,
+        client_type: str = "web",
+        user_type: Optional[str] = None,
+        next_step: Optional[str] = None,
+        profile_type: Optional[str] = None,
     ) -> LoginResponse:
-        """Generate normal authentication response after user registration/login"""
+        """Generate authentication response after user registration/login."""
         expires_delta = get_access_token_expires_time(client_type)
         user_type_upper = user_type.upper() if user_type else None
         token_data = {"sub": str(user.uuid), "user_type": user_type_upper, "client_type": client_type}
         access_token = create_access_token(token_data, expires_delta)
-        
+
         await self.set_auth_cookie(response, access_token, client_type)
 
         RequestContext.set_user(user)
@@ -44,5 +50,7 @@ class AuthService:
         user_data = UserData.from_user(user)
         return LoginResponse(
             token=Token(access_token=access_token, token_type="Bearer"),
-            user=user_data
+            user=user_data,
+            next_step=next_step,
+            profile_type=profile_type,
         )

@@ -21,6 +21,8 @@ export interface UserData {
 export interface LoginResponse {
   token?: Token | null;
   user?: UserData | null;
+  next_step?: string | null;
+  profile_type?: string | null;
 }
 
 export interface OTPRequestResponse {
@@ -52,21 +54,20 @@ export class AuthService extends HttpClient {
   }
 
   /**
-   * Verify OTP and get authentication token.
+   * Verify OTP (customer only). Creates/fetches customer, returns auth token.
+   * Use this for customer app; no business/employee logic.
    */
-  async verifyOTP(
+  async verifyOTPCustomer(
     countryCode: string,
     phoneNumber: string,
     otp: string,
-    userType: string = 'customer',
     clientType: string = 'web'
   ): Promise<LoginResponse> {
     try {
-      return await this.post<LoginResponse>('/auth/verify-otp', {
+      return await this.post<LoginResponse>('/auth/verify-otp-customer', {
         country_code: countryCode,
         phone_number: phoneNumber,
-        otp: otp,
-        user_type: userType.toLowerCase(),
+        otp,
         client_type: clientType,
       });
     } catch (error: any) {
@@ -74,6 +75,21 @@ export class AuthService extends HttpClient {
         error?.response?.data?.detail?.message ||
         error?.response?.data?.detail ||
         'OTP verification failed';
+      throw error;
+    }
+  }
+
+  /**
+   * Get customer profile (personal details only). Requires customer auth.
+   */
+  async getCustomerProfile(): Promise<{ user: UserData; address?: unknown }> {
+    try {
+      return await this.get<{ user: UserData; address?: unknown }>('/auth/profile/customer');
+    } catch (error: any) {
+      error.customMessage =
+        error?.response?.data?.detail?.message ||
+        error?.response?.data?.detail ||
+        'Failed to fetch profile';
       throw error;
     }
   }
