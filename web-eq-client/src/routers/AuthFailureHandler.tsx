@@ -9,10 +9,6 @@ function isOnAuthPage(path: string): boolean {
   return AUTH_PATHS.some((p) => path === p || path.startsWith(p + "/"));
 }
 
-/**
- * Listens for 401/403 (auth:unauthorized) from API. Clears user state and redirects to login.
- * Uses window.location.replace so redirect always works regardless of React Router.
- */
 export function AuthFailureHandler() {
   const resetUser = useUserStore((s) => s.resetUser);
   const redirectingRef = useRef(false);

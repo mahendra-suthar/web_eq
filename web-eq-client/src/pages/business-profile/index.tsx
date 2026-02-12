@@ -42,14 +42,12 @@ const BusinessProfile = () => {
     const [ownerCountryCode, setOwnerCountryCode] = useState<string>("");
     const [ownerPhoneNumber, setOwnerPhoneNumber] = useState<string>("");
 
-    // Owner (user) information
     const [ownerData, setOwnerData] = useState<OwnerProfileData>({
         fullName: "",
         phoneDisplay: "",
         email: "",
     });
 
-    // Business Basic Information
     const [businessData, setBusinessData] = useState<BusinessProfileData>({
         businessName: "",
         businessEmail: "",
@@ -60,7 +58,6 @@ const BusinessProfile = () => {
         profilePicture: null,
     });
 
-    // Location Data
     const [locationData, setLocationData] = useState<AddressData>({
         unit_number: "",
         building: "",
@@ -74,7 +71,6 @@ const BusinessProfile = () => {
         country: "INDIA",
     });
 
-    // Schedule Data
     const [scheduleData, setScheduleData] = useState({
         isAlwaysOpen: false,
         schedule: [] as DaySchedule[],
@@ -82,7 +78,6 @@ const BusinessProfile = () => {
 
     const [categories, setCategories] = useState<Category[]>([]);
 
-    // Day names mapping
     const dayNames = useMemo(() => [
         { day_of_week: 0, day_name: t("sunday") },
         { day_of_week: 1, day_name: t("monday") },

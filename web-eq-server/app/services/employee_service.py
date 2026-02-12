@@ -54,7 +54,6 @@ class EmployeeService:
             raise
 
     def update_employee(self, employee_id: UUID, data: EmployeeUpdate) -> Employee:
-        """Partial update: only set fields that are present in the payload."""
         employee = self.db.query(Employee).filter(Employee.uuid == employee_id).first()
         if not employee:
             raise ValueError(f"Employee with id {employee_id} not found")
@@ -100,14 +99,12 @@ class EmployeeService:
             raise
 
     def get_employee_by_user_id(self, user_id: UUID) -> Optional[Employee]:
-        """Get employee by user_id"""
         try:
             return self.db.query(Employee).filter(Employee.user_id == user_id).first()
         except SQLAlchemyError:
             raise
 
     def get_employee_by_phone(self, country_code: str, phone_number: str) -> Optional[Employee]:
-        """Get employee by phone number and country code"""
         try:
             return self.db.query(Employee).filter(
                 Employee.country_code == country_code,
@@ -117,7 +114,6 @@ class EmployeeService:
             raise
 
     def get_employee_by_invitation_code(self, code: str) -> Optional[Employee]:
-        """Find an employee by valid (unused, not expired) invitation code. Code is normalized (strip, uppercase)."""
         normalized = (code or "").strip().upper()
         if not normalized:
             return None
@@ -153,6 +149,3 @@ class EmployeeService:
             self.db.rollback()
             raise
     
-    def get_employee_by_phone_with_status(self, country_code: str, phone_number: str) -> Optional[Employee]:
-        """Get employee by phone number and country code (same as get_employee_by_phone, kept for compatibility)"""
-        return self.get_employee_by_phone(country_code, phone_number)

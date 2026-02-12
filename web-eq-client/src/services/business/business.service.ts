@@ -117,7 +117,6 @@ export class BusinessService extends HttpClient {
     return this.upsertSchedules(businessId, "BUSINESS", schedules, isAlwaysOpen);
   }
 
-  /** Create or replace schedules for business or employee (profile edit). */
   async upsertSchedules(
     entityId: string,
     entityType: "BUSINESS" | "EMPLOYEE",
