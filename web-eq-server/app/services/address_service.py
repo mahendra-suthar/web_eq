@@ -44,6 +44,22 @@ class AddressService:
         except Exception as e:
             raise e
 
+    def upsert_address(self, address_data: dict, entity_type: EntityType, entity_id: UUID) -> Address:
+        existing = self.get_primary_address_by_entity(entity_type, entity_id)
+        payload = {k: v for k, v in address_data.items() if k not in ("entity_type", "entity_id")}
+        if existing:
+            for key, value in payload.items():
+                if hasattr(existing, key):
+                    setattr(existing, key, value)
+            try:
+                self.db.commit()
+                self.db.refresh(existing)
+                return existing
+            except Exception:
+                self.db.rollback()
+                raise
+        return self.create_address(payload, entity_type, entity_id)
+
     def get_primary_addresses_by_entities(self, entity_type: EntityType, entity_ids: List[UUID]) -> dict[UUID, Optional[Address]]:
         try:
             if not entity_ids:

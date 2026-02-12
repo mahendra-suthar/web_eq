@@ -61,6 +61,15 @@
     margin-top: 20px;
 }
 
+.profile-save-error {
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    background: #fef2f2;
+    color: #dc2626;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
 .profile-section {
     background: white;
     border-radius: 12px;
@@ -78,11 +87,60 @@
             color: #1e293b;
             margin: 0;
         }
+
+        &.section-header-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .section-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+    }
+
+    .info-value-readonly {
+        color: #64748b;
+        font-style: italic;
     }
 
     .section-content {
         // Content styles
     }
+}
+
+// Basic Information: Owner and Business blocks
+.info-block {
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+
+    &:last-of-type {
+        margin-bottom: 0;
+    }
+
+    .info-block-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #475569;
+        margin: 0 0 16px 0;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+}
+
+.owner-block {
+    background: #f8fafc;
+    border-left: 4px solid #667eea;
+}
+
+.business-block {
+    background: #f8fafc;
+    border-left: 4px solid #94a3b8;
 }
 
 // Basic Info Layout with Profile Picture

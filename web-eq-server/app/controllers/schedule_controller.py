@@ -3,8 +3,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
 from typing import List
 
+from app.models.user import User
 from app.services.schedule_service import ScheduleService
 from app.services.business_service import BusinessService
+from app.services.employee_service import EmployeeService
 from app.models.schedule import ScheduleEntityType
 from app.schemas.schedule import ScheduleCreateInput, ScheduleData
 
@@ -14,10 +16,23 @@ class ScheduleController:
         self.db = db
         self.schedule_service = ScheduleService(db)
         self.business_service = BusinessService(db)
+        self.employee_service = EmployeeService(db)
 
-    async def create_schedules(self, payload: ScheduleCreateInput) -> List[ScheduleData]:
+    def can_edit_schedule(self, user: User, entity_id, entity_type_enum: ScheduleEntityType) -> bool:
+        if entity_type_enum == ScheduleEntityType.BUSINESS:
+            business = self.business_service.get_business_by_owner(user.uuid)
+            return business is not None and str(business.uuid) == str(entity_id)
+        if entity_type_enum == ScheduleEntityType.EMPLOYEE:
+            employee = self.employee_service.get_employee_by_user_id(user.uuid)
+            return employee is not None and str(employee.uuid) == str(entity_id)
+        return False
+
+    async def create_schedules(self, payload: ScheduleCreateInput, user: User) -> List[ScheduleData]:
         try:
             entity_type_enum = ScheduleEntityType[payload.entity_type.upper()]
+            if not self.can_edit_schedule(user, payload.entity_id, entity_type_enum):
+                raise HTTPException(status_code=403, detail="Not allowed to update this schedule")
+
             is_business = entity_type_enum == ScheduleEntityType.BUSINESS
 
             if is_business and payload.is_always_open is not None:

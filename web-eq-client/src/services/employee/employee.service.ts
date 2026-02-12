@@ -60,13 +60,37 @@ export class EmployeeService extends HttpClient {
 
     async updateEmployee(employeeId: string, employeeData: Partial<EmployeeData>): Promise<EmployeeData> {
         try {
-            return await this.put<EmployeeData>(`/employee/update_employee/${employeeId}`, employeeData);
+            const payload = Object.fromEntries(
+                Object.entries(employeeData).filter(([_, value]) => value !== undefined)
+            );
+            return await this.put<EmployeeData>(`/employee/update_employee/${employeeId}`, payload);
         } catch (error: any) {
             console.error("Failed to update employee:", error);
             const errorMessage = error?.response?.data?.detail?.message || "Failed to update employee";
             const errorCode = error?.response?.data?.detail?.error_code;
             const customError: any = new Error(errorMessage);
             customError.errorCode = errorCode;
+            throw customError;
+        }
+    }
+
+    /** Employee updates their own employee record (full_name, email, phone, etc.). */
+    async updateMyProfile(data: {
+        full_name?: string;
+        email?: string | null;
+        country_code?: string | null;
+        phone_number?: string | null;
+    }): Promise<EmployeeResponse> {
+        try {
+            const payload = Object.fromEntries(
+                Object.entries(data).filter(([_, value]) => value !== undefined)
+            );
+            return await this.put<EmployeeResponse>("/employee/update_my_profile", payload);
+        } catch (error: any) {
+            console.error("Failed to update my profile:", error);
+            const errorMessage = error?.response?.data?.detail?.message || "Failed to update profile";
+            const customError: any = new Error(errorMessage);
+            customError.errorCode = error?.response?.data?.detail?.error_code;
             throw customError;
         }
     }

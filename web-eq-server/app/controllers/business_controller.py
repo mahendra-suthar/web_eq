@@ -15,16 +15,18 @@ from app.models.queue import QueueService as QueueServiceModel
 from app.models.service import Service
 from app.models.business import Business
 from app.schemas.business import (
-    BusinessBasicInfoInput, 
-    BusinessData, 
+    BusinessBasicInfoInput,
+    BusinessBasicInfoUpdate,
+    BusinessData,
     BusinessListItem,
     BusinessDetailData,
-    BusinessServiceData
+    BusinessServiceData,
 )
 from app.controllers.role_controller import RoleController
 from app.controllers.user_controller import UserController
 from app.core.utils import format_time
 from app.core.constants import TIMEZONE
+from app.models.user import User
 
 
 class BusinessController:
@@ -53,6 +55,22 @@ class BusinessController:
         except Exception as e:
             self.db.rollback()
             raise HTTPException(status_code=500, detail=f"Failed to create business: {str(e)}")
+
+    async def update_business_basic_info(self, data: BusinessBasicInfoUpdate, user: User) -> BusinessData:
+        try:
+            business = self.business_service.get_business_by_owner(user.uuid)
+            if not business:
+                raise HTTPException(status_code=404, detail="Business not found")
+            updated = self.business_service.update_business_basic_info_partial(business, data)
+            return BusinessData.from_business(updated)
+        except HTTPException:
+            raise
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise HTTPException(status_code=500, detail="Database error")
+        except Exception as e:
+            self.db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to update business: {str(e)}")
 
     def get_businesses(self, category_id: Optional[UUID] = None, service_ids: Optional[List[UUID]] = None) -> List[BusinessListItem]:
         try:
@@ -136,7 +154,7 @@ class BusinessController:
 
     def get_business_details(self, business_id: UUID) -> BusinessDetailData:
         try:
-            business = self.business_service.get_business_by_id(business_id)
+            business = self.business_service.get_business_with_category(business_id)
             if not business:
                 raise HTTPException(status_code=404, detail="Business not found")
             

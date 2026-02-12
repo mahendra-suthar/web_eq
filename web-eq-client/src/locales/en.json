@@ -228,6 +228,9 @@
   "businessId": "Business ID",
   "queueId": "Queue ID",
   "employeeId": "Employee ID",
-  "user": "User"
+  "user": "User",
+  "userInformation": "User Information",
+  "employeeInformation": "Employee Information",
+  "queue": "Queue"
 }
 

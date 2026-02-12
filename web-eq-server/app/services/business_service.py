@@ -12,7 +12,7 @@ from app.models.address import Address, EntityType
 from app.models.schedule import Schedule, ScheduleEntityType
 from app.models.review import Review
 from app.core.constants import BUSINESS_DRAFT, BUSINESS_REGISTERED, BUSINESS_ACTIVE
-from app.schemas.business import BusinessBasicInfoInput
+from app.schemas.business import BusinessBasicInfoInput, BusinessBasicInfoUpdate
 
 
 class BusinessService:
@@ -21,9 +21,6 @@ class BusinessService:
 
     def get_business_by_owner(self, owner_id: UUID) -> Optional[Business]:
         return self.db.query(Business).filter(Business.owner_id == owner_id).first()
-
-    def get_business_by_id(self, business_id: UUID) -> Optional[Business]:
-        return self.db.query(Business).filter(Business.uuid == business_id).first()
 
     def create_business_basic_info(self, data: BusinessBasicInfoInput) -> Business:
         new_business = Business(
@@ -57,6 +54,19 @@ class BusinessService:
             business.profile_picture = data.profile_picture  # type: ignore[assignment]
         business.current_step = 1  # type: ignore[assignment] # Step 1: Basic Info
 
+        try:
+            self.db.commit()
+            self.db.refresh(business)
+            return business
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def update_business_basic_info_partial(self, business: Business, data: BusinessBasicInfoUpdate) -> Business:
+        update_data = data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            if hasattr(business, field):
+                setattr(business, field, value)
         try:
             self.db.commit()
             self.db.refresh(business)
@@ -165,7 +175,7 @@ class BusinessService:
 
         return stats
 
-    def get_business_by_id(self, business_id: UUID) -> Optional[Business]:
+    def get_business_with_category(self, business_id: UUID) -> Optional[Business]:
         return self.db.query(Business).options(joinedload(Business.category)).filter(Business.uuid == business_id).first()
 
 

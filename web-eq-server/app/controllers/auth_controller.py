@@ -360,7 +360,7 @@ class AuthController:
             employee = self.employee_service.get_employee_by_user_id(entity_id)
             if not employee:
                 raise HTTPException(status_code=404, detail="Employee not found")
-            business = self.business_service.get_business_by_id(UUID(str(employee.business_id)))  # type: ignore[arg-type]
+            business = self.business_service.get_business_with_category(UUID(str(employee.business_id)))  # type: ignore[arg-type]
             if not business:
                 raise HTTPException(status_code=404, detail="Business not found")
             queue = (
@@ -422,7 +422,7 @@ class AuthController:
             queue = None
             if getattr(employee, "queue_id", None) is not None:
                 queue = self.db.query(Queue).filter(Queue.uuid == employee.queue_id).first()
-            business = self.business_service.get_business_by_id(UUID(str(employee.business_id)))  # type: ignore[arg-type]
+            business = self.business_service.get_business_with_category(UUID(str(employee.business_id)))  # type: ignore[arg-type]
             addresses = self.address_service.get_addresses_by_entity(EntityType.EMPLOYEE, UUID(str(employee.uuid)))  # type: ignore[arg-type]
             address = AddressData.from_address(addresses[0]) if addresses else None
             schedules = self.schedule_service.get_schedules_by_entity(UUID(str(employee.uuid)), ScheduleEntityType.EMPLOYEE)  # type: ignore[arg-type]

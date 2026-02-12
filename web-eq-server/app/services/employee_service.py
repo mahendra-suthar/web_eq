@@ -54,28 +54,18 @@ class EmployeeService:
             raise
 
     def update_employee(self, employee_id: UUID, data: EmployeeUpdate) -> Employee:
+        """Partial update: only set fields that are present in the payload."""
+        employee = self.db.query(Employee).filter(Employee.uuid == employee_id).first()
+        if not employee:
+            raise ValueError(f"Employee with id {employee_id} not found")
+        update_data = data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            if hasattr(employee, field):
+                setattr(employee, field, value)
         try:
-            employee = self.db.query(Employee).filter(Employee.uuid == employee_id).first()
-            
-            if not employee:
-                raise ValueError(f"Employee with id {employee_id} not found")
-
-            if data.full_name is not None:
-                employee.full_name = data.full_name
-            if data.email is not None:
-                employee.email = data.email
-            if data.country_code is not None:
-                employee.country_code = data.country_code
-            if data.phone_number is not None:
-                employee.phone_number = data.phone_number
-            if data.profile_picture is not None:
-                employee.profile_picture = data.profile_picture
-
             self.db.commit()
             self.db.refresh(employee)
-            
             return employee
-            
         except SQLAlchemyError:
             self.db.rollback()
             raise

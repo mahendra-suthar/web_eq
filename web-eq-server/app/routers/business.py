@@ -1,16 +1,19 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
 
 from app.db.database import get_db
 from app.controllers.business_controller import BusinessController
+from app.middleware.permissions import get_current_user
+from app.models.user import User
 from app.schemas.business import (
-    BusinessBasicInfoInput, 
-    BusinessData, 
+    BusinessBasicInfoInput,
+    BusinessBasicInfoUpdate,
+    BusinessData,
     BusinessListItem,
     BusinessDetailData,
-    BusinessServiceData
+    BusinessServiceData,
 )
 
 
@@ -21,6 +24,16 @@ business_router = APIRouter()
 async def create_business_basic_info(payload: BusinessBasicInfoInput, db: Session = Depends(get_db)):
     controller = BusinessController(db)
     return await controller.create_business_basic_info(payload)
+
+
+@business_router.put("/update_basic_info", response_model=BusinessData)
+async def update_business_basic_info(
+    payload: BusinessBasicInfoUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    controller = BusinessController(db)
+    return await controller.update_business_basic_info(payload, user)
 
 
 @business_router.get("/get_businesses", response_model=List[BusinessListItem])

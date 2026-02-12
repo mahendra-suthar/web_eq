@@ -39,6 +39,16 @@ class HttpClient {
     this.instance.interceptors.response.use(
       this.handleSuccess,
       (error: any) => {
+        const status = error?.response?.status;
+        if (status === 401 || status === 403) {
+          try {
+            // Clear persisted user state; next load starts unauthenticated
+            window.localStorage.removeItem("web-eq-user");
+          } catch (_) {}
+          try {
+            window.location.replace("/send-otp");
+          } catch (_) {}
+        }
         return Promise.reject(error);
       }
     );
@@ -59,20 +69,13 @@ class HttpClient {
   }
 
   private handleError(error: any): never {
-    console.log("Request error:", error);
     if (axios.isAxiosError(error)) {
       const e = error as AxiosError;
-      console.error("Axios Error Details:", {
-        message: e.message,
-        name: e.name,
-        code: e.code,
-        config: e.config,
-        request: e.request,
-        response: e.response,
-      });
-      // Handle 401 Unauthorized or Network Errors
-      if (e.response?.status === 401 || e.code === "ERR_NETWORK") {
-        console.warn("Unauthorized or Network Error");         
+      const status = e.response?.status;
+      if (status === 401 || e.code === "ERR_NETWORK") {
+        console.warn("Unauthorized or network error", status ?? e.code);
+      } else {
+        console.error("Request error:", e.message, e.response?.data);
       }
     }
     throw error;

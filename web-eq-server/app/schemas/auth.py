@@ -82,8 +82,6 @@ class OTPVerifyInput(BaseModel):
 
 
 class VerifyInvitationInput(BaseModel):
-    """Request body for verifying an employee invitation code."""
-
     code: str
 
     @field_validator("code")

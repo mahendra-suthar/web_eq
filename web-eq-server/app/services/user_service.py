@@ -65,23 +65,24 @@ class UserService:
         return new_user
 
     def update_user_profile(self, user: User, data: UserRegistrationInput) -> User:
+        """Partial update: only set fields that are present in the payload."""
         user_obj = self.db.query(User).filter(User.uuid == user.uuid).first()
         if not user_obj:
             raise ValueError("User not found in current session")
-        
-        user_obj.full_name = data.full_name  # type: ignore[assignment]
-        user_obj.email = data.email  # type: ignore[assignment]
-        if data.date_of_birth:
-            user_obj.date_of_birth = datetime.strptime(data.date_of_birth, "%Y-%m-%d")  # type: ignore[assignment]
-        else:
-            user_obj.date_of_birth = None  # type: ignore[assignment]
-        user_obj.gender = data.gender  # type: ignore[assignment]
-        
+        update_data = data.model_dump(exclude_unset=True)
+        for skip in ("user_type", "client_type"):
+            update_data.pop(skip, None)
+        for field, value in update_data.items():
+            if not hasattr(user_obj, field):
+                continue
+            if field == "date_of_birth" and value is not None:
+                value = datetime.strptime(value, "%Y-%m-%d")
+            setattr(user_obj, field, value)
         try:
             self.db.commit()
             self.db.refresh(user_obj)
             return user_obj
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             self.db.rollback()
             raise
 

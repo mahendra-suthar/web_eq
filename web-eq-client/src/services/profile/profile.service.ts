@@ -117,4 +117,28 @@ export class ProfileService extends HttpClient {
       throw error;
     }
   }
+
+  async updateAddress(
+    entityType: "BUSINESS" | "EMPLOYEE",
+    entityId: string,
+    address: Partial<AddressData> & { street_1: string; city: string; state: string; postal_code: string }
+  ): Promise<unknown> {
+    try {
+      const payload = Object.fromEntries(
+        Object.entries({
+          ...address,
+          street_1: address.street_1,
+          city: address.city,
+          state: address.state,
+          postal_code: address.postal_code,
+          country: address.country ?? "INDIA",
+        }).filter(([_, value]) => value !== undefined)
+      );
+
+      return await this.put(`/address/${entityType}/${entityId}`, payload);
+    } catch (error: any) {
+      console.error("Failed to update address:", error);
+      throw error;
+    }
+  }
 }

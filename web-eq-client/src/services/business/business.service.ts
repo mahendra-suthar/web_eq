@@ -18,6 +18,16 @@ export interface BusinessBasicInfoInput {
   country_code: string;
 }
 
+export interface BusinessBasicInfoUpdate {
+  name?: string;
+  email?: string;
+  about_business?: string;
+  category_id?: string;
+  profile_picture?: string;
+  phone_number?: string;
+  country_code?: string;
+}
+
 export interface BusinessData {
   uuid: string;
   name: string;
@@ -83,26 +93,51 @@ export class BusinessService extends HttpClient {
     }
   }
 
+  async updateBusinessBasicInfo(data: BusinessBasicInfoUpdate): Promise<BusinessData> {
+    try {
+      const payload = Object.fromEntries(
+        Object.entries(data).filter(([_, value]) => value !== undefined)
+      );
+      const response = await this.put<BusinessData>("/business/update_basic_info", payload);
+      return response;
+    } catch (error: any) {
+      console.error("Failed to update business:", error);
+      const errorMessage = error?.response?.data?.detail?.message || "Failed to update business";
+      const customError: any = new Error(errorMessage);
+      customError.errorCode = error?.response?.data?.detail?.error_code;
+      throw customError;
+    }
+  }
+
   async createBusinessSchedules(
     businessId: string,
     schedules: ScheduleInput[],
     isAlwaysOpen: boolean
   ): Promise<ScheduleData[]> {
+    return this.upsertSchedules(businessId, "BUSINESS", schedules, isAlwaysOpen);
+  }
+
+  /** Create or replace schedules for business or employee (profile edit). */
+  async upsertSchedules(
+    entityId: string,
+    entityType: "BUSINESS" | "EMPLOYEE",
+    schedules: ScheduleInput[],
+    isAlwaysOpen?: boolean
+  ): Promise<ScheduleData[]> {
     try {
       const payload: ScheduleCreateInput = {
-        entity_id: businessId,
-        entity_type: "BUSINESS",
-        is_always_open: isAlwaysOpen,
-        schedules: schedules,
+        entity_id: entityId,
+        entity_type: entityType,
+        is_always_open: isAlwaysOpen ?? false,
+        schedules,
       };
       const response = await this.post<ScheduleData[]>("/schedule/create_schedules", payload);
       return response;
     } catch (error: any) {
-      console.error("Failed to create business schedules:", error);
-      const errorMessage = error?.response?.data?.detail?.message || "Failed to create business schedules";
-      const errorCode = error?.response?.data?.detail?.error_code;
+      console.error("Failed to save schedules:", error);
+      const errorMessage = error?.response?.data?.detail?.message || "Failed to save schedules";
       const customError: any = new Error(errorMessage);
-      customError.errorCode = errorCode;
+      customError.errorCode = error?.response?.data?.detail?.error_code;
       throw customError;
     }
   }
