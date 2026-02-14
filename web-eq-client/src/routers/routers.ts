@@ -8,10 +8,12 @@ export const ROUTERS_PATH = {
   BUSINESSREGISTRATION: "/business-registration",
   DASHBOARD: "/dashboard",
   ALLUSERS: "/admin/users",
+  USER_DETAIL: "/admin/users/:userId",
   EMPLOYEES: "/admin/employees",
   BUSINESSPROFILE: "/admin/business-profile",
   EMPLOYEEPROFILE: "/admin/employee-profile",
   QUEUEUSERS: "/admin/queue-users",
+  QUEUE_USER_DETAIL: "/admin/queue-users/:queueUserId",
 } as const;
 
 /** Redirect path when user is authenticated but next_step is not dashboard */

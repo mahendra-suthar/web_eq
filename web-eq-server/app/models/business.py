@@ -48,9 +48,11 @@ class Business(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    owner = relationship("User", foreign_keys=[owner_id], lazy="selectin")
-    category = relationship("Category", foreign_keys=[category_id], lazy="selectin")
-    queue_services = relationship("QueueService", back_populates="business", lazy="selectin")
+    owner = relationship("User", back_populates="businesses_owned", foreign_keys=[owner_id], lazy="selectin")
+    category = relationship("Category", back_populates="businesses", foreign_keys=[category_id], lazy="selectin")
+    queue_services = relationship("QueueService", back_populates="business", lazy="select")
+    queues = relationship("Queue", back_populates="business", lazy="select")
+    employees = relationship("Employee", back_populates="business", lazy="select")
     parent_business = relationship("Business", remote_side=[uuid], foreign_keys=[parent_business_id], lazy="selectin")
     reviews = relationship("Review", back_populates="business", lazy="noload")
 

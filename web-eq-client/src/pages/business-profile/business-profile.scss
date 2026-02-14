@@ -4,54 +4,14 @@
     display: block;
 }
 
-// Tabs Navigation
-.profile-tabs {
-    display: flex;
-    gap: 8px;
+// Tabs (shared Tabs component) spacing below card header
+.business-profile-page .tabs-container {
     margin-top: 20px;
-    margin-bottom: 24px;
-    padding: 8px;
-    border-radius: 8px;
-    background: #f8fafc;
-    overflow-x: auto;
+}
 
-    .tab-button {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        padding: 12px 20px;
-        border: none;
-        background: transparent;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
-        color: #64748b;
-        cursor: pointer;
-        transition: all 0.2s;
-        white-space: nowrap;
-        font-family: inherit;
-
-        .tab-icon {
-            font-size: 18px;
-        }
-
-        &:hover {
-            background: #f8fafc;
-            color: #1e293b;
-        }
-
-        &.active {
-            background: #667eea;
-            color: white;
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-
-            &:hover {
-                background: #5568d3;
-            }
-        }
-    }
+.business-profile-page .tab-icon-svg {
+    width: 20px;
+    height: 20px;
 }
 
 .profile-content {
@@ -486,20 +446,6 @@
 
 // Responsive Design
 @media (max-width: 768px) {
-
-    .profile-tabs {
-        padding: 4px;
-        gap: 4px;
-
-        .tab-button {
-            padding: 10px 12px;
-            font-size: 13px;
-
-            .tab-icon {
-                font-size: 16px;
-            }
-        }
-    }
 
     .basic-info-layout {
         flex-direction: column;

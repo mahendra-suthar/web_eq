@@ -87,3 +87,17 @@ export const MAX_RECONNECT_DELAY_MS = 30000;
 export enum HttpStatus {
   UNAUTHORIZED = 401,
 }
+
+// ============================================================================
+// Day names (0 = Monday … 6 = Sunday)
+// ============================================================================
+
+export const DAY_NAMES = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];

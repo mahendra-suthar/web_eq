@@ -10,8 +10,10 @@ import pytz
 from app.services.business_service import BusinessService
 from app.services.address_service import AddressService
 from app.services.queue_service import QueueService
+from app.services.schedule_service import ScheduleService
 from app.models.address import Address, EntityType
 from app.models.queue import QueueService as QueueServiceModel
+from app.models.schedule import ScheduleEntityType
 from app.models.service import Service
 from app.models.business import Business
 from app.schemas.business import (
@@ -21,6 +23,8 @@ from app.schemas.business import (
     BusinessListItem,
     BusinessDetailData,
     BusinessServiceData,
+    BusinessScheduleInfo,
+    ScheduleDayItem,
 )
 from app.controllers.role_controller import RoleController
 from app.controllers.user_controller import UserController
@@ -33,6 +37,8 @@ class BusinessController:
     def __init__(self, db: Session):
         self.db = db
         self.business_service = BusinessService(db)
+        self.address_service = AddressService(db)
+        self.schedule_service = ScheduleService(db)
         self.role_controller = RoleController(db)
         self.user_controller = UserController(db)
 
@@ -157,11 +163,27 @@ class BusinessController:
             business = self.business_service.get_business_with_category(business_id)
             if not business:
                 raise HTTPException(status_code=404, detail="Business not found")
-            
-            address_service = AddressService(self.db)
-            address = address_service.get_primary_address_by_entity(EntityType.BUSINESS, business_id)
-            
-            return BusinessDetailData.from_business(business, address)
+
+            address = self.address_service.get_primary_address_by_entity(EntityType.BUSINESS, business_id)
+
+            schedule_info: Optional[BusinessScheduleInfo] = None
+            is_always_open = bool(getattr(business, "is_always_open", False))
+            schedules = self.schedule_service.get_schedules_by_entity(business_id, ScheduleEntityType.BUSINESS)
+            if schedules:
+                day_items = [
+                    ScheduleDayItem(
+                        day_of_week=int(s.day_of_week),
+                        opening_time=format_time(s.opening_time) if s.opening_time else None,
+                        closing_time=format_time(s.closing_time) if s.closing_time else None,
+                        is_open=bool(s.is_open),
+                    )
+                    for s in sorted(schedules, key=lambda x: x.day_of_week)
+                ]
+                schedule_info = BusinessScheduleInfo(is_always_open=is_always_open, schedules=day_items)
+            else:
+                schedule_info = BusinessScheduleInfo(is_always_open=is_always_open, schedules=[])
+
+            return BusinessDetailData.from_business(business, address, schedule_info=schedule_info)
         except HTTPException:
             raise
         except SQLAlchemyError:
@@ -174,7 +196,7 @@ class BusinessController:
         try:
             queue_service = QueueService(self.db)
             services_data = queue_service.get_business_services(business_id)
-            
+
             return [
                 BusinessServiceData.from_queue_service_and_service(queue_svc, service)
                 for queue_svc, service in services_data

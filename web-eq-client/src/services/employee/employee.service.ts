@@ -21,6 +21,7 @@ export interface EmployeeResponse {
     phone_number?: string | null;
     profile_picture?: string | null;
     is_verified: boolean;
+    queue_id?: string | null;
 }
 
 export interface VerifyInvitationResponse {

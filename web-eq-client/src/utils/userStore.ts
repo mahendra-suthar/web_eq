@@ -10,6 +10,7 @@ interface UserState {
   setNextStep: (step: string | null) => void;
   isAuthenticated: () => boolean;
   canAccessDashboard: () => boolean;
+  getProfileType: () => ProfileType | null;
   getBusinessId: () => string | null;
   getEmployeeId: () => string | null;
   resetUser: () => void;
@@ -31,6 +32,16 @@ export const useUserStore = create(
       },
 
       canAccessDashboard: () => get().nextStep === "dashboard",
+
+      getProfileType: () => {
+        const profile = get().profile;
+        if (!profile?.profile_type) return null;
+        const pt = profile.profile_type.toUpperCase();
+        if (pt === ProfileType.BUSINESS || pt === ProfileType.EMPLOYEE || pt === ProfileType.CUSTOMER) {
+          return pt as ProfileType;
+        }
+        return null;
+      },
 
       getBusinessId: () => {
         const profile = get().profile;

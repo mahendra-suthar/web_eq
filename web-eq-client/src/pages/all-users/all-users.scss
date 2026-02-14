@@ -2,4 +2,58 @@
 
 .all-users-page {
     display: block;
+
+    .all-users-context {
+        font-size: 0.875rem;
+        color: #64748b;
+        margin: 0 0 1rem 0;
+    }
+
+    .filter-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+
+        .filter-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .filter-select {
+            min-width: 200px;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            background: #fff;
+        }
+    }
+
+    .all-users-error {
+        margin-bottom: 1rem;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        background: #fef2f2;
+        color: #991b1b;
+    }
+
+    .all-users-empty {
+        padding: 2rem;
+        text-align: center;
+        color: #64748b;
+    }
+
+    .loading-state,
+    .empty-state {
+        padding: 2rem;
+        text-align: center;
+        color: #64748b;
+    }
+
+    .action-placeholder {
+        color: #9ca3af;
+        font-size: 0.875rem;
+    }
 }

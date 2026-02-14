@@ -2,10 +2,12 @@ from uuid import UUID
 from datetime import timedelta
 from typing import List, Optional, Tuple
 from sqlalchemy import asc, or_
-from sqlalchemy.orm import Session, load_only
+from sqlalchemy.orm import Session, load_only, joinedload, selectinload
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.models.employee import Employee
+from app.models.business import Business
+from app.models.queue import Queue, QueueService
 from app.schemas.employee import BusinessEmployeesInput, EmployeeUpdate
 from app.core.utils import generate_invitation_code, now_utc
 
@@ -98,9 +100,47 @@ class EmployeeService:
         except SQLAlchemyError:
             raise
 
+    def get_employee_by_id(self, employee_id: UUID) -> Optional[Employee]:
+        try:
+            return self.db.query(Employee).filter(Employee.uuid == employee_id).first()
+        except SQLAlchemyError:
+            raise
+
+    def get_employee_by_id_with_relations(
+        self, employee_id: UUID
+    ) -> Optional[Employee]:
+        try:
+            return (
+                self.db.query(Employee)
+                .options(
+                    joinedload(Employee.user),
+                    joinedload(Employee.queue)
+                        .selectinload(Queue.queue_services)
+                        .joinedload(QueueService.service),
+                )
+                .filter(Employee.uuid == employee_id)
+                .first()
+            )
+        except SQLAlchemyError:
+            raise
+
     def get_employee_by_user_id(self, user_id: UUID) -> Optional[Employee]:
         try:
             return self.db.query(Employee).filter(Employee.user_id == user_id).first()
+        except SQLAlchemyError:
+            raise
+
+    def get_employee_by_user_id_with_relations(self, user_id: UUID) -> Optional[Employee]:
+        try:
+            return (
+                self.db.query(Employee)
+                .options(
+                    joinedload(Employee.business).joinedload(Business.category),
+                    joinedload(Employee.queue),
+                )
+                .filter(Employee.user_id == user_id)
+                .first()
+            )
         except SQLAlchemyError:
             raise
 
@@ -129,7 +169,6 @@ class EmployeeService:
         )
 
     def activate_employee(self, employee_id: UUID, user_id: UUID) -> Employee:
-        """Activate employee by linking user account, setting verification status, and clearing invitation code."""
         try:
             employee = self.db.query(Employee).filter(Employee.uuid == employee_id).first()
             

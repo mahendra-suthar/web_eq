@@ -1,9 +1,21 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { RouterConstant } from '../../routers/index';
+import { useAllowedNavItems } from '../../hooks/usePermission';
+import { useUserStore } from '../../utils/userStore';
+import { ProfileType } from '../../utils/constants';
 
 const Sidebar = () => {
-    const { ROUTERS_PATH } = RouterConstant;
+    const allowedItems = useAllowedNavItems();
+    const profile = useUserStore((s) => s.profile);
+    const profileType = useUserStore((s) => s.getProfileType());
+
+    const displayName = profile?.user?.full_name?.trim() || profile?.user?.phone_number || 'User';
+    const roleLabel = profileType === ProfileType.BUSINESS ? 'Business' : profileType === ProfileType.EMPLOYEE ? 'Employee' : 'User';
+
+    const navWithSections = allowedItems.map((item, index) => ({
+        ...item,
+        showSection: index === 0 || item.sectionTitle !== allowedItems[index - 1].sectionTitle,
+    }));
 
     return (
         <div className="sidebar">
@@ -16,37 +28,29 @@ const Sidebar = () => {
             </div>
 
             <div className="nav-items">
-                <div className="nav-section-title">Overview</div>
-                <NavLink to={ROUTERS_PATH.DASHBOARD} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                    <div className="nav-item-icon">📊</div>
-                    <span>Dashboard</span>
-                </NavLink>
-
-                <div className="nav-section-title">Employee Management</div>
-                <NavLink to={ROUTERS_PATH.EMPLOYEES} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                    <div className="nav-item-icon">👷</div>
-                    <span>Employees</span>
-                </NavLink>
-
-                <div className="nav-section-title">User Management</div>
-                <NavLink to={ROUTERS_PATH.ALLUSERS} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                    <div className="nav-item-icon">👥</div>
-                    <span>All Users</span>
-                    <span className="nav-item-badge">1,234</span>
-                </NavLink>
-
-                <div className="nav-section-title">Queue Management</div>
-                <NavLink to={ROUTERS_PATH.QUEUEUSERS} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                    <div className="nav-item-icon">📋</div>
-                    <span>Queue Users</span>
-                </NavLink>
+                {navWithSections.map((item) => (
+                    <React.Fragment key={item.path}>
+                        {item.showSection && item.sectionTitle && (
+                            <div className="nav-section-title">{item.sectionTitle}</div>
+                        )}
+                        <NavLink to={item.path} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                            <div className="nav-item-icon">{item.icon}</div>
+                            <span>{item.label}</span>
+                            {item.label === 'All Users' && (
+                                <span className="nav-item-badge">1,234</span>
+                            )}
+                        </NavLink>
+                    </React.Fragment>
+                ))}
             </div>
 
             <div className="admin-info">
-                <div className="admin-avatar">AD</div>
+                <div className="admin-avatar">
+                    {displayName.slice(0, 2).toUpperCase()}
+                </div>
                 <div className="admin-details">
-                    <div className="admin-name">Admin User</div>
-                    <div className="admin-role">Super Admin</div>
+                    <div className="admin-name">{displayName}</div>
+                    <div className="admin-role">{roleLabel}</div>
                 </div>
             </div>
         </div>

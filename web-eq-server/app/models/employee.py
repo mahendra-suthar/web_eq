@@ -1,6 +1,7 @@
 import uuid
 from sqlalchemy import Column, String, ForeignKey, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel
 
@@ -20,4 +21,8 @@ class Employee(BaseModel):
     is_verified = Column(Boolean, default=False, nullable=False)
     invitation_code = Column(String(32), unique=True, nullable=True, index=True)
     invitation_code_expires_at = Column(DateTime(timezone=True), nullable=True)
+
+    queue = relationship("Queue", back_populates="employees", foreign_keys=[queue_id], lazy="select")
+    user = relationship("User", back_populates="employees", foreign_keys=[user_id], lazy="select")
+    business = relationship("Business", back_populates="employees", foreign_keys=[business_id], lazy="select")
 

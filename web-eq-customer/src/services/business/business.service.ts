@@ -36,6 +36,18 @@ export interface AddressData {
   longitude: number | null;
 }
 
+export interface ScheduleDayItem {
+  day_of_week: number;
+  opening_time: string | null;
+  closing_time: string | null;
+  is_open: boolean;
+}
+
+export interface BusinessScheduleInfo {
+  is_always_open: boolean;
+  schedules: ScheduleDayItem[];
+}
+
 export interface BusinessDetailData {
   uuid: string;
   name: string;
@@ -48,6 +60,8 @@ export interface BusinessDetailData {
   category_name: string | null;
   address: AddressData | null;
   is_open: boolean;
+  is_always_open: boolean;
+  schedule: BusinessScheduleInfo | null;
 }
 
 export interface BusinessServiceData {

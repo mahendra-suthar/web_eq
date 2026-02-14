@@ -1,174 +1,395 @@
 @use "../../variables.scss" as *;
 
 .business-details-page {
-  max-width: 1200px;
+  max-width: 800px;
   margin: 0 auto;
-  padding: 32px 24px;
-  padding-bottom: 120px; // space for sticky bar
+  padding: 0 20px 140px;
+  min-height: 100vh;
 
-  .business-details-header {
-    margin-bottom: 32px;
+  .bds-loading,
+  .bds-error {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: $text-secondary;
+  }
 
-    .business-details-header-content {
-      .business-details-title {
-        color: $primary-dark;
-        font-family: "Noto Sans Hebrew", serif;
-        font-size: 32px;
-        font-weight: 700;
-        margin: 0 0 16px 0;
-      }
+  .bds-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
 
-      .business-details-meta {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        margin-bottom: 16px;
-
-        p {
-          color: $text-secondary;
-          font-family: "Noto Sans Hebrew", serif;
-          font-size: 16px;
-          margin: 0;
-        }
-      }
-
-      .business-status-badge {
-        display: inline-block;
-        padding: 4px 12px;
-        background-color: #4caf50;
-        color: white;
-        border-radius: 4px;
-        font-size: 12px;
-        font-weight: 600;
-        font-family: "Noto Sans Hebrew", serif;
-      }
+    .bds-loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid $background-neutral;
+      border-top-color: $primary;
+      border-radius: 50%;
+      animation: bds-spin 0.8s linear infinite;
     }
   }
 
-  .business-details-section {
-    margin-bottom: 40px;
+  .bds-error {
+    color: $text-secondary;
+    p { margin: 0; }
+  }
+}
 
-    .section-title {
-      color: $primary-dark;
-      font-family: "Noto Sans Hebrew", serif;
-      font-size: 24px;
-      font-weight: 700;
-      margin: 0 0 16px 0;
-    }
+@keyframes bds-spin {
+  to { transform: rotate(360deg); }
+}
 
-    .section-subtitle {
-      color: $text-secondary;
-      font-family: "Noto Sans Hebrew", serif;
-      font-size: 14px;
-      margin: 0 0 16px 0;
-    }
+.bds-hero {
+  position: relative;
+  margin: 0 -20px 24px;
+  padding: 32px 20px 28px;
+  overflow: hidden;
+}
 
-    .section-description {
-      color: $text-secondary;
-      font-family: "Noto Sans Hebrew", serif;
-      font-size: 16px;
-      line-height: 1.6;
-      margin: 0;
-    }
+.bds-hero-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, $primary-dark 0%, $primary 50%, $primary-light 100%);
+  opacity: 0.96;
+}
+
+.bds-hero-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.bds-hero-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.bds-hero-initial {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.bds-hero-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.bds-hero-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 4px 0;
+  line-height: 1.3;
+}
+
+.bds-hero-category {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0 0 10px 0;
+}
+
+.bds-hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bds-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.bds-badge-open {
+  background: rgba(255, 255, 255, 0.95);
+  color: $primary-dark;
+}
+
+.bds-badge-24 {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+.bds-contact-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid #e8ecef;
+  margin-bottom: 24px;
+}
+
+.bds-contact-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: $primary;
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.bds-contact-icon {
+  font-size: 1.1rem;
+}
+
+.bds-section {
+  margin-bottom: 32px;
+}
+
+.bds-section-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: $primary-dark;
+  margin: 0 0 12px 0;
+}
+
+.bds-section-subtitle {
+  font-size: 0.9rem;
+  color: $text-secondary;
+  margin: 0 0 16px 0;
+}
+
+.bds-about-text {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: $text-primary;
+  margin: 0;
+}
+
+.bds-address-section {
+  .bds-address-block {
+    margin-bottom: 16px;
+  }
+}
+
+.bds-address-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-style: normal;
+  font-size: 0.95rem;
+  color: $text-primary;
+  margin: 0 0 12px 0;
+
+  span {
+    display: block;
+  }
+}
+
+.bds-map-link {
+  display: inline-block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: $primary;
+  text-decoration: none;
+  margin-top: 8px;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.bds-map-wrap {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e8ecef;
+  background: $background-neutral;
+  aspect-ratio: 16 / 10;
+  max-height: 220px;
+}
+
+.bds-map-iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.bds-schedule {
+  background: $background-neutral;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.bds-schedule-always {
+  margin: 0;
+  font-size: 0.95rem;
+  color: $text-primary;
+  font-weight: 500;
+}
+
+.bds-schedule-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.bds-schedule-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #e2e6e9;
+  font-size: 0.9rem;
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.bds-schedule-day {
+  font-weight: 500;
+  color: $text-primary;
+}
+
+.bds-schedule-time {
+  color: $text-secondary;
+}
+
+.bds-services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.bds-service-card {
+  text-align: left;
+  background: #fff;
+  border: 2px solid #e8ecef;
+  border-radius: 12px;
+  padding: 18px;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+
+  &:hover {
+    border-color: $primary-light;
+    box-shadow: 0 4px 12px rgba(0, 105, 92, 0.08);
   }
 
-  .services-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px;
+  &.selected {
+    border-color: $primary;
+    background: rgba(0, 105, 92, 0.06);
+    box-shadow: 0 4px 12px rgba(0, 105, 92, 0.12);
+  }
+}
 
-    @media screen and (max-width: 768px) {
-      grid-template-columns: 1fr;
-    }
+.bds-service-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: $primary-dark;
+  margin: 0 0 8px 0;
+}
+
+.bds-service-desc {
+  font-size: 0.875rem;
+  color: $text-secondary;
+  line-height: 1.45;
+  margin: 0 0 12px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bds-service-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+}
+
+.bds-service-duration {
+  font-size: 0.85rem;
+  color: $text-secondary;
+}
+
+.bds-service-price {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: $primary;
+}
+
+.bds-empty {
+  text-align: center;
+  padding: 2rem;
+  color: $text-secondary;
+  font-size: 0.95rem;
+}
+
+.bds-sticky-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+  z-index: 100;
+  padding: 16px 20px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.bds-sticky-inner {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.bds-sticky-text {
+  font-size: 0.9rem;
+  color: $text-secondary;
+  margin: 0 0 2px 0;
+}
+
+.bds-sticky-total {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: $primary;
+  margin: 0;
+}
+
+@media (min-width: 600px) {
+  .business-details-page {
+    padding-left: 24px;
+    padding-right: 24px;
   }
 
-  .service-card {
-    background: white;
-    border: 2px solid transparent;
-    border-radius: 8px;
-    padding: 16px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-
-    &.selected {
-      border-color: $primary;
-      background-color: #e3f2fd;
-    }
-
-    .service-name {
-      color: $primary-dark;
-      font-family: "Noto Sans Hebrew", serif;
-      font-size: 18px;
-      font-weight: 600;
-      margin: 0 0 8px 0;
-    }
-
-    .service-description {
-      color: $text-secondary;
-      font-family: "Noto Sans Hebrew", serif;
-      font-size: 14px;
-      margin: 0 0 12px 0;
-    }
-
-    .service-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 12px;
-
-      span {
-        color: $text-secondary;
-        font-family: "Noto Sans Hebrew", serif;
-        font-size: 14px;
-      }
-
-      .service-price {
-        color: $primary;
-        font-family: "Noto Sans Hebrew", serif;
-        font-size: 20px;
-        font-weight: 700;
-      }
-    }
+  .bds-hero {
+    margin-left: -24px;
+    margin-right: -24px;
+    padding-left: 24px;
+    padding-right: 24px;
   }
 
-  .business-details-sticky-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: white;
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-    padding: 16px 24px;
-
-    .sticky-bar-content {
-      max-width: 1200px;
-      margin: 0 auto;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 24px;
-
-      .sticky-bar-text {
-        color: $text-secondary;
-        font-family: "Noto Sans Hebrew", serif;
-        font-size: 14px;
-        margin: 0 0 4px 0;
-      }
-
-      .sticky-bar-total {
-        color: $primary;
-        font-family: "Noto Sans Hebrew", serif;
-        font-size: 20px;
-        font-weight: 700;
-        margin: 0;
-      }
-    }
+  .bds-hero-title {
+    font-size: 1.75rem;
   }
 }

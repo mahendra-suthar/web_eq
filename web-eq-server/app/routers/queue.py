@@ -7,11 +7,11 @@ from datetime import date
 from app.db.database import get_db
 from app.controllers.queue_controller import QueueController
 from app.schemas.queue import (
-    QueueCreate, QueueData, QueueUserData,
+    QueueCreate, QueueData, QueueUserData, QueueUserDetailResponse,
     AvailableSlotData, BookingCreateInput, BookingData
 )
 from app.schemas.service import ServiceData
-from app.middleware.permissions import get_current_user
+from app.middleware.permissions import get_current_user, require_roles
 from app.models.user import User
 
 
@@ -27,6 +27,13 @@ async def create_queue(payload: QueueCreate, db: Session = Depends(get_db)):
 async def get_queues(business_id: UUID, db: Session = Depends(get_db)):
     controller = QueueController(db)
     return await controller.get_queues(business_id)
+
+
+@queue_router.get("/queue-user/{queue_user_id}", response_model=QueueUserDetailResponse)
+async def get_queue_user_detail(queue_user_id: UUID, db: Session = Depends(get_db)):
+    controller = QueueController(db)
+    return await controller.get_queue_user_detail(queue_user_id)
+
 
 @queue_router.get("/get_business_services/{business_id}", response_model=List[ServiceData])
 async def get_business_services(business_id: UUID, db: Session = Depends(get_db)):

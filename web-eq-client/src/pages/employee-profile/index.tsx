@@ -6,6 +6,7 @@ import { BusinessService } from '../../services/business/business.service';
 import { EmployeeService } from '../../services/employee/employee.service';
 import { OTPService } from '../../services/otp/otp.service';
 import { emailRegex } from '../../utils/utils';
+import { Tabs } from '../../components/tabs/Tabs';
 import './employee-profile.scss';
 
 interface UserProfileData {
@@ -298,30 +299,15 @@ const EmployeeProfile = () => {
                     <h2 className="card-title">{t("employeeProfile")}</h2>
                 </div>
 
-                <div className="profile-tabs">
-                    <button
-                        className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('overview')}
-                    >
-                        <span className="tab-icon">📋</span>
-                        <span>{t("basicInformation")}</span>
-                    </button>
-                    <button
-                        className={`tab-button ${activeTab === 'location' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('location')}
-                    >
-                        <span className="tab-icon">📍</span>
-                        <span>{t("location")}</span>
-                    </button>
-                    <button
-                        className={`tab-button ${activeTab === 'schedule' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('schedule')}
-                    >
-                        <span className="tab-icon">🕐</span>
-                        <span>{t("schedule")}</span>
-                    </button>
-                </div>
-
+                <Tabs
+                    tabs={[
+                        { id: 'overview', label: t("basicInformation") },
+                        { id: 'location', label: t("location") },
+                        { id: 'schedule', label: t("schedule") },
+                    ]}
+                    activeTabId={activeTab}
+                    onTabChange={(id) => setActiveTab(id as TabType)}
+                >
                 {saveError && (
                     <div className="profile-save-error" role="alert">{saveError}</div>
                 )}
@@ -604,6 +590,7 @@ const EmployeeProfile = () => {
                         </div>
                     )}
                 </div>
+                </Tabs>
             </div>
         </div>
     );

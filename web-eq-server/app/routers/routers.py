@@ -8,7 +8,7 @@ from app.routers.employee import employee_router
 from app.routers.address import address_router
 from app.routers.queue import queue_router
 from app.routers.service import service_router
-from app.routers.user import user_router
+from app.routers.user import user_router, users_router, users_router
 from app.routers.review import review_router
 from app.routers.websocket import router as websocket_router
 
@@ -23,6 +23,7 @@ routers.include_router(address_router, prefix="/address", tags=["Address"])
 routers.include_router(queue_router, prefix="/queue", tags=["Queue"])
 routers.include_router(service_router, prefix="/service", tags=["Service"])
 routers.include_router(user_router, prefix="/user", tags=["User"])
+routers.include_router(users_router, prefix="/users", tags=["Users"])
 routers.include_router(review_router, prefix="/review", tags=["Review"])
 routers.include_router(websocket_router, tags=["WebSocket"])
 

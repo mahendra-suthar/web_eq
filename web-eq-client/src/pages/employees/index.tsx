@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { EmployeeService, EmployeeResponse } from '../../services/employee/employee.service';
 import { useBusinessRegistrationStore } from '../../utils/businessRegistrationStore';
 import { useUserStore } from '../../utils/userStore';
 import { getInitials, getAvatarBackground } from '../../utils/utils';
 import Pagination from '../../components/pagination';
+import { RouterConstant } from '../../routers/index';
 import "./employees.scss";
 
 const Employees = () => {
     const { t } = useTranslation();
     const { businessId: routeBusinessId } = useParams<{ businessId?: string }>();
     const location = useLocation();
+    const navigate = useNavigate();
     const { businessId: storeBusinessId } = useBusinessRegistrationStore();
     const profileBusinessId = useUserStore((s) => s.getBusinessId());
 
@@ -196,13 +198,15 @@ const Employees = () => {
                                     </td>
                                     <td>
                                         <div className="action-buttons">
-                                                <button 
-                                                    className="action-btn" 
-                                                    title={t("view")}
-                                                    aria-label={t("viewEmployee")}
-                                                >
-                                                    👁️
-                                                </button>
+                                            <button
+                                                type="button"
+                                                className="action-btn"
+                                                title={t("view")}
+                                                aria-label={t("viewEmployee")}
+                                                onClick={() => navigate(`${RouterConstant.ROUTERS_PATH.EMPLOYEES}/${emp.uuid}`)}
+                                            >
+                                                👁️
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>

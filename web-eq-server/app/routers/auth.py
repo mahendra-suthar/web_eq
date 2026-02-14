@@ -1,13 +1,15 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Response, Request
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.middleware.permissions import get_current_user, require_roles
 from app.schemas.auth import OTPRequestInput, OTPRequestResponse, OTPVerifyInput, UserRegistrationInput, VerifyInvitationInput
 from app.schemas.user import LoginResponse, UserData
-from app.schemas.profile import UnifiedProfileResponse, CustomerProfileResponse, BusinessProfileResponse
+from app.schemas.profile import UnifiedProfileResponse, CustomerProfileResponse, BusinessProfileResponse, EmployeeDetailsResponse
 from app.controllers.auth_controller import AuthController
 from app.models.user import User
-from app.middleware.permissions import get_current_user
 
 
 auth_router = APIRouter()
@@ -83,3 +85,13 @@ async def get_customer_profile(user: User = Depends(get_current_user), db: Sessi
 async def get_business_profile(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     controller = AuthController(db)
     return await controller.get_business_profile(user)
+
+
+@auth_router.get(
+    "/profile/employee/{employee_id}",
+    response_model=EmployeeDetailsResponse,
+    dependencies=[Depends(require_roles(["BUSINESS"]))],
+)
+async def get_employee_profile_route(employee_id: UUID, db: Session = Depends(get_db)):
+    controller = AuthController(db)
+    return await controller.get_employee_details(employee_id)

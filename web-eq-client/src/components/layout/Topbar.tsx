@@ -18,10 +18,13 @@ const Topbar = () => {
 
     const pageTitle = useMemo(() => {
         const path = location.pathname;
-        
+        const isEmployeeDetail = path.startsWith(ROUTERS_PATH.EMPLOYEES + "/") && path !== ROUTERS_PATH.EMPLOYEES;
+
         if (path === ROUTERS_PATH.DASHBOARD) {
             return t("dashboard");
-        } else         if (path === ROUTERS_PATH.EMPLOYEES) {
+        } else if (isEmployeeDetail) {
+            return t("employeeDetail");
+        } else if (path === ROUTERS_PATH.EMPLOYEES) {
             return t("employeeManagement");
         } else if (path === ROUTERS_PATH.ALLUSERS) {
             return t("userManagement");

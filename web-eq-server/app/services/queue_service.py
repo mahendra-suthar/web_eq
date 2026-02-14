@@ -1,10 +1,10 @@
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Tuple, cast, Optional
 from uuid import UUID
 
-from app.models.queue import Queue, QueueService as QueueServiceModel, QueueUser
+from app.models.queue import Queue, QueueService as QueueServiceModel, QueueUser, QueueUserService
 from app.models.service import Service
 from app.models.employee import Employee
 from app.models.user import User
@@ -53,6 +53,22 @@ class QueueService:
             raise
         except Exception:
             self.db.rollback()
+            raise
+
+    def get_queue_user_by_id_with_relations(self, queue_user_id: UUID) -> Optional[QueueUser]:
+        """Load queue user with user, queue, and selected services (queue_user_services -> queue_service -> service)."""
+        try:
+            return (
+                self.db.query(QueueUser)
+                .options(
+                    joinedload(QueueUser.user),
+                    joinedload(QueueUser.queue),
+                    selectinload(QueueUser.queue_user_services).joinedload(QueueUserService.queue_service).joinedload(QueueServiceModel.service),
+                )
+                .filter(QueueUser.uuid == queue_user_id)
+                .first()
+            )
+        except SQLAlchemyError:
             raise
 
     def get_queues(self, business_id: UUID):  # type: ignore

@@ -20,7 +20,6 @@ from app.core.constants import BUSINESS_REGISTERED
 from app.models.user import User
 from app.models.address import EntityType
 from app.models.schedule import ScheduleEntityType
-from app.models.queue import Queue
 from app.schemas.auth import (
     OTPRequestInput, OTPRequestResponse, OTPRequestErrorCode, OTPVerifyInput,
     OTPVerifyErrorCode, UserRegistrationInput, VerifyInvitationInput
@@ -28,7 +27,8 @@ from app.schemas.auth import (
 from app.schemas.user import LoginResponse, UserData
 from app.schemas.profile import (
     UnifiedProfileResponse, CustomerProfileResponse, BusinessProfileResponse,
-    OwnerInfo, BusinessInfo, EmployeeInfo, ScheduleInfo, AddressData
+    OwnerInfo, BusinessInfo, EmployeeInfo, ScheduleInfo, AddressData, EmployeeDetailsResponse,
+    QueueDetailInfo, QueueDetailServiceData,
 )
 from app.schemas.schedule import ScheduleData
 from app.core.context import RequestContext
@@ -357,17 +357,13 @@ class AuthController:
         entity_id = UUID(str(user.uuid))  # type: ignore[arg-type]
 
         if user_type == "EMPLOYEE":
-            employee = self.employee_service.get_employee_by_user_id(entity_id)
+            employee = self.employee_service.get_employee_by_user_id_with_relations(entity_id)
             if not employee:
                 raise HTTPException(status_code=404, detail="Employee not found")
-            business = self.business_service.get_business_with_category(UUID(str(employee.business_id)))  # type: ignore[arg-type]
+            business = employee.business
             if not business:
                 raise HTTPException(status_code=404, detail="Business not found")
-            queue = (
-                self.db.query(Queue).filter(Queue.uuid == employee.queue_id).first()
-                if getattr(employee, "queue_id", None) else None
-            )
-            employee_info = EmployeeInfo.from_employee(employee, queue=queue)
+            employee_info = EmployeeInfo.from_employee(employee, queue=employee.queue)
             entity_id = UUID(str(employee.uuid))  # type: ignore[arg-type]
             entity_type_addr = EntityType.EMPLOYEE
             entity_type_sched = ScheduleEntityType.EMPLOYEE
@@ -393,6 +389,73 @@ class AuthController:
             employee=employee_info,
         )
 
+    async def get_employee_details(self, employee_id: UUID) -> EmployeeDetailsResponse:
+        employee = self.employee_service.get_employee_by_id_with_relations(employee_id)
+        if not employee:
+            raise HTTPException(status_code=404, detail="Employee not found")
+        employee_info = EmployeeInfo.from_employee(employee, queue=employee.queue)
+        if employee.user:
+            user_info = OwnerInfo.from_user(employee.user)
+        else:
+            user_info = self.user_info_from_employee(employee)
+        address = self.get_primary_address(EntityType.EMPLOYEE, employee.uuid)
+        schedule = self.get_schedule_info(employee.uuid, ScheduleEntityType.EMPLOYEE, False)
+        queue_detail = self.build_queue_detail(employee.queue) if employee.queue else None
+        return EmployeeDetailsResponse(
+            user=user_info,
+            address=address,
+            schedule=schedule,
+            employee=employee_info,
+            queue_detail=queue_detail,
+        )
+
+    def build_queue_detail(self, queue) -> QueueDetailInfo:
+        start_time = None
+        if getattr(queue, "start_time", None) is not None and hasattr(queue.start_time, "strftime"):
+            start_time = queue.start_time.strftime("%H:%M")
+        end_time = None
+        if getattr(queue, "end_time", None) is not None and hasattr(queue.end_time, "strftime"):
+            end_time = queue.end_time.strftime("%H:%M")
+        services = []
+        for qs in getattr(queue, "queue_services", []) or []:
+            svc = getattr(qs, "service", None)
+            name = (svc.name if svc else None) or ""
+            description = getattr(qs, "description", None) or (getattr(svc, "description", None) if svc else None)
+            services.append(
+                QueueDetailServiceData(
+                    uuid=str(qs.uuid),
+                    name=name,
+                    description=description,
+                    service_fee=getattr(qs, "service_fee", None),
+                    avg_service_time=getattr(qs, "avg_service_time", None),
+                )
+            )
+        return QueueDetailInfo(
+            uuid=str(queue.uuid),
+            business_id=str(queue.merchant_id),
+            name=queue.name,
+            status=queue.status,
+            limit=getattr(queue, "limit", None),
+            start_time=start_time,
+            end_time=end_time,
+            current_length=getattr(queue, "current_length", None),
+            serves_num=getattr(queue, "serves_num", None),
+            is_counter=getattr(queue, "is_counter", None),
+            services=services,
+        )
+
+    def user_info_from_employee(self, employee) -> OwnerInfo:
+        return OwnerInfo(
+            uuid=str(employee.uuid),
+            full_name=getattr(employee, "full_name", None),
+            email=getattr(employee, "email", None),
+            phone_number=getattr(employee, "phone_number", None) or "",
+            country_code=getattr(employee, "country_code", None) or "",
+            profile_picture=getattr(employee, "profile_picture", None),
+            date_of_birth=None,
+            gender=None,
+        )
+
     async def get_profile(self, user: User) -> UnifiedProfileResponse:
         user_type = RequestContext.get_user_type()
         user_info = OwnerInfo.from_user(user)
@@ -416,13 +479,10 @@ class AuthController:
             )
 
         if user_type == "EMPLOYEE":
-            employee = self.employee_service.get_employee_by_user_id(entity_id)
+            employee = self.employee_service.get_employee_by_user_id_with_relations(entity_id)
             if not employee:
                 raise HTTPException(status_code=404, detail="Employee not found")
-            queue = None
-            if getattr(employee, "queue_id", None) is not None:
-                queue = self.db.query(Queue).filter(Queue.uuid == employee.queue_id).first()
-            business = self.business_service.get_business_with_category(UUID(str(employee.business_id)))  # type: ignore[arg-type]
+            business = employee.business
             addresses = self.address_service.get_addresses_by_entity(EntityType.EMPLOYEE, UUID(str(employee.uuid)))  # type: ignore[arg-type]
             address = AddressData.from_address(addresses[0]) if addresses else None
             schedules = self.schedule_service.get_schedules_by_entity(UUID(str(employee.uuid)), ScheduleEntityType.EMPLOYEE)  # type: ignore[arg-type]
@@ -430,7 +490,7 @@ class AuthController:
                 profile_type="EMPLOYEE",
                 user=user_info,
                 business=BusinessInfo.from_business(business) if business else None,
-                employee=EmployeeInfo.from_employee(employee, queue=queue),
+                employee=EmployeeInfo.from_employee(employee, queue=employee.queue),
                 address=address,
                 schedule=ScheduleInfo(
                     is_always_open=False,

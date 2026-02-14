@@ -9,7 +9,7 @@ from app.services.queue_service import QueueService
 from app.services.business_service import BusinessService
 from app.services.realtime.queue_manager import queue_manager
 from app.schemas.queue import (
-    QueueCreate, QueueData, QueueUserData,
+    QueueCreate, QueueData, QueueUserData, QueueUserDetailResponse, QueueUserDetailUserInfo,
     AvailableSlotData, BookingCreateInput, BookingData, BookingServiceData
 )
 from app.schemas.user import UserData
@@ -17,6 +17,7 @@ from app.schemas.service import ServiceData
 from app.models.service import Service
 from app.models.queue import Queue, QueueService as QueueServiceModel, QueueUser, QueueUserService
 from app.models.business import Business
+from app.models.employee import Employee
 from app.core.constants import BUSINESS_REGISTERED, QUEUE_USER_REGISTERED
 
 
@@ -55,6 +56,53 @@ class QueueController:
             raise HTTPException(status_code=500, detail=f"Database error occurred while getting queue: {str(e)}")
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to get queue: {str(e)}")
+
+    async def get_queue_user_detail(self, queue_user_id: UUID) -> QueueUserDetailResponse:
+        try:
+            queue_user = self.queue_service.get_queue_user_by_id_with_relations(queue_user_id)
+            if not queue_user:
+                raise HTTPException(status_code=404, detail="Queue user not found")
+            if not queue_user.user or not queue_user.queue:
+                raise HTTPException(status_code=404, detail="Queue user data incomplete")
+            service_names = [
+                rel.queue_service.service.name
+                for rel in (queue_user.queue_user_services or [])
+                if rel.queue_service and rel.queue_service.service
+            ]
+            employee_id = str(queue_user.queue.employees[0].uuid) if queue_user.queue.employees else None
+            return QueueUserDetailResponse(
+                user=QueueUserDetailUserInfo(
+                    full_name=queue_user.user.full_name,
+                    email=queue_user.user.email,
+                    phone_number=queue_user.user.phone_number,
+                    country_code=queue_user.user.country_code,
+                    profile_picture=queue_user.user.profile_picture,
+                ),
+                queue_name=queue_user.queue.name,
+                service_names=service_names,
+                queue_user_id=str(queue_user.uuid),
+                token_number=queue_user.token_number,
+                queue_date=queue_user.queue_date,
+                enqueue_time=queue_user.enqueue_time,
+                dequeue_time=queue_user.dequeue_time,
+                status=queue_user.status,
+                priority=queue_user.priority,
+                turn_time=queue_user.turn_time,
+                estimated_enqueue_time=queue_user.estimated_enqueue_time,
+                estimated_dequeue_time=queue_user.estimated_dequeue_time,
+                joined_queue=queue_user.joined_queue,
+                is_scheduled=queue_user.is_scheduled,
+                notes=queue_user.notes,
+                cancellation_reason=queue_user.cancellation_reason,
+                reschedule_count=queue_user.reschedule_count,
+                employee_id=employee_id
+            )
+        except HTTPException:
+            raise
+        except SQLAlchemyError as e:
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to get queue user detail: {str(e)}")
 
     async def get_business_services(self, business_id: UUID) -> List[ServiceData]:
         try:

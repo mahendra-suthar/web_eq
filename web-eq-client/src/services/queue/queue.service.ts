@@ -11,6 +11,36 @@ export interface QueueCreatePayload {
     }[];
 }
 
+export interface QueueUserDetailUserInfo {
+  full_name?: string | null;
+  email?: string | null;
+  phone_number: string;
+  country_code: string;
+  profile_picture?: string | null;
+}
+
+export interface QueueUserDetailResponse {
+  user: QueueUserDetailUserInfo;
+  queue_name: string;
+  service_names: string[];
+  employee_id?: string | null;
+  queue_user_id: string;
+  token_number?: string | null;
+  queue_date: string;
+  enqueue_time?: string | null;
+  dequeue_time?: string | null;
+  status?: number | null;
+  priority: boolean;
+  turn_time?: number | null;
+  estimated_enqueue_time?: string | null;
+  estimated_dequeue_time?: string | null;
+  joined_queue: boolean;
+  is_scheduled: boolean;
+  notes?: string | null;
+  cancellation_reason?: string | null;
+  reschedule_count: number;
+}
+
 export interface QueueUserData {
     uuid: string;
     user_id: string;
@@ -48,6 +78,15 @@ export class QueueService extends HttpClient {
             return await this.post<any>(`/queue/create_queue`, payload);
         } catch (error: any) {
             console.error("Failed to create queue:", error);
+            throw error;
+        }
+    }
+
+    async getQueueUserDetail(queueUserId: string): Promise<QueueUserDetailResponse> {
+        try {
+            return await this.get<QueueUserDetailResponse>(`/queue/queue-user/${queueUserId}`);
+        } catch (error: any) {
+            console.error("Failed to get queue user detail:", error);
             throw error;
         }
     }

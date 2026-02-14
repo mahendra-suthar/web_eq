@@ -1,6 +1,7 @@
 import uuid
 from sqlalchemy import String, Column, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel
 
@@ -14,4 +15,7 @@ class Service(BaseModel):
     description = Column(String, nullable=True)
     image = Column(String, nullable=True)
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.uuid"), nullable=True)
+
+    category = relationship("Category", back_populates="services", foreign_keys=[category_id], lazy="select")
+    queue_services = relationship("QueueService", back_populates="service", lazy="select")
 

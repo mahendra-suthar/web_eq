@@ -66,6 +66,29 @@ class QueueInfo(BaseModel):
     status: Optional[int] = None
 
 
+class QueueDetailServiceData(BaseModel):
+    uuid: str
+    name: str
+    description: Optional[str] = None
+    service_fee: Optional[float] = None
+    avg_service_time: Optional[int] = None  # minutes
+
+
+class QueueDetailInfo(BaseModel):
+    """Queue with full details and services (from employee queue_services)."""
+    uuid: str
+    business_id: str
+    name: str
+    status: Optional[int] = None
+    limit: Optional[int] = None
+    start_time: Optional[str] = None  # "HH:MM"
+    end_time: Optional[str] = None
+    current_length: Optional[int] = None
+    serves_num: Optional[int] = None
+    is_counter: Optional[bool] = None
+    services: List[QueueDetailServiceData] = []
+
+
 class EmployeeInfo(BaseModel):
     uuid: str
     business_id: str
@@ -163,3 +186,10 @@ class UnifiedProfileResponse(BaseModel):
     employee: Optional[EmployeeInfo] = None
     address: Optional[AddressData] = None
     schedule: Optional[ScheduleInfo] = None
+
+class EmployeeDetailsResponse(BaseModel):
+    user: OwnerInfo
+    address: Optional[AddressData] = None
+    schedule: Optional[ScheduleInfo] = None
+    employee: Optional[EmployeeInfo] = None
+    queue_detail: Optional[QueueDetailInfo] = None  # when employee has queue, includes services

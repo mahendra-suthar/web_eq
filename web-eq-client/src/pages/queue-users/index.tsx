@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { QueueService, QueueUserData } from '../../services/queue/queue.service';
 import { ProfileService } from '../../services/profile/profile.service';
@@ -10,6 +11,7 @@ import "./queue-users.scss";
 
 const QueueUsers = () => {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const queueService = useMemo(() => new QueueService(), []);
     const profileService = useMemo(() => new ProfileService(), []);
     const { profile, setProfile, getBusinessId, getEmployeeId } = useUserStore();
@@ -276,6 +278,7 @@ const QueueUsers = () => {
                                                     className="action-btn" 
                                                     title={t("view")}
                                                     aria-label={t("view")}
+                                                    onClick={() => navigate(`/admin/queue-users/${queueUser.uuid}`)}
                                                 >
                                                     👁️
                                                 </button>

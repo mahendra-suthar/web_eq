@@ -63,3 +63,38 @@
         }
     }
 }
+
+/* Common pagination (page + limit) */
+.common-pagination {
+    .pagination-limit {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-right: 12px;
+
+        .pagination-limit-label {
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .pagination-limit-select {
+            padding: 4px 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 13px;
+            background: #fff;
+        }
+    }
+
+    .pagination-info,
+    .pagination-current {
+        font-size: 13px;
+        color: #64748b;
+        margin-right: 8px;
+    }
+
+    .pagination-current {
+        font-weight: 500;
+        color: #334155;
+    }
+}

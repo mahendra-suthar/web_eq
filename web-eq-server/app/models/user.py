@@ -25,4 +25,8 @@ class User(Base):
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     roles = relationship("UserRoles", back_populates="user", cascade="all, delete-orphan", passive_deletes=True, lazy="selectin")
+    employees = relationship("Employee", back_populates="user", lazy="select")
+    businesses_owned = relationship("Business", back_populates="owner", lazy="select")
+    queue_users = relationship("QueueUser", back_populates="user", lazy="select")
+    reviews = relationship("Review", back_populates="user", lazy="select")
 

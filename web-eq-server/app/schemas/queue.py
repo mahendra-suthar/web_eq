@@ -56,6 +56,36 @@ class QueueUserData(BaseModel):
         from_attributes = True
 
 
+class QueueUserDetailUserInfo(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: str
+    country_code: str
+    profile_picture: Optional[str] = None
+
+
+class QueueUserDetailResponse(BaseModel):
+    user: QueueUserDetailUserInfo
+    queue_name: str
+    service_names: List[str] = []
+    employee_id: Optional[str] = None  # for redirect to employee detail → queue tab
+    queue_user_id: str
+    token_number: Optional[str] = None
+    queue_date: date
+    enqueue_time: Optional[datetime] = None
+    dequeue_time: Optional[datetime] = None
+    status: Optional[int] = None
+    priority: bool = False
+    turn_time: Optional[int] = None  # minutes
+    estimated_enqueue_time: Optional[datetime] = None
+    estimated_dequeue_time: Optional[datetime] = None
+    joined_queue: bool = False
+    is_scheduled: bool = False
+    notes: Optional[str] = None
+    cancellation_reason: Optional[str] = None
+    reschedule_count: int = 0
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Customer Booking Schemas
 # ─────────────────────────────────────────────────────────────────────────────

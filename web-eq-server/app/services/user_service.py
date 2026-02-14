@@ -1,14 +1,17 @@
 from sqlalchemy.orm import Session, load_only
-from sqlalchemy import and_, or_, asc
+from sqlalchemy import and_, or_, asc, func
 from uuid import UUID
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Any
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.models.user import User
 from app.models.role import UserRoles, Role
+from app.models.queue import Queue, QueueUser
 from app.schemas.auth import UserRegistrationInput
+from app.schemas.user import AppointmentUserItem
 from app.core.context import RequestContext
+from app.utils.pagination import paginate_query
 
 
 class UserService:
@@ -17,6 +20,26 @@ class UserService:
 
     def get_user_by_id(self, user_id: UUID) -> Optional[User]:
         return self.db.query(User).filter(User.uuid == user_id).first()
+
+    def get_user_detail(self, user_id: UUID) -> Optional[Tuple[User, List[Any]]]:
+        user = self.get_user_by_id(user_id)
+        if not user:
+            return None
+
+        rows = (
+            self.db.query(
+                Queue.uuid.label("queue_id"),
+                Queue.name.label("queue_name"),
+                func.count(QueueUser.uuid).label("total_appointments"),
+                func.max(QueueUser.created_at).label("last_visit"),
+            )
+            .join(QueueUser, QueueUser.queue_id == Queue.uuid)
+            .filter(QueueUser.user_id == user_id)
+            .group_by(Queue.uuid, Queue.name)
+            .order_by(func.max(QueueUser.created_at).desc().nullslast())
+            .all()
+        )
+        return (user, rows)
 
     def get_user_by_phone(self, country_code: str, phone_number: str) -> Optional[User]:
         return (
@@ -117,5 +140,58 @@ class UserService:
 
         except SQLAlchemyError:
             raise
+
+    def get_users_with_appointments(
+        self,
+        business_id: Optional[UUID] = None,
+        queue_id: Optional[UUID] = None,
+        page: int = 1,
+        limit: int = 20,
+    ) -> Tuple[List[AppointmentUserItem], int]:
+        base = (
+            self.db.query(
+                User.uuid.label("user_id"),
+                User.full_name,
+                User.email,
+                User.country_code,
+                User.phone_number,
+                func.count(QueueUser.uuid).label("total_appointments"),
+                func.max(QueueUser.created_at).label("last_visit_date"),
+            )
+            .join(QueueUser, QueueUser.user_id == User.uuid)
+            .join(Queue, Queue.uuid == QueueUser.queue_id)
+        )
+        if business_id is not None:
+            base = base.filter(Queue.merchant_id == business_id)
+        else:
+            base = base.filter(Queue.uuid == queue_id)
+
+        base_grouped = base.group_by(User.uuid, User.full_name, User.email, User.country_code, User.phone_number)
+        rows, total = paginate_query(
+            base_grouped,
+            page=page,
+            limit=limit,
+            order_by=func.max(QueueUser.created_at).desc(),
+        )
+
+        items: List[AppointmentUserItem] = []
+        for row in rows:
+            phone_number = (row.phone_number or "").strip()
+            if row.country_code and phone_number:
+                phone_display = f"{row.country_code} {phone_number}"
+            else:
+                phone_display = phone_number
+            items.append(
+                AppointmentUserItem(
+                    user_id=str(row.user_id),
+                    full_name=row.full_name,
+                    email=row.email,
+                    country_code=row.country_code,
+                    phone_number=phone_display,
+                    total_appointments=row.total_appointments or 0,
+                    last_visit_date=row.last_visit_date,
+                )
+            )
+        return items, total
 
 

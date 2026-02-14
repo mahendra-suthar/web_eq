@@ -94,6 +94,37 @@ export interface BusinessProfileResponse {
   employee?: EmployeeInfo;
 }
 
+export interface QueueDetailServiceData {
+  uuid: string;
+  name: string;
+  description?: string | null;
+  service_fee?: number | null;
+  avg_service_time?: number | null;
+}
+
+export interface QueueDetailInfo {
+  uuid: string;
+  business_id: string;
+  name: string;
+  status?: number | null;
+  limit?: number | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  current_length?: number | null;
+  serves_num?: number | null;
+  is_counter?: boolean | null;
+  services: QueueDetailServiceData[];
+}
+
+/** Employee details for business viewing one of their employees (no business block). */
+export interface EmployeeDetailsResponse {
+  user: OwnerInfo;
+  address?: AddressData;
+  schedule?: ScheduleInfo;
+  employee?: EmployeeInfo;
+  queue_detail?: QueueDetailInfo | null;
+}
+
 export class ProfileService extends HttpClient {
   constructor() {
     super();
@@ -114,6 +145,15 @@ export class ProfileService extends HttpClient {
       return await this.get<BusinessProfileResponse>("/auth/profile/business");
     } catch (error: any) {
       console.error("Failed to fetch business profile:", error);
+      throw error;
+    }
+  }
+
+  async getEmployeeProfile(employeeId: string): Promise<EmployeeDetailsResponse> {
+    try {
+      return await this.get<EmployeeDetailsResponse>(`/auth/profile/employee/${employeeId}`);
+    } catch (error: any) {
+      console.error("Failed to fetch employee profile:", error);
       throw error;
     }
   }

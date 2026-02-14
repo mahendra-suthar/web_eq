@@ -43,9 +43,9 @@ async def update_my_profile(
 
 
 @employee_router.get(
-    "/get_employees/{business_id}", 
-    response_model=list[EmployeeData], 
-    dependencies=[Depends(require_roles(["BUSINESS"]))]
+    "/get_employees/{business_id}",
+    response_model=list[EmployeeData],
+    dependencies=[Depends(require_roles(["BUSINESS"]))],
 )
 async def get_employees(
     business_id: UUID, page: int = 1, limit: int = 10, search: str = "", db: Session = Depends(get_db)

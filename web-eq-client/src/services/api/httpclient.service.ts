@@ -10,18 +10,18 @@ import { getApiUrl } from '../../configs/config';
 
 class HttpClient {
   private instance: AxiosInstance;
+  private baseURL: string;
 
   constructor() {
-    const baseURL = getApiUrl();
+    this.baseURL = getApiUrl();
     this.instance = axios.create({
-      baseURL,
+      baseURL: this.baseURL,
       timeout: 120000, // 2 min
       withCredentials: true,
-    });    
+    });
 
     this.instance.interceptors.request.use(
       (config) => {
-        // Don't set Content-Type for FormData - let browser handle it
         if (!(config.data instanceof FormData)) {
           config.headers['Content-Type'] = 'application/json';
         }
@@ -29,7 +29,7 @@ class HttpClient {
         return config;
       },
       this.handleRequestError
-    ); 
+    );
 
     this.instance.interceptors.request.use(
       this.handleRequestConfig,
@@ -40,14 +40,12 @@ class HttpClient {
       this.handleSuccess,
       (error: any) => {
         const status = error?.response?.status;
+        const code = error?.code;
+
         if (status === 401 || status === 403) {
-          try {
-            // Clear persisted user state; next load starts unauthenticated
-            window.localStorage.removeItem("web-eq-user");
-          } catch (_) {}
-          try {
-            window.location.replace("/send-otp");
-          } catch (_) {}
+          window.dispatchEvent(new Event("auth:unauthorized"));
+        } else if (code === "ERR_NETWORK") {
+          window.dispatchEvent(new Event("auth:unauthorized"));
         }
         return Promise.reject(error);
       }
@@ -72,8 +70,9 @@ class HttpClient {
     if (axios.isAxiosError(error)) {
       const e = error as AxiosError;
       const status = e.response?.status;
-      if (status === 401 || e.code === "ERR_NETWORK") {
-        console.warn("Unauthorized or network error", status ?? e.code);
+      const code = e.code ?? "UNKNOWN";
+      if (status === 401 || code === "ERR_NETWORK") {
+        console.warn("Unauthorized or network error", status ?? code);
       } else {
         console.error("Request error:", e.message, e.response?.data);
       }

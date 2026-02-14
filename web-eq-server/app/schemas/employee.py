@@ -33,9 +33,11 @@ class EmployeeData(BaseModel):
     phone_number: Optional[str] = None
     profile_picture: Optional[str] = None
     is_verified: bool
+    queue_id: Optional[str] = None
 
     @classmethod
     def from_employee(cls, employee) -> "EmployeeData":
+        queue_id = getattr(employee, "queue_id", None)
         return cls(
             uuid=str(employee.uuid),
             business_id=str(employee.business_id),
@@ -45,6 +47,7 @@ class EmployeeData(BaseModel):
             phone_number=getattr(employee, "phone_number", None),
             profile_picture=employee.profile_picture,
             is_verified=employee.is_verified,
+            queue_id=str(queue_id) if queue_id else None,
         )
 
     class Config:

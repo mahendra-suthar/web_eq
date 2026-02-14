@@ -1,0 +1,99 @@
+@use "../../variables.scss" as *;
+
+.tabs-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.tabs-bar {
+  display: flex;
+  gap: 0;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+  overflow-x: auto;
+}
+
+.tabs-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px 16px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.2s, box-shadow 0.2s;
+  font-family: inherit;
+  position: relative;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 3px;
+    background: transparent;
+    border-radius: 3px 3px 0 0;
+  }
+
+  &:hover {
+    color: #64748b;
+  }
+
+  &.tabs-tab--active {
+    color: #1e293b;
+
+    &::after {
+      background: #1e293b;
+    }
+  }
+}
+
+.tabs-tab-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.9;
+
+  svg {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+.tabs-tab--active .tabs-tab-icon {
+  opacity: 1;
+}
+
+.tabs-tab-label {
+  line-height: 1.3;
+}
+
+.tabs-panel {
+  padding: 24px 0 0;
+  min-height: 120px;
+}
+
+@media (max-width: 640px) {
+  .tabs-tab {
+    padding: 12px 14px 14px;
+    font-size: 13px;
+  }
+
+  .tabs-panel {
+    padding: 20px 0 0;
+  }
+}
