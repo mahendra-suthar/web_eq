@@ -33,7 +33,6 @@ def get_users_appointments(
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    """Get unique users who have created appointments. Provide exactly one of business_id or queue_id."""
     controller = UserController(db)
     return controller.get_users_appointments(
         business_id=business_id,
@@ -52,6 +51,5 @@ def get_user_detail(
     user_id: UUID,
     db: Session = Depends(get_db),
 ):
-    """Get complete user information and queue-wise appointment summary. Returns 404 if user not found."""
     controller = UserController(db)
     return controller.get_user_detail(user_id)

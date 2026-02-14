@@ -43,7 +43,6 @@ class LoginResponse(BaseModel):
 
 
 class AppointmentUserItem(BaseModel):
-    """Single user with appointment stats (unique users who have created QueueUsers)."""
     user_id: str
     full_name: Optional[str] = None
     email: Optional[str] = None
@@ -62,7 +61,6 @@ class AppointmentUserItem(BaseModel):
 
 
 class UsersAppointmentsResponse(BaseModel):
-    """Paginated response for GET /users/appointments."""
     items: list[AppointmentUserItem]
     total: int
     page: int
@@ -72,7 +70,6 @@ class UsersAppointmentsResponse(BaseModel):
 # ─── User Detail (GET /users/{user_id}) ─────────────────────────────────────
 
 class UserDetailUserInfo(BaseModel):
-    """Basic user information for user detail page."""
     user_id: str
     full_name: Optional[str] = None
     email: Optional[str] = None
@@ -109,7 +106,6 @@ class QueueSummaryItem(BaseModel):
 
 
 class UserDetailResponse(BaseModel):
-    """Full user detail with queue-wise appointment summary. UI-friendly structure."""
     user_info: UserDetailUserInfo
     queue_summary: list[QueueSummaryItem]
 

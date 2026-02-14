@@ -56,7 +56,6 @@ class QueueService:
             raise
 
     def get_queue_user_by_id_with_relations(self, queue_user_id: UUID) -> Optional[QueueUser]:
-        """Load queue user with user, queue, and selected services (queue_user_services -> queue_service -> service)."""
         try:
             return (
                 self.db.query(QueueUser)

@@ -164,14 +164,11 @@ class AddressData(BaseModel):
 
 
 class CustomerProfileResponse(BaseModel):
-    """Customer profile: personal details only. No business or employee data."""
     user: OwnerInfo
     address: Optional[AddressData] = None
 
 
 class BusinessProfileResponse(BaseModel):
-    """Business profile: owner (userinfo), business, address, schedule.
-    When caller is employee: also includes single employee (with queue)."""
     owner: OwnerInfo
     business: BusinessInfo
     address: Optional[AddressData] = None
