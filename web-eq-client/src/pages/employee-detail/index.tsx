@@ -3,8 +3,11 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AddressData, DaySchedule } from '../../utils/businessRegistrationStore';
 import { ProfileService, EmployeeDetailsResponse, QueueDetailInfo } from '../../services/profile/profile.service';
+import { EmployeeService } from '../../services/employee/employee.service';
+import { BusinessService } from '../../services/business/business.service';
 import { Tabs } from '../../components/tabs/Tabs';
 import { RouterConstant } from '../../routers/index';
+import { emailRegex } from '../../utils/utils';
 import './employee-detail.scss';
 
 const iconOverview = (
@@ -45,11 +48,21 @@ const EmployeeDetail = () => {
     const [error, setError] = useState<string>("");
 
     const profileService = useMemo(() => new ProfileService(), []);
+    const employeeService = useMemo(() => new EmployeeService(), []);
+    const businessService = useMemo(() => new BusinessService(), []);
 
     const [userDisplay, setUserDisplay] = useState({ fullName: "", phoneDisplay: "", email: "" });
     const [employeeDisplay, setEmployeeDisplay] = useState({
         fullName: "", email: "", phoneDisplay: "", queueName: "", isVerified: false, profilePicture: null as string | null,
     });
+    const [employeeCountryCode, setEmployeeCountryCode] = useState("");
+    const [employeePhoneNumber, setEmployeePhoneNumber] = useState("");
+
+    const [editingOverview, setEditingOverview] = useState(false);
+    const [editingLocation, setEditingLocation] = useState(false);
+    const [editingSchedule, setEditingSchedule] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string>("");
     const [queueDisplay, setQueueDisplay] = useState<{ name: string; uuid?: string; status?: number | null } | null>(null);
     const [locationData, setLocationData] = useState<AddressData>({
         unit_number: "", building: "", floor: "", street_1: "", street_2: "",
@@ -94,6 +107,8 @@ const EmployeeDetail = () => {
                     isVerified: emp?.is_verified ?? false,
                     profilePicture: emp?.profile_picture || null,
                 });
+                setEmployeeCountryCode(emp?.country_code || "");
+                setEmployeePhoneNumber(emp?.phone_number || "");
                 if (emp?.queue) {
                     setQueueDisplay({
                         name: emp.queue.name,
@@ -155,6 +170,104 @@ const EmployeeDetail = () => {
             setActiveTab('queue');
         }
     }, [queueDisplay?.uuid, location.state]);
+
+    const handleSaveEmployee = useCallback(async () => {
+        if (!employeeId) return;
+        const fullName = employeeDisplay.fullName.trim();
+        if (!fullName) {
+            setSaveError(t("fullNameRequired"));
+            return;
+        }
+        const email = employeeDisplay.email?.trim() || undefined;
+        if (email && !emailRegex.test(email)) {
+            setSaveError(t("emailInvalid"));
+            return;
+        }
+        setSaveError("");
+        setSaving(true);
+        try {
+            await employeeService.updateEmployee(employeeId, {
+                full_name: fullName,
+                email: email || undefined,
+                country_code: employeeCountryCode.trim() || undefined,
+                phone_number: employeePhoneNumber.trim() || undefined,
+            });
+            await fetchProfile();
+            setEditingOverview(false);
+        } catch (err: any) {
+            setSaveError(err?.response?.data?.detail?.message || err?.message || t("failedToLoadEmployees"));
+        } finally {
+            setSaving(false);
+        }
+    }, [employeeId, employeeDisplay.fullName, employeeDisplay.email, employeeCountryCode, employeePhoneNumber, employeeService, fetchProfile, t]);
+
+    const handleCancelEdit = useCallback(() => {
+        setEditingOverview(false);
+        setSaveError("");
+        fetchProfile();
+    }, [fetchProfile]);
+
+    const handleSaveLocation = useCallback(async () => {
+        if (!employeeId) return;
+        if (!locationData.street_1?.trim() || !locationData.city?.trim() || !locationData.state?.trim() || !locationData.postal_code?.trim()) {
+            setSaveError(t("enterBusinessAddress"));
+            return;
+        }
+        setSaveError("");
+        setSaving(true);
+        try {
+            await profileService.updateAddress("EMPLOYEE", employeeId, {
+                ...locationData,
+                street_1: locationData.street_1,
+                city: locationData.city,
+                state: locationData.state,
+                postal_code: locationData.postal_code,
+            });
+            await fetchProfile();
+            setEditingLocation(false);
+        } catch (err: any) {
+            setSaveError(err?.response?.data?.detail?.message || err?.message || t("failedToLoadEmployees"));
+        } finally {
+            setSaving(false);
+        }
+    }, [employeeId, locationData, profileService, fetchProfile, t]);
+
+    const handleCancelLocation = useCallback(() => {
+        setEditingLocation(false);
+        setSaveError("");
+        fetchProfile();
+    }, [fetchProfile]);
+
+    const handleSaveSchedule = useCallback(async () => {
+        if (!employeeId) return;
+        if (!scheduleData.isAlwaysOpen && scheduleData.schedule.every(d => !d.is_open)) {
+            setSaveError(t("selectAtLeastOneDay"));
+            return;
+        }
+        setSaveError("");
+        setSaving(true);
+        try {
+            const schedules = scheduleData.schedule.map(d => ({
+                day_of_week: d.day_of_week,
+                is_open: d.is_open,
+                opening_time: d.is_open && d.opening_time ? d.opening_time : undefined,
+                closing_time: d.is_open && d.closing_time ? d.closing_time : undefined,
+            }));
+            await businessService.upsertSchedules(employeeId, "EMPLOYEE", schedules, scheduleData.isAlwaysOpen);
+            await fetchProfile();
+            setEditingSchedule(false);
+        } catch (err: any) {
+            setSaveError(err?.message || err?.response?.data?.detail?.message || t("failedToLoadEmployees"));
+        } finally {
+            setSaving(false);
+        }
+    }, [employeeId, scheduleData, businessService, fetchProfile, t]);
+
+    const handleCancelSchedule = useCallback(() => {
+        setEditingSchedule(false);
+        setSaveError("");
+        fetchProfile();
+    }, [fetchProfile]);
 
     const tabItems = useMemo(() => {
         const items: { id: TabType; label: string; icon: React.ReactNode }[] = [
@@ -219,6 +332,11 @@ const EmployeeDetail = () => {
                     onTabChange={(id) => setActiveTab(id as TabType)}
                 >
                 <div className="profile-content">
+                    {saveError && (
+                        <div className="employee-detail-save-error" role="alert">
+                            {saveError}
+                        </div>
+                    )}
                     {activeTab === 'overview' && (
                         <div className="profile-section">
                             <div className="section-header">
@@ -244,7 +362,23 @@ const EmployeeDetail = () => {
                                 </div>
 
                                 <div className="info-block employee-block">
-                                    <h3 className="info-block-title">{t("employee")}</h3>
+                                    <div className="info-block-header-actions">
+                                        <h3 className="info-block-title">{t("employee")}</h3>
+                                        {!editingOverview ? (
+                                            <button type="button" className="btn btn-primary" onClick={() => setEditingOverview(true)}>
+                                                {t("editProfile")}
+                                            </button>
+                                        ) : (
+                                            <div className="section-actions">
+                                                <button type="button" className="btn btn-secondary" onClick={handleCancelEdit} disabled={saving}>
+                                                    {t("cancel")}
+                                                </button>
+                                                <button type="button" className="btn btn-primary" onClick={handleSaveEmployee} disabled={saving}>
+                                                    {saving ? t("saving") : t("saveChanges")}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                     <div className="basic-info-layout">
                                         <div className="profile-picture-container">
                                             <div className="profile-picture-wrapper">
@@ -261,15 +395,57 @@ const EmployeeDetail = () => {
                                         <div className="info-grid">
                                             <div className="info-field">
                                                 <label className="info-label">{t("fullName")}</label>
-                                                <div className="info-value">{employeeDisplay.fullName || t("notAvailable")}</div>
+                                                {editingOverview ? (
+                                                    <input
+                                                        type="text"
+                                                        className="info-input"
+                                                        value={employeeDisplay.fullName}
+                                                        onChange={e => setEmployeeDisplay(prev => ({ ...prev, fullName: e.target.value }))}
+                                                        placeholder={t("enterFullName")}
+                                                    />
+                                                ) : (
+                                                    <div className="info-value">{employeeDisplay.fullName || t("notAvailable")}</div>
+                                                )}
                                             </div>
                                             <div className="info-field">
                                                 <label className="info-label">{t("email")}</label>
-                                                <div className="info-value">{employeeDisplay.email || t("notAvailable")}</div>
+                                                {editingOverview ? (
+                                                    <input
+                                                        type="email"
+                                                        className="info-input"
+                                                        value={employeeDisplay.email}
+                                                        onChange={e => setEmployeeDisplay(prev => ({ ...prev, email: e.target.value }))}
+                                                        placeholder={t("enterEmail")}
+                                                    />
+                                                ) : (
+                                                    <div className="info-value">{employeeDisplay.email || t("notAvailable")}</div>
+                                                )}
                                             </div>
+                                            {editingOverview && (
+                                                <div className="info-field">
+                                                    <label className="info-label">{t("countryCode")}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="info-input"
+                                                        value={employeeCountryCode}
+                                                        onChange={e => setEmployeeCountryCode(e.target.value)}
+                                                        placeholder="+91"
+                                                    />
+                                                </div>
+                                            )}
                                             <div className="info-field">
                                                 <label className="info-label">{t("phoneNumber")}</label>
-                                                <div className="info-value">{employeeDisplay.phoneDisplay || t("notAvailable")}</div>
+                                                {editingOverview ? (
+                                                    <input
+                                                        type="tel"
+                                                        className="info-input"
+                                                        value={employeePhoneNumber}
+                                                        onChange={e => setEmployeePhoneNumber(e.target.value.replace(/\D/g, "").slice(0, 15))}
+                                                        placeholder={t("enterPhoneNumber")}
+                                                    />
+                                                ) : (
+                                                    <div className="info-value">{employeeDisplay.phoneDisplay || t("notAvailable")}</div>
+                                                )}
                                             </div>
                                             <div className="info-field">
                                                 <label className="info-label">{t("isVerified")}</label>
@@ -286,40 +462,67 @@ const EmployeeDetail = () => {
 
                     {activeTab === 'location' && (
                         <div className="profile-section">
-                            <div className="section-header">
+                            <div className="section-header section-header-actions">
                                 <h2 className="section-title">{t("location")}</h2>
+                                {!editingLocation ? (
+                                    <button type="button" className="btn btn-primary" onClick={() => setEditingLocation(true)}>
+                                        {t("editProfile")}
+                                    </button>
+                                ) : (
+                                    <div className="section-actions">
+                                        <button type="button" className="btn btn-secondary" onClick={handleCancelLocation} disabled={saving}>{t("cancel")}</button>
+                                        <button type="button" className="btn btn-primary" onClick={handleSaveLocation} disabled={saving}>
+                                            {saving ? t("saving") : t("saveChanges")}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                             <div className="section-content">
                                 <div className="info-grid">
                                     {[
-                                        { key: 'unit_number', label: t("unitNumber") },
-                                        { key: 'building', label: t("building") },
-                                        { key: 'floor', label: t("floor") },
-                                    ].map(({ key, label }) => (
+                                        { key: 'unit_number', label: t("unitNumber"), placeholder: t("enterUnitNumber") },
+                                        { key: 'building', label: t("building"), placeholder: t("enterBuilding") },
+                                        { key: 'floor', label: t("floor"), placeholder: t("enterFloor") },
+                                    ].map(({ key, label, placeholder }) => (
                                         <div key={key} className="info-field">
                                             <label className="info-label">{label}</label>
-                                            <div className="info-value">{(locationData as any)[key] || t("notAvailable")}</div>
+                                            {editingLocation ? (
+                                                <input type="text" className="info-input" value={(locationData as any)[key] || ""}
+                                                    onChange={e => setLocationData(prev => ({ ...prev, [key]: e.target.value }))} placeholder={placeholder} />
+                                            ) : (
+                                                <div className="info-value">{(locationData as any)[key] || t("notAvailable")}</div>
+                                            )}
                                         </div>
                                     ))}
                                     {[
-                                        { key: 'street_1', label: t("street1"), fullWidth: true },
-                                        { key: 'street_2', label: t("street2"), fullWidth: true },
-                                    ].map(({ key, label, fullWidth }) => (
+                                        { key: 'street_1', label: t("street1"), placeholder: t("enterStreet1"), fullWidth: true },
+                                        { key: 'street_2', label: t("street2"), placeholder: t("enterStreet2"), fullWidth: true },
+                                    ].map(({ key, label, placeholder, fullWidth }) => (
                                         <div key={key} className={`info-field ${fullWidth ? 'full-width' : ''}`}>
                                             <label className="info-label">{label}</label>
-                                            <div className="info-value">{(locationData as any)[key] || t("notAvailable")}</div>
+                                            {editingLocation ? (
+                                                <input type="text" className="info-input" value={(locationData as any)[key] || ""}
+                                                    onChange={e => setLocationData(prev => ({ ...prev, [key]: e.target.value }))} placeholder={placeholder} />
+                                            ) : (
+                                                <div className="info-value">{(locationData as any)[key] || t("notAvailable")}</div>
+                                            )}
                                         </div>
                                     ))}
                                     {[
-                                        { key: 'city', label: t("city") },
-                                        { key: 'district', label: t("district") },
-                                        { key: 'state', label: t("state") },
-                                        { key: 'postal_code', label: t("postalCode") },
-                                        { key: 'country', label: t("country") },
-                                    ].map(({ key, label }) => (
+                                        { key: 'city', label: t("city"), placeholder: t("enterCity") },
+                                        { key: 'district', label: t("district"), placeholder: t("enterDistrict") },
+                                        { key: 'state', label: t("state"), placeholder: t("state") },
+                                        { key: 'postal_code', label: t("postalCode"), placeholder: t("postalCode") },
+                                        { key: 'country', label: t("country"), placeholder: t("country") },
+                                    ].map(({ key, label, placeholder }) => (
                                         <div key={key} className="info-field">
                                             <label className="info-label">{label}</label>
-                                            <div className="info-value">{(locationData as any)[key] || t("notAvailable")}</div>
+                                            {editingLocation ? (
+                                                <input type="text" className="info-input" value={(locationData as any)[key] || ""}
+                                                    onChange={e => setLocationData(prev => ({ ...prev, [key]: e.target.value }))} placeholder={placeholder} />
+                                            ) : (
+                                                <div className="info-value">{(locationData as any)[key] || t("notAvailable")}</div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -329,26 +532,91 @@ const EmployeeDetail = () => {
 
                     {activeTab === 'schedule' && (
                         <div className="profile-section">
-                            <div className="section-header">
+                            <div className="section-header section-header-actions">
                                 <h2 className="section-title">{t("schedule")}</h2>
+                                {!editingSchedule ? (
+                                    <button type="button" className="btn btn-primary" onClick={() => setEditingSchedule(true)}>
+                                        {t("editProfile")}
+                                    </button>
+                                ) : (
+                                    <div className="section-actions">
+                                        <button type="button" className="btn btn-secondary" onClick={handleCancelSchedule} disabled={saving}>{t("cancel")}</button>
+                                        <button type="button" className="btn btn-primary" onClick={handleSaveSchedule} disabled={saving}>
+                                            {saving ? t("saving") : t("saveChanges")}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                             <div className="section-content">
                                 <div className="schedule-header">
                                     <div className="info-field">
                                         <label className="info-label">{t("alwaysOpen")}</label>
-                                        <div className="info-value">{scheduleData.isAlwaysOpen ? t("yes") : t("no")}</div>
+                                        {editingSchedule ? (
+                                            <label className="schedule-toggle-label">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={scheduleData.isAlwaysOpen}
+                                                    onChange={e => setScheduleData(prev => ({ ...prev, isAlwaysOpen: e.target.checked }))}
+                                                />
+                                                <span>{scheduleData.isAlwaysOpen ? t("yes") : t("no")}</span>
+                                            </label>
+                                        ) : (
+                                            <div className="info-value">{scheduleData.isAlwaysOpen ? t("yes") : t("no")}</div>
+                                        )}
                                     </div>
                                 </div>
                                 {!scheduleData.isAlwaysOpen && (
                                     <div className="schedule-list">
-                                        {scheduleData.schedule.map((day) => (
+                                        {scheduleData.schedule.map((day, idx) => (
                                             <div key={day.day_of_week} className="schedule-item">
-                                                <div className="schedule-day"><span>{day.day_name}</span></div>
+                                                <div className="schedule-day">
+                                                    {editingSchedule ? (
+                                                        <label className="schedule-toggle-label">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={day.is_open}
+                                                                onChange={() => {
+                                                                    const next = [...scheduleData.schedule];
+                                                                    next[idx] = {
+                                                                        ...day,
+                                                                        is_open: !day.is_open,
+                                                                        opening_time: !day.is_open ? "09:00" : "",
+                                                                        closing_time: !day.is_open ? "18:00" : "",
+                                                                    };
+                                                                    setScheduleData(prev => ({ ...prev, schedule: next }));
+                                                                }}
+                                                            />
+                                                            <span>{day.day_name}</span>
+                                                        </label>
+                                                    ) : (
+                                                        <span>{day.day_name}</span>
+                                                    )}
+                                                </div>
                                                 {day.is_open ? (
                                                     <div className="schedule-times">
-                                                        <span>{day.opening_time}</span>
-                                                        <span className="time-separator">-</span>
-                                                        <span>{day.closing_time}</span>
+                                                        {editingSchedule ? (
+                                                            <>
+                                                                <input type="time" className="time-input" value={day.opening_time || ""}
+                                                                    onChange={e => {
+                                                                        const next = [...scheduleData.schedule];
+                                                                        next[idx] = { ...day, opening_time: e.target.value };
+                                                                        setScheduleData(prev => ({ ...prev, schedule: next }));
+                                                                    }} />
+                                                                <span className="time-separator">-</span>
+                                                                <input type="time" className="time-input" value={day.closing_time || ""}
+                                                                    onChange={e => {
+                                                                        const next = [...scheduleData.schedule];
+                                                                        next[idx] = { ...day, closing_time: e.target.value };
+                                                                        setScheduleData(prev => ({ ...prev, schedule: next }));
+                                                                    }} />
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span>{day.opening_time}</span>
+                                                                <span className="time-separator">-</span>
+                                                                <span>{day.closing_time}</span>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 ) : (
                                                     <div className="schedule-times"><span>{t("closed")}</span></div>

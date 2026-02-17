@@ -1,7 +1,3 @@
-"""
-Real-time Queue Manager for customer booking experience.
-Uses Redis for state management and WebSockets for live updates.
-"""
 import logging
 from fastapi import WebSocket
 from starlette.websockets import WebSocketState
@@ -12,7 +8,10 @@ from datetime import datetime, date, timedelta, time
 from uuid import UUID
 from enum import Enum
 import pytz
-import json
+
+from app.services.queue_service import QueueService
+from app.core.constants import TIMEZONE
+from app.core.config import REDIS_URL, MAX_QUEUE_SIZE
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ class QueueManager:
         self.redis: Any = None
         self.max_queue_size = max_queue_size
         self.avg_wait_time_per_user = 5  # minutes
-        self.ist = pytz.timezone("Asia/Kolkata")
+        self.ist = pytz.timezone(TIMEZONE)
         
         # WebSocket connections: {business_id:date -> [websocket, ...]}
         self.websocket_clients: Dict[str, List[WebSocket]] = defaultdict(list)
@@ -229,16 +228,40 @@ class QueueManager:
         except Exception:
             return position * self.avg_wait_time_per_user
     
+    async def get_queue_metrics_for_calculation(
+        self, queue_id: str, date_str: str
+    ) -> Dict:
+        """
+        Get raw metrics from Redis for BookingCalculationService.
+        Returns registered count, in-progress count, and total active users.
+        """
+        registered_count = await self.get_queue_length(queue_id, date_str)
+        in_progress_count = await self.get_in_progress_count(queue_id, date_str)
+        
+        return {
+            "registered_count": registered_count,
+            "in_progress_count": in_progress_count,
+            "total_active": registered_count + in_progress_count
+        }
+    
+    async def get_in_progress_count(self, queue_id: str, date_str: str) -> int:
+        """Count users currently being served (in-progress status)"""
+        if not self.redis:
+            return 0
+        
+        key = f"queue:{queue_id}:{date_str}:status:{QueueStatus.IN_PROGRESS.value}"
+        try:
+            return await self.redis.llen(key)
+        except Exception:
+            return 0
+    
     # ─────────────────────────────────────────────────────────────────────────
     # Business Queue State (Aggregated for all queues)
     # ─────────────────────────────────────────────────────────────────────────
     
     async def get_business_queue_state(self, db: Session, business_id: str, date_str: str) -> Dict:
         """Get aggregated queue state for all queues of a business."""
-        from app.models.queue import Queue
-        
-        # Get all queues for this business
-        queues = db.query(Queue).filter(Queue.merchant_id == UUID(business_id)).all()
+        queues = QueueService(db).get_queues_by_business_id(UUID(business_id))
         
         queue_states = []
         for queue in queues:
@@ -296,25 +319,25 @@ class QueueManager:
         Get available slots for booking.
         Returns queues that can serve the selected services with availability info.
         """
-        from app.models.queue import Queue, QueueService as QueueServiceModel
-        from app.models.service import Service
-        
-        # Get queues for this business
-        query = db.query(Queue).filter(Queue.merchant_id == UUID(business_id))
-        queues = query.all()
-        
+        queue_svc = QueueService(db)
+        queues = queue_svc.get_queues_by_business_id(UUID(business_id))
+        if not queues:
+            return []
+
+        queue_to_service_ids = queue_svc.get_queue_to_service_ids([q.uuid for q in queues])
+        queue_service_id_strs_map = {
+            qid: [str(sid) for sid in sids]
+            for qid, sids in queue_to_service_ids.items()
+        }
+
         available_slots = []
         for queue in queues:
             queue_id = str(queue.uuid)
-            
+            queue_uuid = queue.uuid
+
             # Check if queue offers the selected services
             if service_ids:
-                queue_service_ids = db.query(QueueServiceModel.service_id).filter(
-                    QueueServiceModel.queue_id == queue.uuid
-                ).all()
-                queue_service_id_strs = [str(qs[0]) for qs in queue_service_ids]
-                
-                # Skip if queue doesn't offer any of the selected services
+                queue_service_id_strs = queue_service_id_strs_map.get(queue_uuid, [])
                 if not any(sid in queue_service_id_strs for sid in service_ids):
                     continue
             
@@ -360,5 +383,4 @@ class QueueManager:
 
 
 # Global instance
-from app.core.config import REDIS_URL, MAX_QUEUE_SIZE
 queue_manager = QueueManager(redis_url=REDIS_URL, max_queue_size=MAX_QUEUE_SIZE)

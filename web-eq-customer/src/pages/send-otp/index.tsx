@@ -16,6 +16,7 @@ export default function SendOTPPage() {
 
   const returnTo = (location.state?.returnTo as string) || null;
   const selectedServices = (location.state?.selectedServices as string[]) || null;
+  const selectedServicesData = location.state?.selectedServicesData ?? null;
   const businessName = (location.state?.businessName as string) || null;
 
   const validatePhone = (phoneNumber: string): boolean => {
@@ -38,15 +39,16 @@ export default function SendOTPPage() {
       const authService = new AuthService();
       await authService.sendOTP(DEFAULT_COUNTRY_CODE, phone, ProfileType.CUSTOMER.toLowerCase());
       
-      navigate("/verify-otp", { 
-        state: { 
+      navigate("/verify-otp", {
+        state: {
           phone: `${DEFAULT_COUNTRY_CODE} ${phone.replace(/\D/g, "")}`,
           phoneNumber: phone.replace(/\D/g, ""),
           countryCode: DEFAULT_COUNTRY_CODE,
           returnTo,
           selectedServices,
+          selectedServicesData,
           businessName,
-        } 
+        },
       });
     } catch (err: any) {
       let errorMessage = t("failedToSendOtp");

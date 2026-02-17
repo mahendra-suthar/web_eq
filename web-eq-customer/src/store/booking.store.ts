@@ -15,7 +15,27 @@ export interface AvailableSlotData {
   capacity: number | null;
   estimated_wait_minutes: number;
   estimated_appointment_time: string;
+  estimated_wait_range?: string; // e.g. "15-25 min" from booking-preview API
   status: string;
+}
+
+// Queue option from booking-preview API (position, wait time, appointment time)
+export interface QueueOptionData {
+  queue_id: string;
+  queue_name: string;
+  position: number;
+  estimated_wait_minutes: number;
+  estimated_wait_range: string;
+  estimated_appointment_time: string;
+  is_recommended: boolean;
+  available: boolean;
+}
+
+export interface BookingPreviewData {
+  business_id: string;
+  date: string;
+  queues: QueueOptionData[];
+  recommended_queue_id: string | null;
 }
 
 // Types for booking confirmation
@@ -36,10 +56,12 @@ export interface BookingData {
   queue_date: string;
   position: number;
   estimated_wait_minutes: number;
+  estimated_wait_range?: string;
   estimated_appointment_time: string;
   services: BookingServiceData[];
   status: string;
   created_at: string;
+  already_in_queue?: boolean;
 }
 
 // WebSocket message types

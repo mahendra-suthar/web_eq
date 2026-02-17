@@ -103,6 +103,16 @@
     border-left: 4px solid #94a3b8;
 }
 
+.business-profile-employees-cta {
+    background: #f0f9ff;
+    border-left: 4px solid #0ea5e9;
+    .business-profile-employees-hint {
+        margin: 0 0 12px 0;
+        font-size: 14px;
+        color: #64748b;
+    }
+}
+
 // Basic Info Layout with Profile Picture
 .basic-info-layout {
     display: flex;

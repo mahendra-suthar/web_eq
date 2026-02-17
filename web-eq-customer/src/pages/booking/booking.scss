@@ -394,6 +394,17 @@
       color: $primary-dark;
       font-weight: 500;
     }
+
+    .bp-slot-range {
+      font-weight: 400;
+      color: $text-secondary;
+      margin-left: 2px;
+    }
+  }
+
+  &.recommended {
+    border-color: $primary;
+    box-shadow: 0 0 0 1px rgba($primary, 0.2);
   }
 }
 
@@ -457,6 +468,12 @@
 
 .bp-summary-queue {
   margin-top: 4px;
+}
+
+.bp-summary-range,
+.bp-card-meta-range {
+  font-weight: 400;
+  color: $text-secondary;
 }
 
 .bp-cta {
@@ -603,4 +620,104 @@
   .bp-dates-grid {
     grid-template-columns: repeat(4, 1fr);
   }
+}
+
+// ——— Inline error (main flow) ———
+.bp-error-inline {
+  margin-top: 16px;
+}
+
+// ——— Already in queue popup ———
+.bp-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: bp-modal-fade-in 0.2s ease-out;
+}
+
+@keyframes bp-modal-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.bp-modal-content {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  animation: bp-modal-slide-in 0.25s ease-out;
+}
+
+@keyframes bp-modal-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bp-modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: $primary-dark;
+  margin: 0 0 4px 0;
+}
+
+.bp-modal-subtitle {
+  font-size: 0.9rem;
+  color: $text-secondary;
+  margin: 0 0 20px 0;
+}
+
+.bp-modal-details {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f5f7f9;
+  border-radius: 12px;
+}
+
+.bp-modal-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 0 8px 0;
+  font-size: 0.95rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.bp-modal-label {
+  color: $text-secondary;
+}
+
+.bp-modal-value {
+  font-weight: 600;
+  color: $primary-dark;
+}
+
+.bp-modal-range {
+  font-weight: 400;
+  color: $text-secondary;
+}
+
+.bp-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
 }

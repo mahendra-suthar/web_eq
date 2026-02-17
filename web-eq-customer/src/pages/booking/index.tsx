@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useBookingStore, type AvailableSlotData } from "../../store/booking.store";
+import { useBookingStore, type QueueOptionData } from "../../store/booking.store";
 import { useAuthStore } from "../../store/auth.store";
 import { useQueueWebSocket } from "../../hooks/useQueueWebSocket";
 import { BookingService } from "../../services/booking/booking.service";
@@ -44,21 +44,25 @@ export default function BookingPage() {
   const {
     selectedDate,
     selectedQueue,
-    availableSlots,
     loading,
     error,
+    bookingConfirmation,
     setSelectedDate,
     setSelectedQueue,
     setAvailableSlots,
     setLoading,
     setError,
+    setBookingConfirmation,
   } = useBookingStore();
 
   const [selectedServices, setSelectedServices] = useState<BusinessServiceData[]>(initialSelectedServicesData);
-  const [showConfirmation, setShowConfirmation] = useState(false);
   const [bookingInProgress, setBookingInProgress] = useState(false);
+  const [queueOptions, setQueueOptions] = useState<QueueOptionData[]>([]);
+  const [selectedQueueOption, setSelectedQueueOption] = useState<QueueOptionData | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
-  const { connected: wsConnectedState, sendRefresh } = useQueueWebSocket({
+  const { connected: wsConnectedState } = useQueueWebSocket({
     businessId: businessId || "",
     date: selectedDate || "",
     enabled: !!businessId && !!selectedDate,
@@ -86,31 +90,58 @@ export default function BookingPage() {
     loadServices();
   }, [businessId, initialSelectedServices, initialSelectedServicesData, setLoading, setError]);
 
-  const fetchSlots = useCallback(async () => {
-    if (!businessId || !selectedDate) return;
+  const serviceIds = useMemo(
+    () => selectedServices.map((s) => s.uuid).filter(Boolean),
+    [selectedServices]
+  );
+
+  const fetchBookingPreview = useCallback(async () => {
+    if (!businessId || !selectedDate || serviceIds.length === 0) return;
     try {
-      setLoading(true);
-      setError(null);
+      setPreviewLoading(true);
+      setPreviewError(null);
+      setQueueOptions([]);
+      setSelectedQueueOption(null);
+      setAvailableSlots([]);
+      setSelectedQueue(null);
+
       const bookingService = new BookingService();
-      const slots = await bookingService.getAvailableSlots(
+      const preview = await bookingService.getBookingPreview(
         businessId,
         selectedDate,
-        initialSelectedServices
+        serviceIds
       );
-      setAvailableSlots(slots);
+
+      setQueueOptions(preview.queues || []);
+
+      const recommended = preview.queues?.find((q) => q.is_recommended);
+      const defaultSelection = recommended ?? preview.queues?.[0] ?? null;
+      if (defaultSelection) {
+        handleQueueOptionSelect(defaultSelection);
+      }
     } catch (err: any) {
-      console.error("Failed to fetch available slots:", err);
-      setError("Failed to load available slots. Please try again.");
+      console.error("Failed to fetch booking preview:", err);
+      const message =
+        err.response?.data?.detail || "Failed to load queue options. Please try again.";
+      setPreviewError(message);
+      setQueueOptions([]);
+      setSelectedQueueOption(null);
+      setAvailableSlots([]);
+      setSelectedQueue(null);
     } finally {
-      setLoading(false);
+      setPreviewLoading(false);
     }
-  }, [businessId, selectedDate, initialSelectedServices, setAvailableSlots, setLoading, setError]);
+  }, [businessId, selectedDate, serviceIds, setAvailableSlots, setSelectedQueue]);
 
   useEffect(() => {
-    if (selectedDate && !isDateInPast(selectedDate)) {
-      fetchSlots();
+    if (selectedDate && !isDateInPast(selectedDate) && serviceIds.length > 0) {
+      fetchBookingPreview();
+    } else {
+      setQueueOptions([]);
+      setSelectedQueueOption(null);
+      setPreviewError(null);
     }
-  }, [selectedDate, fetchSlots]);
+  }, [selectedDate, serviceIds.length, fetchBookingPreview]);
 
   const totalPrice = selectedServices.reduce((sum, s) => sum + (s.price || 0), 0);
   const totalDuration = selectedServices.reduce((sum, s) => sum + (s.duration || 0), 0);
@@ -119,33 +150,60 @@ export default function BookingPage() {
     if (isDateInPast(date)) return;
     setSelectedDate(date);
     setSelectedQueue(null);
+    setSelectedQueueOption(null);
+    setQueueOptions([]);
+    setPreviewError(null);
   };
 
-  const handleQueueSelect = (slot: AvailableSlotData) => {
-    if (!slot.available) return;
-    setSelectedQueue(slot);
+  const handleQueueOptionSelect = (option: QueueOptionData) => {
+    if (!option.available) return;
+    setSelectedQueueOption(option);
+    setSelectedQueue({
+      queue_id: option.queue_id,
+      queue_name: option.queue_name,
+      date: selectedDate || "",
+      available: option.available,
+      current_position: option.position,
+      capacity: null,
+      estimated_wait_minutes: option.estimated_wait_minutes,
+      estimated_appointment_time: option.estimated_appointment_time,
+      estimated_wait_range: option.estimated_wait_range,
+      status: option.available ? "Available" : "Full",
+    });
   };
 
   const handleConfirm = async () => {
-    if (!businessId || !selectedQueue || !selectedDate) return;
+    if (!businessId || !selectedDate) return;
+    const queueId = selectedQueueOption?.queue_id ?? selectedQueue?.queue_id;
+    if (!queueId) {
+      setError("Please select a queue.");
+      return;
+    }
     if (isDateInPast(selectedDate)) {
       setError("Please select today or a future date.");
       return;
     }
     setBookingInProgress(true);
+    setError(null);
+    setBookingConfirmation(null);
     try {
       const bookingService = new BookingService();
-      await bookingService.createBooking({
+      const result = await bookingService.createBooking({
         business_id: businessId,
-        queue_id: selectedQueue.queue_id,
+        queue_id: queueId,
         queue_date: selectedDate,
-        service_ids: initialSelectedServices,
+        service_ids: serviceIds.length > 0 ? serviceIds : initialSelectedServices,
       });
+      if (result.already_in_queue) {
+        setBookingConfirmation(result);
+        return;
+      }
       alert(t("bookingConfirmed"));
       navigate("/");
     } catch (err: any) {
       console.error("Booking failed:", err);
-      const errorMsg = err.response?.data?.detail || "Booking failed. Please try again.";
+      const errorMsg =
+        err.response?.data?.detail || "Booking failed. Please try again.";
       setError(errorMsg);
       if (err.response?.status === HttpStatus.UNAUTHORIZED) {
         alert(t("pleaseLogin"));
@@ -164,80 +222,16 @@ export default function BookingPage() {
     }
   };
 
-  const canProceedToSlots = selectedDate !== null && selectedDate !== "" && !isDateInPast(selectedDate);
-  const canConfirm = selectedQueue !== null;
+  const canProceedToSlots =
+    selectedDate !== null &&
+    selectedDate !== "" &&
+    !isDateInPast(selectedDate) &&
+    serviceIds.length > 0;
+  const canConfirm = selectedQueueOption !== null || selectedQueue !== null;
+  const displayQueue = selectedQueueOption ?? selectedQueue;
+  const alreadyInQueueData = bookingConfirmation?.already_in_queue ? bookingConfirmation : null;
 
-  // ——— Confirmation screen ———
-  if (showConfirmation) {
-    return (
-      <div className="booking-page booking-page-confirm">
-        <div className="bp-confirm-header">
-          <h1 className="bp-title">Confirm Booking</h1>
-          <p className="bp-subtitle">Review and fix your appointment</p>
-        </div>
-
-        <section className="bp-card">
-          <h3 className="bp-card-heading">Business</h3>
-          <p className="bp-card-value">{initialBusinessName}</p>
-        </section>
-
-        <section className="bp-card">
-          <h3 className="bp-card-heading">Services</h3>
-          <ul className="bp-service-list">
-            {selectedServices.map((service) => (
-              <li key={service.uuid} className="bp-service-list-item">
-                <span className="bp-service-list-name">{service.name}</span>
-                <span className="bp-service-list-meta">
-                  ₹{service.price ?? 0} · {service.duration ?? 0} min
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="bp-card">
-          <h3 className="bp-card-heading">Date & time slot</h3>
-          <p className="bp-card-value">{selectedDate ? formatDateDisplay(selectedDate) : ""}</p>
-          <p className="bp-card-meta">
-            {selectedQueue?.queue_name} · Est. wait: {selectedQueue?.estimated_wait_minutes} min
-          </p>
-          <p className="bp-card-meta">Expected at: {selectedQueue?.estimated_appointment_time}</p>
-        </section>
-
-        <section className="bp-card bp-card-total">
-          <div className="bp-total-row">
-            <span className="bp-total-label">Total</span>
-            <span className="bp-total-amount">₹{totalPrice}</span>
-          </div>
-        </section>
-
-        {error && (
-          <div className="bp-error" role="alert">
-            <p>{error}</p>
-          </div>
-        )}
-
-        <div className="bp-actions">
-          <Button
-            text="Back"
-            color="outline-blue"
-            onClick={() => setShowConfirmation(false)}
-            disabled={bookingInProgress}
-          />
-          <Button
-            text={bookingInProgress ? t("confirming") : t("fixAppointment")}
-            color="blue"
-            size="lg"
-            onClick={handleConfirm}
-            disabled={bookingInProgress}
-            loading={bookingInProgress}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // ——— Main booking flow: Date → Services (table) → Time slots → Summary ———
+  // ——— Main booking flow: Date → Services (table) → Time slots → Fix Appointment ———
   return (
     <div className="booking-page">
       <header className="bp-header">
@@ -322,79 +316,78 @@ export default function BookingPage() {
         )}
       </section>
 
-      {/* 3. Time slots — when date selected */}
+      {/* 3. Queue options — when date + services selected (from booking-preview API) */}
       {canProceedToSlots && (
         <section className="bp-section" aria-labelledby="bp-slots-title">
           <h2 id="bp-slots-title" className="bp-section-title">{t("selectTimeSlot")}</h2>
-          <p className="bp-section-desc">Choose a time slot · Updates in real-time</p>
+          <p className="bp-section-desc">
+            Choose a queue · Position, wait time and appointment time shown below
+          </p>
 
-          {loading ? (
+          {previewLoading ? (
             <div className="bp-loading">
               <div className="bp-spinner" aria-hidden />
-              <p>Loading available slots…</p>
+              <p>Loading queue options…</p>
             </div>
-          ) : error ? (
+          ) : previewError ? (
             <div className="bp-error" role="alert">
-              <p>{error}</p>
-              <Button text="Retry" color="outline-blue" onClick={fetchSlots} />
+              <p>{previewError}</p>
+              <Button text="Retry" color="outline-blue" onClick={fetchBookingPreview} />
             </div>
-          ) : availableSlots.length === 0 ? (
+          ) : queueOptions.length === 0 ? (
             <div className="bp-empty">
               <p>{t("noSlotsAvailable")}</p>
-              <p className="bp-empty-hint">Try another date.</p>
+              <p className="bp-empty-hint">Try another date or check back later.</p>
             </div>
           ) : (
             <div className="bp-slots-grid">
-              {availableSlots.map((slot) => (
+              {queueOptions.map((option) => (
                 <button
-                  key={slot.queue_id}
+                  key={option.queue_id}
                   type="button"
-                  className={`bp-slot-card ${selectedQueue?.queue_id === slot.queue_id ? "selected" : ""} ${!slot.available ? "unavailable" : ""}`}
-                  onClick={() => handleQueueSelect(slot)}
-                  disabled={!slot.available}
-                  aria-pressed={selectedQueue?.queue_id === slot.queue_id}
+                  className={`bp-slot-card ${selectedQueueOption?.queue_id === option.queue_id ? "selected" : ""} ${!option.available ? "unavailable" : ""} ${option.is_recommended ? "recommended" : ""}`}
+                  onClick={() => handleQueueOptionSelect(option)}
+                  disabled={!option.available}
+                  aria-pressed={selectedQueueOption?.queue_id === option.queue_id}
                 >
                   <div className="bp-slot-header">
-                    <h3 className="bp-slot-queue">{slot.queue_name}</h3>
-                    <span className={`bp-slot-status ${slot.available ? "available" : "full"}`}>
-                      {slot.status}
+                    <h3 className="bp-slot-queue">{option.queue_name}</h3>
+                    <span className={`bp-slot-status ${option.available ? "available" : "full"}`}>
+                      {option.is_recommended ? "Recommended" : option.available ? "Available" : "Full"}
                     </span>
                   </div>
                   <div className="bp-slot-details">
                     <p className="bp-slot-row">
                       <span className="label">Position</span>
-                      <span className="value">#{slot.current_position + 1}</span>
+                      <span className="value">#{option.position}</span>
                     </p>
                     <p className="bp-slot-row">
                       <span className="label">Est. wait</span>
-                      <span className="value">{slot.estimated_wait_minutes} min</span>
+                      <span className="value">{option.estimated_wait_minutes} min</span>
+                      {option.estimated_wait_range && (
+                        <span className="value bp-slot-range"> ({option.estimated_wait_range})</span>
+                      )}
                     </p>
                     <p className="bp-slot-row">
                       <span className="label">Expected at</span>
-                      <span className="value">{slot.estimated_appointment_time}</span>
+                      <span className="value">{option.estimated_appointment_time}</span>
                     </p>
-                    {slot.capacity != null && (
-                      <p className="bp-slot-row">
-                        <span className="label">Capacity</span>
-                        <span className="value">{slot.current_position}/{slot.capacity}</span>
-                      </p>
-                    )}
                   </div>
                 </button>
               ))}
             </div>
           )}
 
-          {wsConnectedState && !loading && (
-            <button type="button" className="bp-refresh" onClick={sendRefresh}>
-              ↻ Refresh slots
+          {wsConnectedState && !previewLoading && queueOptions.length > 0 && (
+            <button type="button" className="bp-refresh" onClick={fetchBookingPreview}>
+              ↻ Refresh estimates
             </button>
           )}
         </section>
       )}
 
-      {/* 4. Summary & continue */}
-      {canConfirm && (
+      {/* 4. Summary & Fix Appointment */}
+      {canConfirm && displayQueue && (
         <section className="bp-section bp-section-summary">
           <div className="bp-summary-card">
             <div className="bp-summary-row">
@@ -405,17 +398,90 @@ export default function BookingPage() {
               {selectedServices.length} {selectedServices.length === 1 ? t("service") : t("services")} · {selectedDate ? formatDateDisplay(selectedDate) : ""}
             </p>
             <p className="bp-summary-queue">
-              {selectedQueue?.queue_name} · Wait ~{selectedQueue?.estimated_wait_minutes} min
+              {displayQueue.queue_name} · Wait ~{displayQueue.estimated_wait_minutes} min
+              {selectedQueueOption?.estimated_wait_range && (
+                <span className="bp-summary-range"> ({selectedQueueOption.estimated_wait_range})</span>
+              )}
+            </p>
+            <p className="bp-summary-meta">
+              Expected at: {displayQueue.estimated_appointment_time}
             </p>
           </div>
           <Button
-            text={t("continueToConfirm")}
+            text={bookingInProgress ? t("confirming") : t("fixAppointment")}
             color="blue"
             size="lg"
-            onClick={() => setShowConfirmation(true)}
+            onClick={handleConfirm}
+            disabled={bookingInProgress}
+            loading={bookingInProgress}
             className="bp-cta"
           />
         </section>
+      )}
+
+      {error && (
+        <div className="bp-error bp-error-inline" role="alert">
+          <p>{error}</p>
+        </div>
+      )}
+
+      {/* Already in queue popup */}
+      {alreadyInQueueData && (
+        <div
+          className="bp-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bp-already-in-queue-title"
+          onClick={() => setBookingConfirmation(null)}
+        >
+          <div
+            className="bp-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="bp-already-in-queue-title" className="bp-modal-title">
+              {t("alreadyInQueueForToday")}
+            </h2>
+            <p className="bp-modal-subtitle">Your current queue details</p>
+            <div className="bp-modal-details">
+              <p className="bp-modal-row">
+                <span className="bp-modal-label">Queue</span>
+                <span className="bp-modal-value">{alreadyInQueueData.queue_name}</span>
+              </p>
+              <p className="bp-modal-row">
+                <span className="bp-modal-label">Position</span>
+                <span className="bp-modal-value">#{alreadyInQueueData.position}</span>
+              </p>
+              <p className="bp-modal-row">
+                <span className="bp-modal-label">Est. wait</span>
+                <span className="bp-modal-value">
+                  {alreadyInQueueData.estimated_wait_minutes} min
+                  {alreadyInQueueData.estimated_wait_range && (
+                    <span className="bp-modal-range"> ({alreadyInQueueData.estimated_wait_range})</span>
+                  )}
+                </span>
+              </p>
+              <p className="bp-modal-row">
+                <span className="bp-modal-label">Expected at</span>
+                <span className="bp-modal-value">{alreadyInQueueData.estimated_appointment_time}</span>
+              </p>
+            </div>
+            <div className="bp-modal-actions">
+              <Button
+                text={t("back")}
+                color="outline-blue"
+                onClick={() => setBookingConfirmation(null)}
+              />
+              <Button
+                text={t("backToHome")}
+                color="blue"
+                onClick={() => {
+                  setBookingConfirmation(null);
+                  navigate("/");
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -18,6 +18,7 @@ export default function VerifyOTPPage() {
   const countryCode = (location.state?.countryCode as string) || DEFAULT_COUNTRY_CODE;
   const returnTo = (location.state?.returnTo as string) || null;
   const selectedServices = (location.state?.selectedServices as string[]) || null;
+  const selectedServicesData = location.state?.selectedServicesData ?? null;
   const businessName = (location.state?.businessName as string) || null;
 
   const [otp, setOtp] = useState<string>("");
@@ -70,37 +71,40 @@ export default function VerifyOTPPage() {
         const userData = {
           ...response.user,
           date_of_birth: response.user.date_of_birth
-            ? (typeof response.user.date_of_birth === 'string'
+            ? (typeof response.user.date_of_birth === "string"
               ? response.user.date_of_birth
               : new Date(response.user.date_of_birth).toISOString())
             : null,
         };
         setUserInfo(userData);
 
-        try {
-          const profile = await authService.getCustomerProfile();
-          if (profile?.user) {
-            const profileUser = {
-              ...profile.user,
-              date_of_birth: profile.user.date_of_birth
-                ? (typeof profile.user.date_of_birth === 'string'
-                  ? profile.user.date_of_birth
-                  : new Date(profile.user.date_of_birth).toISOString())
-                : null,
-            };
-            setUserInfo(profileUser);
-          }
-        } catch (_) {
-          // Keep login response user if profile fetch fails
-        }
-
+        // Navigate immediately so user is never stuck; do not block on profile fetch
         if (returnTo) {
           navigate(returnTo, {
-            state: { selectedServices, businessName },
+            state: { selectedServices, selectedServicesData, businessName },
           });
         } else {
           navigate("/");
         }
+
+        // Optionally enrich with profile in background (cookie may not be available yet on same tick)
+        authService.getCustomerProfile().then(
+          (profile) => {
+            if (profile?.user) {
+              const profileUser = {
+                ...profile.user,
+                date_of_birth: profile.user.date_of_birth
+                  ? (typeof profile.user.date_of_birth === "string"
+                    ? profile.user.date_of_birth
+                    : new Date(profile.user.date_of_birth).toISOString())
+                  : null,
+              };
+              setUserInfo(profileUser);
+            }
+          }
+        ).catch(() => {
+          // Keep login response user if profile fetch fails
+        });
       } else {
         setError(t("invalidResponse"));
       }
@@ -176,7 +180,7 @@ export default function VerifyOTPPage() {
   return (
     <div className="verify-otp-page">
       <div className="verify-otp-header">
-        <button className="back-button" onClick={() => navigate("/send-otp", { state: { returnTo, selectedServices, businessName } })}>
+        <button className="back-button" onClick={() => navigate("/send-otp", { state: { returnTo, selectedServices, selectedServicesData, businessName } })}>
           ←
         </button>
         <div className="header-content">

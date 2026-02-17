@@ -8,7 +8,7 @@ from app.db.database import get_db
 from app.controllers.queue_controller import QueueController
 from app.schemas.queue import (
     QueueCreate, QueueData, QueueUserData, QueueUserDetailResponse,
-    AvailableSlotData, BookingCreateInput, BookingData
+    AvailableSlotData, BookingCreateInput, BookingData, BookingPreviewData
 )
 from app.schemas.service import ServiceData
 from app.middleware.permissions import get_current_user, require_roles
@@ -66,6 +66,21 @@ async def get_queue_users(
 # Customer Booking Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 
+@queue_router.post("/booking-preview", response_model=BookingPreviewData)
+async def get_booking_preview(
+    business_id: UUID = Query(..., description="Business UUID"),
+    booking_date: date = Query(..., description="Date for booking (YYYY-MM-DD)"),
+    service_ids: List[UUID] = Query(..., description="QueueService UUIDs"),
+    db: Session = Depends(get_db)
+):
+    controller = QueueController(db)
+    return await controller.get_booking_preview(
+        business_id=business_id,
+        booking_date=booking_date,
+        service_ids=service_ids
+    )
+
+
 @queue_router.get("/available_slots/{business_id}", response_model=List[AvailableSlotData])
 async def get_available_slots(
     business_id: UUID,
@@ -96,11 +111,16 @@ async def create_booking(
     """
     Create a booking for the authenticated user.
     
-    Requires authentication. After booking:
+    Requires authentication. 
+    - If queue_id provided: Use that queue (validates availability)
+    - If queue_id NOT provided: Auto-select optimal queue (shortest wait)
+    
+    After booking:
     - User is added to the queue
     - Token number is generated
     - Position and wait time are calculated
-    - All connected WebSocket clients are notified
+    - For today's bookings: Added to Redis + WebSocket updates
+    - For future bookings: Saved to DB only
     """
     controller = QueueController(db)
     return await controller.create_booking(

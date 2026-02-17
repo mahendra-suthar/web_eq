@@ -178,4 +178,5 @@ class BusinessService:
     def get_business_with_category(self, business_id: UUID) -> Optional[Business]:
         return self.db.query(Business).options(joinedload(Business.category)).filter(Business.uuid == business_id).first()
 
-
+    def get_business_by_id(self, business_id: UUID) -> Optional[Business]:
+        return self.db.query(Business).filter(Business.uuid == business_id).first()

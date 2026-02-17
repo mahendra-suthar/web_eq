@@ -90,8 +90,20 @@ class QueueUserDetailResponse(BaseModel):
 # Customer Booking Schemas
 # ─────────────────────────────────────────────────────────────────────────────
 
+class QueueOptionData(BaseModel):
+    """Queue option with calculated metrics for booking"""
+    queue_id: str
+    queue_name: str
+    position: int
+    estimated_wait_minutes: int
+    estimated_wait_range: str  # e.g., "15-25 min"
+    estimated_appointment_time: str  # HH:MM format
+    is_recommended: bool
+    available: bool
+
+
 class AvailableSlotData(BaseModel):
-    """Available slot/queue for customer booking"""
+    """Available slot/queue for customer booking (legacy)"""
     queue_id: str
     queue_name: str
     date: str
@@ -111,7 +123,7 @@ class BookingServiceInput(BaseModel):
 class BookingCreateInput(BaseModel):
     """Input for creating a booking"""
     business_id: UUID
-    queue_id: UUID
+    queue_id: Optional[UUID] = None  # Optional - auto-selected if not provided
     queue_date: date
     service_ids: List[UUID]  # QueueService UUIDs
     notes: Optional[str] = None
@@ -136,13 +148,23 @@ class BookingData(BaseModel):
     queue_date: date
     position: int
     estimated_wait_minutes: int
+    estimated_wait_range: str  # e.g., "15-25 min"
     estimated_appointment_time: str
     services: List[BookingServiceData]
     status: str
     created_at: datetime
+    already_in_queue: Optional[bool] = False
 
     class Config:
         from_attributes = True
+
+
+class BookingPreviewData(BaseModel):
+    """Preview of queue options before booking confirmation"""
+    business_id: str
+    date: str
+    queues: List[QueueOptionData]
+    recommended_queue_id: Optional[str] = None
 
 
 class BusinessQueueState(BaseModel):

@@ -48,6 +48,7 @@
   "confirming": "Confirming...",
   "bookingConfirmed": "Booking confirmed successfully!",
   "bookingFailed": "Booking failed. Please try again.",
+  "alreadyInQueueForToday": "You are already in the queue for today",
   "totalAmount": "Total Amount",
   "service": "service",
   "services": "services",

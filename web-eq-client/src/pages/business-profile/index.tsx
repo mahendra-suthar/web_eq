@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AddressData, DaySchedule } from '../../utils/businessRegistrationStore';
 import { ProfileService, UnifiedProfileResponse } from '../../services/profile/profile.service';
@@ -6,6 +7,7 @@ import { BusinessService, Category } from '../../services/business/business.serv
 import { OTPService } from '../../services/otp/otp.service';
 import { emailRegex } from '../../utils/utils';
 import { Tabs } from '../../components/tabs/Tabs';
+import { RouterConstant } from '../../routers/index';
 import './business-profile.scss';
 
 interface BusinessProfileData {
@@ -28,6 +30,7 @@ type TabType = 'overview' | 'location' | 'schedule';
 
 const BusinessProfile = () => {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<TabType>('overview');
     const [fetching, setFetching] = useState(true);
     const [error, setError] = useState<string>("");
@@ -471,6 +474,15 @@ const BusinessProfile = () => {
                                         </div>
                                     </div>
                                 </div>
+                                {businessId && (
+                                    <div className="info-block business-profile-employees-cta">
+                                        <h3 className="info-block-title">{t("businessEmployees")}</h3>
+                                        <p className="info-value business-profile-employees-hint">{t("manageEmployeesHint")}</p>
+                                        <button type="button" className="btn btn-secondary" onClick={() => navigate(RouterConstant.ROUTERS_PATH.EMPLOYEES, { state: { businessId } })}>
+                                            {t("manageEmployees")}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
