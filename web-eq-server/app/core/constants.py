@@ -55,8 +55,13 @@ QUEUE_USER_PRIORITY_REQUESTED = 6
 
 # Time format constants
 TIME_FORMAT = "%I:%M %p"
+TIME_FORMAT_HM = "%H:%M"
 TIMEZONE = "Asia/Kolkata"
 
 # Business "always open" time bounds (used for schedule validation and defaults)
 BIZ_EARLIEST_TIME = _time(0, 0)
 BIZ_LATEST_TIME = _time(23, 59)
+
+# Booking / queue calculation defaults
+DEFAULT_AVG_TIME = 15          # minutes per slot when no historical data exists
+DEFAULT_OPEN_TIME = _time(9, 0)  # fallback opening time when no schedule is configured

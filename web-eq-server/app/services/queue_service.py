@@ -1,7 +1,7 @@
 from sqlalchemy import func, extract, case, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.exc import SQLAlchemyError
-from typing import List, Tuple, Dict, cast, Optional, Any, TYPE_CHECKING
+from typing import List, Tuple, Dict, cast, Optional, Any
 from collections import defaultdict
 from uuid import UUID
 from datetime import datetime, date, timedelta
@@ -23,59 +23,45 @@ from app.core.constants import (
     QUEUE_USER_COMPLETED,
 )
 
-if TYPE_CHECKING:
-    from app.services.booking_calculation_service import BookingCalculationService
-
 
 class QueueService:
     def __init__(self, db: Session):
         self.db = db
 
     def create_queue(self, data: QueueCreate, services: List[Service]) -> Queue:
-        try:
-            service_configs = {s.service_id: s for s in data.services}
-            new_queue = Queue(merchant_id=data.business_id, name=data.name, status=1)
-            self.db.add(new_queue)
-            self.db.flush()
+        service_configs = {s.service_id: s for s in data.services}
+        new_queue = Queue(merchant_id=data.business_id, name=data.name, status=1)
+        self.db.add(new_queue)
+        self.db.flush()
 
-            if data.employee_id:
-                self.db.query(Employee).filter(Employee.uuid == data.employee_id).update({"queue_id": new_queue.uuid})
+        if data.employee_id:
+            self.db.query(Employee).filter(Employee.uuid == data.employee_id).update({"queue_id": new_queue.uuid})
 
-            queue_services: list[QueueServiceModel] = []
-            for s in services:
-                cfg = service_configs.get(s.uuid)  # type: ignore
-                if not cfg:
-                    continue
-
-                queue_services.append(
-                    QueueServiceModel(
-                        service_id=s.uuid,
-                        business_id=data.business_id,
-                        queue_id=new_queue.uuid,
-                        description=s.description,
-                        service_fee=cfg.service_fee,
-                        avg_service_time=cfg.avg_service_time,
-                        status=1,
-                    )
+        queue_services: list[QueueServiceModel] = []
+        for s in services:
+            cfg = service_configs.get(s.uuid)  # type: ignore
+            if not cfg:
+                continue
+            queue_services.append(
+                QueueServiceModel(
+                    service_id=s.uuid,
+                    business_id=data.business_id,
+                    queue_id=new_queue.uuid,
+                    description=s.description,
+                    service_fee=cfg.service_fee,
+                    avg_service_time=cfg.avg_service_time,
+                    status=1,
                 )
+            )
 
-            self.db.add_all(queue_services)
-            self.db.commit()
-            self.db.refresh(new_queue)
-            return new_queue
-
-        except SQLAlchemyError:
-            self.db.rollback()
-            raise
-        except Exception:
-            self.db.rollback()
-            raise
+        self.db.add_all(queue_services)
+        return new_queue
 
     def update_queue(self, queue_id: UUID, business_id: UUID, data: QueueUpdate) -> Optional[Queue]:
+        queue = self.get_queue_by_id_and_business(queue_id, business_id)
+        if not queue:
+            return None
         try:
-            queue = self.get_queue_by_id_and_business(queue_id, business_id)
-            if not queue:
-                return None
             payload = data.model_dump(exclude_unset=True)
             want_employee_update = "employee_id" in payload
             employee_id = payload.pop("employee_id", None) if want_employee_update else None
@@ -86,9 +72,8 @@ class QueueService:
                 if employee_id:
                     self.db.query(Employee).filter(Employee.uuid == employee_id).update({"queue_id": queue_id})
             self.db.commit()
-            self.db.refresh(queue)
             return queue
-        except SQLAlchemyError:
+        except Exception:
             self.db.rollback()
             raise
 
@@ -96,19 +81,19 @@ class QueueService:
         self, queue_id: UUID, business_id: UUID, items: List[QueueServiceAddItem]
     ) -> List[QueueServiceModel]:
         """Add one or more services to a queue. Skips service_id already in queue. Returns created queue_services."""
+        queue = self.get_queue_by_id_and_business(queue_id, business_id)
+        if not queue:
+            return []
+        existing = {
+            row.service_id
+            for row in self.db.query(QueueServiceModel.service_id).filter(
+                QueueServiceModel.queue_id == queue_id
+            ).all()
+        }
+        to_add = [i for i in items if i.service_id not in existing]
+        if not to_add:
+            return []
         try:
-            queue = self.get_queue_by_id_and_business(queue_id, business_id)
-            if not queue:
-                return []
-            existing = {
-                row.service_id
-                for row in self.db.query(QueueServiceModel.service_id).filter(
-                    QueueServiceModel.queue_id == queue_id
-                ).all()
-            }
-            to_add = [i for i in items if i.service_id not in existing]
-            if not to_add:
-                return []
             created = [
                 QueueServiceModel(
                     service_id=item.service_id,
@@ -123,10 +108,8 @@ class QueueService:
             ]
             self.db.add_all(created)
             self.db.commit()
-            for qs in created:
-                self.db.refresh(qs)
             return created
-        except SQLAlchemyError:
+        except Exception:
             self.db.rollback()
             raise
 
@@ -134,30 +117,29 @@ class QueueService:
         self, queue_service_id: UUID, data: QueueServiceUpdate
     ) -> Optional[QueueServiceModel]:
         """Update a queue_service row. Returns updated row or None."""
+        qs = self.db.query(QueueServiceModel).filter(QueueServiceModel.uuid == queue_service_id).first()
+        if not qs:
+            return None
         try:
-            qs = self.db.query(QueueServiceModel).filter(QueueServiceModel.uuid == queue_service_id).first()
-            if not qs:
-                return None
             payload = data.model_dump(exclude_unset=True)
             for key, val in payload.items():
                 setattr(qs, key, val)
             self.db.commit()
-            self.db.refresh(qs)
             return qs
-        except SQLAlchemyError:
+        except Exception:
             self.db.rollback()
             raise
 
     def delete_queue_service(self, queue_service_id: UUID) -> bool:
         """Remove a queue_service (removes service from queue). Returns True if deleted."""
+        qs = self.db.query(QueueServiceModel).filter(QueueServiceModel.uuid == queue_service_id).first()
+        if not qs:
+            return False
         try:
-            qs = self.db.query(QueueServiceModel).filter(QueueServiceModel.uuid == queue_service_id).first()
-            if not qs:
-                return False
             self.db.delete(qs)
             self.db.commit()
             return True
-        except SQLAlchemyError:
+        except Exception:
             self.db.rollback()
             raise
 
@@ -607,60 +589,5 @@ class QueueService:
             raise
         except Exception:
             raise
-
-    def get_existing_booking_response_payload(
-        self,
-        user_id: UUID,
-        queue_id: UUID,
-        queue_date: Any,
-        business_id: UUID,
-        booking_calc_service: "BookingCalculationService",
-    ) -> Optional[dict]:
-        """
-        If the user is already in this queue for this date, return a dict suitable for
-        BookingData(already_in_queue=True). All DB access and payload construction is done here.
-        Returns None if no existing same-day booking.
-        """
-        existing = self.get_existing_same_day_booking(user_id, queue_id, queue_date)
-        if not existing:
-            return None
-
-        existing_with_relations = self.get_queue_user_by_id_with_relations(existing.uuid) or existing
-        metrics = booking_calc_service.get_existing_queue_user_metrics(existing_with_relations)
-
-        queue = self.get_queue_by_id(queue_id)
-        business = self.db.query(Business).filter(Business.uuid == business_id).first()
-        if not queue or not business:
-            return None
-
-        services_data: List[dict] = []
-        for qus in existing_with_relations.queue_user_services or []:
-            qs = getattr(qus, "queue_service", None)
-            if qs and getattr(qs, "service", None):
-                s = qs.service
-                services_data.append({
-                    "uuid": str(qs.uuid),
-                    "name": s.name,
-                    "price": getattr(qs, "service_fee", None),
-                    "duration": getattr(qs, "avg_service_time", None),
-                })
-
-        return {
-            "uuid": str(existing_with_relations.uuid),
-            "token_number": existing_with_relations.token_number or "",
-            "queue_id": str(queue_id),
-            "queue_name": queue.name,
-            "business_id": str(business_id),
-            "business_name": business.name,
-            "queue_date": queue_date,
-            "position": metrics["position"],
-            "estimated_wait_minutes": metrics["wait_minutes"],
-            "estimated_wait_range": metrics["wait_range"],
-            "estimated_appointment_time": metrics["appointment_time"],
-            "services": services_data,
-            "status": "confirmed",
-            "created_at": existing_with_relations.created_at or datetime.now(),
-            "already_in_queue": True,
-        }
 
 

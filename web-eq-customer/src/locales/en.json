@@ -55,5 +55,7 @@
   "liveUpdates": "Live updates",
   "connecting": "Connecting...",
   "today": "Today",
-  "tomorrow": "Tomorrow"
+  "tomorrow": "Tomorrow",
+  "employeeNotAvailable": "Not Available",
+  "employeeNotAvailableOnDay": "Employee is not available on this day"
 }

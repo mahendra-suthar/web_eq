@@ -14,7 +14,7 @@ DB_ECHO_LOGS = os.getenv("DB_ECHO_LOGS", "False").lower() == "true"
 # JWT configuration
 SECRET_KEY = os.getenv("SECRET_KEY", "secretkey")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "720"))
 
 # OTP configuration
 OTP_EXPIRY_MINUTES = int(os.getenv("OTP_EXPIRY_MINUTES", "5"))

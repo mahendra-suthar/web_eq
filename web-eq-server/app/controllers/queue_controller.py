@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
 from uuid import UUID
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import date, datetime, time, timedelta
 
 from app.services.queue_service import QueueService
@@ -17,9 +17,7 @@ from app.schemas.queue import (
 from app.schemas.user import UserData
 from app.schemas.service import ServiceData
 from app.models.service import Service
-from app.models.queue import QueueService as QueueServiceModel, QueueUser, QueueUserService
-from app.models.business import Business
-from app.models.employee import Employee
+from app.models.queue import QueueUser, QueueUserService
 from app.core.constants import BUSINESS_REGISTERED, QUEUE_USER_REGISTERED
 from app.services.booking_calculation_service import BookingCalculationService
 
@@ -41,12 +39,16 @@ class QueueController:
             self.business_service.update_registration_state(
                 business_id=data.business_id, status=BUSINESS_REGISTERED, current_step=None
             )
+            self.db.commit()
             return QueueData.from_queue(queue)
         except HTTPException:
+            self.db.rollback()
             raise
         except SQLAlchemyError as e:
+            self.db.rollback()
             raise HTTPException(status_code=500, detail=f"Database error occurred while creating queue: {str(e)}")
         except Exception as e:
+            self.db.rollback()
             raise HTTPException(status_code=500, detail=f"Failed to create queue: {str(e)}")
 
     async def get_queues(self, business_id: UUID) -> List[QueueData]:
@@ -128,6 +130,8 @@ class QueueController:
                 )
                 for qs in created
             ]
+        except HTTPException:
+            raise
         except SQLAlchemyError as e:
             raise HTTPException(status_code=500, detail=f"Database error while adding services: {str(e)}")
         except Exception as e:
@@ -279,17 +283,17 @@ class QueueController:
     ) -> BookingPreviewData:
         try:
             calc_service = BookingCalculationService(self.db)
-            
+
             business = self.business_service.get_business_by_id(business_id)
             if not business:
                 raise HTTPException(status_code=404, detail="Business not found")
-            
+
             preview = calc_service.calculate_booking_preview(
                 business_id, booking_date, service_ids
             )
-            
-            return BookingPreviewData(**preview)    
-            
+
+            return BookingPreviewData(**preview)
+
         except HTTPException:
             raise
         except Exception as e:
@@ -303,10 +307,10 @@ class QueueController:
     ) -> List[AvailableSlotData]:
         try:
             await queue_manager.connect_to_redis()
-            
+
             date_str = booking_date.strftime("%Y-%m-%d")
             service_id_strs = [str(sid) for sid in service_ids] if service_ids else None
-            
+
             slots = await queue_manager.get_available_slots(
                 db=self.db,
                 business_id=str(business_id),
@@ -326,9 +330,9 @@ class QueueController:
     ) -> BookingData:
         try:
             await queue_manager.connect_to_redis()
-            
+
             calc_service = BookingCalculationService(self.db)
-            
+
             business = self.business_service.get_business_by_id(data.business_id)
             if not business:
                 raise HTTPException(status_code=404, detail="Business not found")
@@ -338,18 +342,16 @@ class QueueController:
             )
             if not queue_services:
                 raise HTTPException(status_code=400, detail="No valid services selected")
-            
+
             # Auto-select optimal queue if not provided
             if data.queue_id:
-                # Validate provided queue
                 queue = self.queue_service.get_queue_by_id_and_business(
                     data.queue_id, data.business_id
                 )
                 if not queue:
                     raise HTTPException(status_code=404, detail="Queue not found")
                 queue_id = data.queue_id
-                
-                # Calculate metrics for selected queue
+
                 if data.queue_date == date.today():
                     metrics = calc_service.calculate_today_queue_metrics(
                         queue_id, data.queue_date, data.service_ids
@@ -359,13 +361,12 @@ class QueueController:
                         queue_id, data.queue_date, data.service_ids
                     )
             else:
-                # Find optimal queue
                 optimal_queue = calc_service.find_optimal_queue(
                     data.business_id, data.queue_date, data.service_ids
                 )
                 if not optimal_queue:
                     raise HTTPException(status_code=404, detail="No available queues for selected services")
-                
+
                 queue_id = UUID(optimal_queue["queue_id"])
                 metrics = {
                     "position": optimal_queue["position"],
@@ -373,44 +374,39 @@ class QueueController:
                     "wait_range": optimal_queue["estimated_wait_range"],
                     "appointment_time": optimal_queue["estimated_appointment_time"]
                 }
-                
-                # Get queue object
+
                 queue = self.queue_service.get_queue_by_id(queue_id)
                 if not queue:
                     raise HTTPException(status_code=404, detail="Selected queue not found")
-            
+
             # Same-day duplicate check: if already in this queue for this date, return existing booking
             if data.queue_date == date.today():
-                payload = self.queue_service.get_existing_booking_response_payload(
+                existing_booking = self.get_existing_booking(
                     user_id=user_id,
                     queue_id=queue_id,
                     queue_date=data.queue_date,
                     business_id=data.business_id,
-                    booking_calc_service=calc_service,
+                    queue=queue,
+                    business=business,
+                    calc_service=calc_service,
                 )
-                if payload is not None:
-                    return BookingData(**payload)
-            
-            # Calculate service time
-            total_service_time = sum(
-                (qs.avg_service_time or 5) for qs in queue_services
-            )
-            
-            # Generate token
+                if existing_booking is not None:
+                    return existing_booking
+
+            total_service_time = sum((qs.avg_service_time or 5) for qs in queue_services)
+
             date_str = data.queue_date.strftime("%Y-%m-%d")
             token_number = await queue_manager.generate_token_number(str(queue_id), date_str)
-            
-            # Parse appointment time
+
             from datetime import datetime as dt
             try:
                 appt_hour, appt_min = map(int, metrics["appointment_time"].split(":"))
                 estimated_enqueue_dt = dt.combine(data.queue_date, time(appt_hour, appt_min))
                 estimated_dequeue_dt = estimated_enqueue_dt + timedelta(minutes=total_service_time)
-            except:
+            except Exception:
                 estimated_enqueue_dt = None
                 estimated_dequeue_dt = None
-            
-            # Create queue user
+
             queue_user = QueueUser(
                 user_id=user_id,
                 queue_id=queue_id,
@@ -425,19 +421,15 @@ class QueueController:
             )
             self.db.add(queue_user)
             self.db.flush()
-            
-            # Link services
+
             for qs in queue_services:
-                queue_user_service = QueueUserService(
+                self.db.add(QueueUserService(
                     queue_user_id=queue_user.uuid,
                     queue_service_id=qs.uuid
-                )
-                self.db.add(queue_user_service)
-            
+                ))
+
             self.db.commit()
-            self.db.refresh(queue_user)
-            
-            # Add to Redis only if today
+
             if data.queue_date == date.today():
                 await queue_manager.add_to_queue(
                     db=self.db,
@@ -448,13 +440,12 @@ class QueueController:
                     total_service_time=total_service_time,
                     business_id=str(data.business_id)
                 )
-            
-            # Build services data (batch load via service layer; no query in loop)
+
             services_data = [
                 BookingServiceData(**d)
                 for d in self.queue_service.get_booking_services_data(queue_services)
             ]
-            
+
             return BookingData(
                 uuid=str(queue_user.uuid),
                 token_number=token_number,
@@ -471,7 +462,7 @@ class QueueController:
                 status="confirmed",
                 created_at=datetime.now()
             )
-            
+
         except HTTPException:
             self.db.rollback()
             raise
@@ -482,4 +473,50 @@ class QueueController:
             self.db.rollback()
             raise HTTPException(status_code=500, detail=f"Failed to create booking: {str(e)}")
 
+    def get_existing_booking(
+        self,
+        user_id: UUID,
+        queue_id: UUID,
+        queue_date: date,
+        business_id: UUID,
+        queue: Any,
+        business: Any,
+        calc_service: BookingCalculationService,
+    ) -> Optional[BookingData]:
+        """Return a BookingData for an existing same-day booking, or None if no duplicate."""
+        existing = self.queue_service.get_existing_same_day_booking(user_id, queue_id, queue_date)
+        if not existing:
+            return None
 
+        existing_full = self.queue_service.get_queue_user_by_id_with_relations(existing.uuid) or existing
+        metrics = calc_service.get_existing_queue_user_metrics(existing_full)
+
+        services_data = []
+        for qus in existing_full.queue_user_services or []:
+            qs = getattr(qus, "queue_service", None)
+            if qs and getattr(qs, "service", None):
+                s = qs.service
+                services_data.append(BookingServiceData(
+                    uuid=str(qs.uuid),
+                    name=s.name,
+                    price=getattr(qs, "service_fee", None),
+                    duration=getattr(qs, "avg_service_time", None),
+                ))
+
+        return BookingData(
+            uuid=str(existing_full.uuid),
+            token_number=existing_full.token_number or "",
+            queue_id=str(queue_id),
+            queue_name=queue.name,
+            business_id=str(business_id),
+            business_name=business.name,
+            queue_date=queue_date,
+            position=metrics["position"],
+            estimated_wait_minutes=metrics["wait_minutes"],
+            estimated_wait_range=metrics["wait_range"],
+            estimated_appointment_time=metrics["appointment_time"],
+            services=services_data,
+            status="confirmed",
+            created_at=existing_full.created_at or datetime.now(),
+            already_in_queue=True,
+        )

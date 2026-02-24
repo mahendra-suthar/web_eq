@@ -10,7 +10,7 @@ from app.middleware.auth_middleware import AuthMiddleware
 # Import all models to ensure they're registered with SQLAlchemy
 from app.models import (
     User, UserLogin, Business, Category,
-    Address, Schedule, Employee, Service,
+    Address, Schedule, ScheduleBreak, ScheduleException, Employee, Service,
     Queue, QueueUser, QueueService, QueueUserService,
     Role, UserRoles, Review
 )  # noqa: F401

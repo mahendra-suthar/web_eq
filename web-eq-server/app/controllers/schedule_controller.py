@@ -1,7 +1,9 @@
+from datetime import date as date_type
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
 from typing import List
+from uuid import UUID
 
 from app.core.constants import BIZ_EARLIEST_TIME, BIZ_LATEST_TIME
 from app.models.user import User
@@ -9,7 +11,10 @@ from app.models.schedule import ScheduleEntityType
 from app.services.schedule_service import ScheduleService
 from app.services.business_service import BusinessService
 from app.services.employee_service import EmployeeService
-from app.schemas.schedule import ScheduleCreateInput, ScheduleData, ScheduleInput
+from app.schemas.schedule import (
+    ScheduleCreateInput, ScheduleData, ScheduleInput,
+    ScheduleExceptionCreate, ScheduleExceptionData, ScheduleExceptionUpdate,
+)
 
 
 class ScheduleController:
@@ -24,8 +29,16 @@ class ScheduleController:
             business = self.business_service.get_business_by_owner(user.uuid)
             return business is not None and str(business.uuid) == str(entity_id)
         if entity_type_enum == ScheduleEntityType.EMPLOYEE:
+            # Allow if the current user is the employee themselves
             employee = self.employee_service.get_employee_by_user_id(user.uuid)
-            return employee is not None and str(employee.uuid) == str(entity_id)
+            if employee is not None and str(employee.uuid) == str(entity_id):
+                return True
+            # Allow if the current user is the business owner of this employee
+            employee = self.employee_service.get_employee_by_id(entity_id)
+            if employee is None:
+                return False
+            business = self.business_service.get_business_by_owner(user.uuid)
+            return business is not None and str(business.uuid) == str(employee.business_id)
         return False
 
     def get_business_schedule_data_for_validation(self, business_id):
@@ -58,7 +71,13 @@ class ScheduleController:
                 return f"Employee closing time on day {day} must not be after business closing time."
         return None
 
-    async def create_schedules(self, payload: ScheduleCreateInput, user: User) -> List[ScheduleData]:
+    # ──────────────────────────────────────────────────────────────────────────
+    # Schedule CRUD
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def create_schedules(
+        self, payload: ScheduleCreateInput, user: User
+    ) -> List[ScheduleData]:
         try:
             entity_type_enum = ScheduleEntityType[payload.entity_type.upper()]
             if not self.can_edit_schedule(user, payload.entity_id, entity_type_enum):
@@ -86,13 +105,18 @@ class ScheduleController:
                 if err:
                     raise HTTPException(status_code=400, detail=err)
 
+            # Delete existing schedules (CASCADE removes their breaks/exceptions)
             self.schedule_service.delete_schedules_by_entity(payload.entity_id, entity_type_enum)
-            created_schedules = self.schedule_service.create_schedules(
+            self.schedule_service.create_schedules(
                 payload.entity_id, entity_type_enum, payload.schedules
             )
+            self.db.commit()
 
-            self.schedule_service.commit_and_refresh_schedules(created_schedules)
-            return [ScheduleData.from_schedule(schedule) for schedule in created_schedules]
+            # Reload with breaks eagerly so ScheduleData.from_schedule works
+            schedules_with_breaks = self.schedule_service.get_schedules_with_breaks(
+                payload.entity_id, entity_type_enum
+            )
+            return [ScheduleData.from_schedule(s) for s in schedules_with_breaks]
 
         except HTTPException:
             self.db.rollback()
@@ -104,3 +128,73 @@ class ScheduleController:
             self.db.rollback()
             raise HTTPException(status_code=500, detail=f"Failed to create schedules: {str(e)}")
 
+    async def get_schedules(
+        self, entity_id: UUID, entity_type: str
+    ) -> List[ScheduleData]:
+        try:
+            entity_type_enum = ScheduleEntityType[entity_type.upper()]
+            schedules = self.schedule_service.get_schedules_with_breaks(entity_id, entity_type_enum)
+            return [ScheduleData.from_schedule(s) for s in schedules]
+        except KeyError:
+            raise HTTPException(status_code=400, detail="Invalid entity_type")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to get schedules: {str(e)}")
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Schedule Exception CRUD
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def get_schedule_exceptions(
+        self, schedule_id: UUID
+    ) -> List[ScheduleExceptionData]:
+        try:
+            excs = self.schedule_service.get_exceptions_for_schedule(schedule_id)
+            return [ScheduleExceptionData.from_orm(e) for e in excs]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to get exceptions: {str(e)}")
+
+    async def create_schedule_exception(
+        self, payload: ScheduleExceptionCreate
+    ) -> ScheduleExceptionData:
+        try:
+            exc = self.schedule_service.create_schedule_exception(payload)
+            return ScheduleExceptionData.from_orm(exc)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except SQLAlchemyError:
+            raise HTTPException(status_code=500, detail="Database error")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to create exception: {str(e)}")
+
+    async def update_schedule_exception(
+        self, schedule_id: UUID, exception_date: date_type, payload: ScheduleExceptionUpdate
+    ) -> ScheduleExceptionData:
+        try:
+            exc = self.schedule_service.update_schedule_exception(
+                schedule_id, exception_date, payload
+            )
+            return ScheduleExceptionData.from_orm(exc)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except SQLAlchemyError:
+            raise HTTPException(status_code=500, detail="Database error")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to update exception: {str(e)}")
+
+    async def delete_schedule_exception(
+        self, schedule_id: UUID, exception_date: date_type
+    ) -> dict:
+        try:
+            deleted = self.schedule_service.delete_schedule_exception(schedule_id, exception_date)
+            if not deleted:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No exception found for date {exception_date}",
+                )
+            return {"success": True}
+        except HTTPException:
+            raise
+        except SQLAlchemyError:
+            raise HTTPException(status_code=500, detail="Database error")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to delete exception: {str(e)}")

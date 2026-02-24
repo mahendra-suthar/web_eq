@@ -352,27 +352,39 @@ export default function BookingPage() {
                 >
                   <div className="bp-slot-header">
                     <h3 className="bp-slot-queue">{option.queue_name}</h3>
-                    <span className={`bp-slot-status ${option.available ? "available" : "full"}`}>
-                      {option.is_recommended ? "Recommended" : option.available ? "Available" : "Full"}
+                    <span className={`bp-slot-status ${option.available ? "available" : option.unavailability_reason === "employee_not_available" ? "not-available" : "full"}`}>
+                      {option.is_recommended
+                        ? "Recommended"
+                        : option.available
+                        ? "Available"
+                        : option.unavailability_reason === "employee_not_available"
+                        ? t("employeeNotAvailable")
+                        : "Full"}
                     </span>
                   </div>
-                  <div className="bp-slot-details">
-                    <p className="bp-slot-row">
-                      <span className="label">Position</span>
-                      <span className="value">#{option.position}</span>
-                    </p>
-                    <p className="bp-slot-row">
-                      <span className="label">Est. wait</span>
-                      <span className="value">{option.estimated_wait_minutes} min</span>
-                      {option.estimated_wait_range && (
-                        <span className="value bp-slot-range"> ({option.estimated_wait_range})</span>
-                      )}
-                    </p>
-                    <p className="bp-slot-row">
-                      <span className="label">Expected at</span>
-                      <span className="value">{option.estimated_appointment_time}</span>
-                    </p>
-                  </div>
+                  {option.unavailability_reason === "employee_not_available" ? (
+                    <div className="bp-slot-unavailable-msg">
+                      <p>{t("employeeNotAvailableOnDay")}</p>
+                    </div>
+                  ) : (
+                    <div className="bp-slot-details">
+                      <p className="bp-slot-row">
+                        <span className="label">Position</span>
+                        <span className="value">#{option.position}</span>
+                      </p>
+                      <p className="bp-slot-row">
+                        <span className="label">Est. wait</span>
+                        <span className="value">{option.estimated_wait_minutes} min</span>
+                        {option.estimated_wait_range && (
+                          <span className="value bp-slot-range"> ({option.estimated_wait_range})</span>
+                        )}
+                      </p>
+                      <p className="bp-slot-row">
+                        <span className="label">Expected at</span>
+                        <span className="value">{option.estimated_appointment_time}</span>
+                      </p>
+                    </div>
+                  )}
                 </button>
               ))}
             </div>

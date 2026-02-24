@@ -372,6 +372,21 @@
       background: rgba(198, 40, 40, 0.12);
       color: #c62828;
     }
+
+    &.not-available {
+      background: rgba(117, 117, 117, 0.12);
+      color: #757575;
+    }
+  }
+
+  .bp-slot-unavailable-msg {
+    padding: 12px 0 4px;
+    p {
+      margin: 0;
+      font-size: 0.875rem;
+      color: #757575;
+      font-style: italic;
+    }
   }
 
   .bp-slot-details {

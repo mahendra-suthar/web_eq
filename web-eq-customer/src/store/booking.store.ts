@@ -29,6 +29,7 @@ export interface QueueOptionData {
   estimated_appointment_time: string;
   is_recommended: boolean;
   available: boolean;
+  unavailability_reason?: string | null;
 }
 
 export interface BookingPreviewData {

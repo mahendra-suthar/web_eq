@@ -109,7 +109,8 @@ class BusinessController:
 
             now = datetime.now(pytz.timezone(TIMEZONE))
             current_time = now.time()
-            day_of_week = now.weekday()
+            # Use JS convention (0=Sun … 6=Sat) to match how day_of_week is stored by the frontend.
+            day_of_week = (now.weekday() + 1) % 7
             schedules_map = self.business_service.get_schedules_by_businesses(business_ids, day_of_week)
             review_stats = self.business_service.get_review_stats_by_businesses(business_ids)
 

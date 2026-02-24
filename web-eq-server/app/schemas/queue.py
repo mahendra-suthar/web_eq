@@ -155,6 +155,9 @@ class QueueOptionData(BaseModel):
     estimated_appointment_time: str  # HH:MM format
     is_recommended: bool
     available: bool
+    # Set when the queue is unavailable for a specific reason rather than just being full.
+    # e.g. "employee_not_available" — frontend should show this instead of metrics.
+    unavailability_reason: Optional[str] = None
 
 
 class AvailableSlotData(BaseModel):
