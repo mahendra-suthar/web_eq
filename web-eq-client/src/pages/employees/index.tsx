@@ -118,7 +118,16 @@ const Employees = () => {
                         <button className="btn btn-secondary" disabled={loading || employees.length === 0}>
                             {t("export")}
                         </button>
-                        <button className="btn btn-primary">
+                        <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() =>
+                                navigate(`${RouterConstant.ROUTERS_PATH.EMPLOYEES}/new`, {
+                                    state: resolvedBusinessId ? { businessId: resolvedBusinessId } : undefined,
+                                })
+                            }
+                            disabled={loading || !resolvedBusinessId}
+                        >
                             {t("addEmployee")}
                         </button>
                     </div>

@@ -1,3 +1,5 @@
+from datetime import time as _time
+
 UNPROTECTED_ROUTE_PATHS = [
     "/api/auth/send-otp",
     "/api/auth/verify-otp",
@@ -54,3 +56,7 @@ QUEUE_USER_PRIORITY_REQUESTED = 6
 # Time format constants
 TIME_FORMAT = "%I:%M %p"
 TIMEZONE = "Asia/Kolkata"
+
+# Business "always open" time bounds (used for schedule validation and defaults)
+BIZ_EARLIEST_TIME = _time(0, 0)
+BIZ_LATEST_TIME = _time(23, 59)

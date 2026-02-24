@@ -1,4 +1,4 @@
-from sqlalchemy import func, extract, case, or_
+from sqlalchemy import func, extract, case, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Tuple, Dict, cast, Optional, Any, TYPE_CHECKING
@@ -11,7 +11,12 @@ from app.models.service import Service
 from app.models.employee import Employee
 from app.models.user import User
 from app.models.business import Business
-from app.schemas.queue import QueueCreate
+from app.schemas.queue import (
+    QueueCreate,
+    QueueUpdate,
+    QueueServiceAddItem,
+    QueueServiceUpdate,
+)
 from app.core.constants import (
     QUEUE_USER_REGISTERED,
     QUEUE_USER_IN_PROGRESS,
@@ -63,6 +68,96 @@ class QueueService:
             self.db.rollback()
             raise
         except Exception:
+            self.db.rollback()
+            raise
+
+    def update_queue(self, queue_id: UUID, business_id: UUID, data: QueueUpdate) -> Optional[Queue]:
+        try:
+            queue = self.get_queue_by_id_and_business(queue_id, business_id)
+            if not queue:
+                return None
+            payload = data.model_dump(exclude_unset=True)
+            want_employee_update = "employee_id" in payload
+            employee_id = payload.pop("employee_id", None) if want_employee_update else None
+            for key, val in payload.items():
+                setattr(queue, key, val)
+            if want_employee_update:
+                self.db.query(Employee).filter(Employee.queue_id == queue_id).update({"queue_id": None})
+                if employee_id:
+                    self.db.query(Employee).filter(Employee.uuid == employee_id).update({"queue_id": queue_id})
+            self.db.commit()
+            self.db.refresh(queue)
+            return queue
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+
+    def add_services_to_queue(
+        self, queue_id: UUID, business_id: UUID, items: List[QueueServiceAddItem]
+    ) -> List[QueueServiceModel]:
+        """Add one or more services to a queue. Skips service_id already in queue. Returns created queue_services."""
+        try:
+            queue = self.get_queue_by_id_and_business(queue_id, business_id)
+            if not queue:
+                return []
+            existing = {
+                row.service_id
+                for row in self.db.query(QueueServiceModel.service_id).filter(
+                    QueueServiceModel.queue_id == queue_id
+                ).all()
+            }
+            to_add = [i for i in items if i.service_id not in existing]
+            if not to_add:
+                return []
+            created = [
+                QueueServiceModel(
+                    service_id=item.service_id,
+                    business_id=business_id,
+                    queue_id=queue_id,
+                    description=item.description,
+                    service_fee=item.service_fee,
+                    avg_service_time=item.avg_service_time,
+                    status=1,
+                )
+                for item in to_add
+            ]
+            self.db.add_all(created)
+            self.db.commit()
+            for qs in created:
+                self.db.refresh(qs)
+            return created
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+
+    def update_queue_service(
+        self, queue_service_id: UUID, data: QueueServiceUpdate
+    ) -> Optional[QueueServiceModel]:
+        """Update a queue_service row. Returns updated row or None."""
+        try:
+            qs = self.db.query(QueueServiceModel).filter(QueueServiceModel.uuid == queue_service_id).first()
+            if not qs:
+                return None
+            payload = data.model_dump(exclude_unset=True)
+            for key, val in payload.items():
+                setattr(qs, key, val)
+            self.db.commit()
+            self.db.refresh(qs)
+            return qs
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+
+    def delete_queue_service(self, queue_service_id: UUID) -> bool:
+        """Remove a queue_service (removes service from queue). Returns True if deleted."""
+        try:
+            qs = self.db.query(QueueServiceModel).filter(QueueServiceModel.uuid == queue_service_id).first()
+            if not qs:
+                return False
+            self.db.delete(qs)
+            self.db.commit()
+            return True
+        except SQLAlchemyError:
             self.db.rollback()
             raise
 
@@ -132,6 +227,18 @@ class QueueService:
         """Return a Queue by id, or None."""
         try:
             return self.db.query(Queue).filter(Queue.uuid == queue_id).first()
+        except SQLAlchemyError:
+            raise
+
+    def get_queue_services_with_service(self, queue_id: UUID) -> List[Tuple[QueueServiceModel, Service]]:
+        """Return queue_services for a queue with Service joined (for detail view)."""
+        try:
+            return (
+                self.db.query(QueueServiceModel, Service)
+                .join(Service, QueueServiceModel.service_id == Service.uuid)
+                .filter(QueueServiceModel.queue_id == queue_id)
+                .all()
+            )
         except SQLAlchemyError:
             raise
 
@@ -359,34 +466,56 @@ class QueueService:
             raise
 
     def get_queues(self, business_id: UUID):  # type: ignore
+        # Use correlated subqueries to avoid json_agg(distinct(...)), which PostgreSQL
+        # does not support (no equality operator for type json).
         try:
+            emp_subq = (
+                select(
+                    func.coalesce(
+                        func.json_agg(
+                            func.json_build_object("uuid", Employee.uuid, "name", Employee.full_name)
+                        ),
+                        "[]",
+                    )
+                )
+                .select_from(Employee)
+                .where(Employee.queue_id == Queue.uuid)
+                .correlate(Queue)
+                .scalar_subquery()
+            )
+            svc_subq = (
+                select(
+                    func.coalesce(
+                        func.json_agg(func.json_build_object("uuid", QueueServiceModel.uuid)),
+                        "[]",
+                    )
+                )
+                .select_from(QueueServiceModel)
+                .where(QueueServiceModel.queue_id == Queue.uuid)
+                .correlate(Queue)
+                .scalar_subquery()
+            )
+            user_count_subq = (
+                select(func.count(func.distinct(QueueUser.user_id)))
+                .select_from(QueueUser)
+                .where(QueueUser.queue_id == Queue.uuid)
+                .correlate(Queue)
+                .scalar_subquery()
+            )
             result = (
                 self.db.query(
-                    Queue.uuid.label("queue_id"),
-                    Queue.name.label("queue_name"),
-                    Queue.status.label("status"),
-                    func.json_agg(
-                        func.distinct(
-                            func.json_build_object(
-                                "uuid", Employee.uuid,
-                                "name", Employee.full_name,
-                            )
-                        )
-                    ).filter(Employee.uuid.isnot(None)).label("employees"),
-                    func.json_agg(
-                        func.distinct(
-                            func.json_build_object(
-                                "uuid", QueueServiceModel.uuid
-                            )
-                        )
-                    ).filter(QueueServiceModel.uuid.isnot(None)).label("services"),
-                    func.count(func.distinct(QueueUser.user_id)).label("unique_users"),
+                    Queue.uuid,
+                    Queue.merchant_id,
+                    Queue.name,
+                    Queue.status,
+                    Queue.is_counter,
+                    Queue.limit,
+                    Queue.created_at,
+                    emp_subq.label("employees"),
+                    svc_subq.label("services"),
+                    user_count_subq.label("unique_users"),
                 )
-                .outerjoin(Employee, Employee.queue_id == Queue.uuid)
-                .outerjoin(QueueServiceModel, QueueServiceModel.queue_id == Queue.uuid)
-                .outerjoin(QueueUser, QueueUser.queue_id == Queue.uuid)
                 .filter(Queue.merchant_id == business_id)
-                .group_by(Queue.uuid, Queue.name, Queue.status)
                 .all()
             )
             return result

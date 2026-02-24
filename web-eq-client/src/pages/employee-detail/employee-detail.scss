@@ -127,6 +127,11 @@
             cursor: not-allowed;
         }
     }
+
+    &.btn-sm {
+        padding: 6px 12px;
+        font-size: 13px;
+    }
 }
 
 .employee-detail-page .info-input {
@@ -302,6 +307,14 @@
     &.pending {
         background: #fef3c7;
         color: #92400e;
+    }
+}
+
+.employee-detail-page .queue-tab-section .queue-empty-state {
+    .queue-empty-message {
+        font-size: 14px;
+        color: #64748b;
+        margin: 0 0 20px 0;
     }
 }
 

@@ -9,7 +9,9 @@ from app.services.queue_service import QueueService
 from app.services.business_service import BusinessService
 from app.services.realtime.queue_manager import queue_manager
 from app.schemas.queue import (
-    QueueCreate, QueueData, QueueUserData, QueueUserDetailResponse, QueueUserDetailUserInfo,
+    QueueCreate, QueueData, QueueDetailData, QueueServiceDetailData,
+    QueueUpdate, QueueServicesAdd, QueueServiceUpdate,
+    QueueUserData, QueueUserDetailResponse, QueueUserDetailUserInfo,
     AvailableSlotData, BookingCreateInput, BookingData, BookingServiceData, BookingPreviewData
 )
 from app.schemas.user import UserData
@@ -31,9 +33,9 @@ class QueueController:
     async def create_queue(self, data: QueueCreate) -> QueueData:
         try:
             service_ids = [s.service_id for s in data.services]
-            services = self.db.query(Service).filter(Service.uuid.in_(service_ids)).all()
-            if not services:
-                raise HTTPException(400, "No valid services selected")
+            services = self.db.query(Service).filter(Service.uuid.in_(service_ids)).all() if service_ids else []
+            if service_ids and len(services) != len(service_ids):
+                raise HTTPException(400, "One or more services not found")
 
             queue = self.queue_service.create_queue(data=data, services=services)
             self.business_service.update_registration_state(
@@ -57,6 +59,114 @@ class QueueController:
             raise HTTPException(status_code=500, detail=f"Database error occurred while getting queue: {str(e)}")
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to get queue: {str(e)}")
+
+    async def get_queue_detail(self, queue_id: UUID) -> QueueDetailData:
+        try:
+            queue = self.queue_service.get_queue_by_id(queue_id)
+            if not queue:
+                raise HTTPException(status_code=404, detail="Queue not found")
+            rows = self.queue_service.get_queue_services_with_service(queue_id)
+            services = [
+                QueueServiceDetailData(
+                    uuid=qs.uuid,
+                    service_id=qs.service_id,
+                    service_name=getattr(svc, "name", None),
+                    description=getattr(qs, "description", None) or getattr(svc, "description", None),
+                    service_fee=getattr(qs, "service_fee", None),
+                    avg_service_time=getattr(qs, "avg_service_time", None),
+                )
+                for qs, svc in rows
+            ]
+            assigned_employee_id = queue.employees[0].uuid if queue.employees else None
+            return QueueDetailData(
+                uuid=queue.uuid,
+                business_id=queue.merchant_id,
+                name=queue.name,
+                status=queue.status,
+                limit=getattr(queue, "limit", None),
+                current_length=getattr(queue, "current_length", None),
+                assigned_employee_id=assigned_employee_id,
+                services=services,
+            )
+        except HTTPException:
+            raise
+        except SQLAlchemyError as e:
+            raise HTTPException(status_code=500, detail=f"Database error occurred while getting queue: {str(e)}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to get queue: {str(e)}")
+
+    async def update_queue(self, queue_id: UUID, business_id: UUID, data: QueueUpdate) -> QueueData:
+        try:
+            queue = self.queue_service.update_queue(queue_id, business_id, data)
+            if not queue:
+                raise HTTPException(status_code=404, detail="Queue not found")
+            return QueueData.from_queue(queue)
+        except HTTPException:
+            raise
+        except SQLAlchemyError as e:
+            raise HTTPException(status_code=500, detail=f"Database error while updating queue: {str(e)}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to update queue: {str(e)}")
+
+    async def add_services_to_queue(
+        self, queue_id: UUID, business_id: UUID, data: QueueServicesAdd
+    ) -> List[QueueServiceDetailData]:
+        try:
+            created = self.queue_service.add_services_to_queue(queue_id, business_id, data.services)
+            if not created:
+                return []
+            service_ids = [qs.service_id for qs in created]
+            services = {s.uuid: s for s in self.db.query(Service).filter(Service.uuid.in_(service_ids)).all()}
+            return [
+                QueueServiceDetailData(
+                    uuid=qs.uuid,
+                    service_id=qs.service_id,
+                    service_name=getattr(services.get(qs.service_id), "name", None),
+                    description=qs.description,
+                    service_fee=qs.service_fee,
+                    avg_service_time=qs.avg_service_time,
+                )
+                for qs in created
+            ]
+        except SQLAlchemyError as e:
+            raise HTTPException(status_code=500, detail=f"Database error while adding services: {str(e)}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to add services: {str(e)}")
+
+    async def update_queue_service(
+        self, queue_service_id: UUID, data: QueueServiceUpdate
+    ) -> QueueServiceDetailData:
+        try:
+            qs = self.queue_service.update_queue_service(queue_service_id, data)
+            if not qs:
+                raise HTTPException(status_code=404, detail="Queue service not found")
+            svc = self.db.query(Service).filter(Service.uuid == qs.service_id).first()
+            return QueueServiceDetailData(
+                uuid=qs.uuid,
+                service_id=qs.service_id,
+                service_name=svc.name if svc else None,
+                description=qs.description,
+                service_fee=qs.service_fee,
+                avg_service_time=qs.avg_service_time,
+            )
+        except HTTPException:
+            raise
+        except SQLAlchemyError as e:
+            raise HTTPException(status_code=500, detail=f"Database error while updating queue service: {str(e)}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to update queue service: {str(e)}")
+
+    async def delete_queue_service(self, queue_service_id: UUID) -> None:
+        try:
+            ok = self.queue_service.delete_queue_service(queue_service_id)
+            if not ok:
+                raise HTTPException(status_code=404, detail="Queue service not found")
+        except HTTPException:
+            raise
+        except SQLAlchemyError as e:
+            raise HTTPException(status_code=500, detail=f"Database error while removing queue service: {str(e)}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to remove queue service: {str(e)}")
 
     async def get_queue_user_detail(self, queue_user_id: UUID) -> QueueUserDetailResponse:
         try:

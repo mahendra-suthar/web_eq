@@ -17,6 +17,7 @@ class EmployeeUpdate(BaseModel):
     country_code: Optional[str] = None
     phone_number: Optional[str] = None
     profile_picture: Optional[str] = None
+    queue_id: Optional[UUID] = None
 
 
 class BusinessEmployeesInput(BaseModel):

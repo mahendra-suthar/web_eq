@@ -59,7 +59,10 @@ export class EmployeeService extends HttpClient {
         }
     }
 
-    async updateEmployee(employeeId: string, employeeData: Partial<EmployeeData>): Promise<EmployeeData> {
+    async updateEmployee(
+        employeeId: string,
+        employeeData: Partial<EmployeeData> & { queue_id?: string | null }
+    ): Promise<EmployeeData> {
         try {
             const payload = Object.fromEntries(
                 Object.entries(employeeData).filter(([_, value]) => value !== undefined)

@@ -15,11 +15,15 @@ import BusinessRegistration from "./pages/business-registration";
 import Dashboard from "./pages/dashboard";
 import AllUsers from "./pages/all-users";
 import Employees from "./pages/employees";
+import EmployeeAdd from "./pages/employee-add";
 import EmployeeDetail from "./pages/employee-detail";
 import BusinessProfile from "./pages/business-profile";
 import EmployeeProfile from "./pages/employee-profile";
 import QueueUsers from "./pages/queue-users";
 import QueueUserDetail from "./pages/queue-user-detail";
+import Queues from "./pages/queues";
+import QueueAdd from "./pages/queue-add";
+import QueueDetail from "./pages/queue-detail";
 import UserDetail from "./pages/user-detail";
 
 const App = () => {
@@ -42,9 +46,13 @@ const App = () => {
           <Route path={ROUTERS_PATH.ALLUSERS} element={<RoleGuard permission={Permission.VIEW_ALL_USERS}><AllUsers /></RoleGuard>} />
           <Route path={`${ROUTERS_PATH.ALLUSERS}/:userId`} element={<RoleGuard permission={Permission.VIEW_ALL_USERS}><UserDetail /></RoleGuard>} />
           <Route path={ROUTERS_PATH.EMPLOYEES} element={<RoleGuard permission={Permission.VIEW_EMPLOYEES}><Employees /></RoleGuard>} />
+          <Route path={`${ROUTERS_PATH.EMPLOYEES}/new`} element={<RoleGuard permission={Permission.VIEW_EMPLOYEES}><EmployeeAdd /></RoleGuard>} />
           <Route path={`${ROUTERS_PATH.EMPLOYEES}/:employeeId`} element={<RoleGuard permission={Permission.VIEW_EMPLOYEES}><EmployeeDetail /></RoleGuard>} />
           <Route path={ROUTERS_PATH.BUSINESSPROFILE} element={<BusinessProfile />} />
           <Route path={ROUTERS_PATH.EMPLOYEEPROFILE} element={<EmployeeProfile />} />
+          <Route path={ROUTERS_PATH.QUEUES} element={<RoleGuard permission={Permission.VIEW_QUEUES}><Queues /></RoleGuard>} />
+          <Route path={`${ROUTERS_PATH.QUEUES}/new`} element={<RoleGuard permission={Permission.VIEW_QUEUES}><QueueAdd /></RoleGuard>} />
+          <Route path={`${ROUTERS_PATH.QUEUES}/:queueId`} element={<RoleGuard permission={Permission.VIEW_QUEUES}><QueueDetail /></RoleGuard>} />
           <Route path={ROUTERS_PATH.QUEUEUSERS} element={<QueueUsers />} />
           <Route path={`${ROUTERS_PATH.QUEUEUSERS}/:queueUserId`} element={<RoleGuard permission={Permission.VIEW_QUEUE_USERS}><QueueUserDetail /></RoleGuard>} />
         </Route>

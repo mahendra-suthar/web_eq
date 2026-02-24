@@ -6,9 +6,11 @@ import { ProfileService, EmployeeDetailsResponse, QueueDetailInfo } from '../../
 import { EmployeeService } from '../../services/employee/employee.service';
 import { BusinessService } from '../../services/business/business.service';
 import { Tabs } from '../../components/tabs/Tabs';
+import { EmployeeOverviewForm } from '../../components/employee/EmployeeOverviewForm';
 import { RouterConstant } from '../../routers/index';
 import { emailRegex } from '../../utils/utils';
 import './employee-detail.scss';
+import '../../components/employee/employee-overview-form.scss';
 
 const iconOverview = (
     <svg className="tab-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -70,6 +72,9 @@ const EmployeeDetail = () => {
     });
     const [scheduleData, setScheduleData] = useState({ isAlwaysOpen: false, schedule: [] as DaySchedule[] });
     const [queueDetail, setQueueDetail] = useState<QueueDetailInfo | null>(null);
+    const [businessId, setBusinessId] = useState<string | null>(null);
+    const [assigningQueue, setAssigningQueue] = useState(false);
+    const [queueAssignError, setQueueAssignError] = useState<string>("");
 
     const dayNames = useMemo(() => [
         { day_of_week: 0, day_name: t("sunday") },
@@ -153,6 +158,7 @@ const EmployeeDetail = () => {
                 schedule: mappedSchedule,
             });
             setQueueDetail(profile.queue_detail ?? null);
+            setBusinessId(profile.employee?.business_id ?? null);
         } catch (err: any) {
             setError(err?.response?.data?.detail?.message || err?.message || t("failedToLoadEmployees"));
         } finally {
@@ -166,10 +172,24 @@ const EmployeeDetail = () => {
 
     useEffect(() => {
         const openTab = (location.state as { openTab?: TabType })?.openTab;
-        if (openTab === 'queue' && queueDisplay?.uuid) {
+        if (openTab === 'queue') {
             setActiveTab('queue');
         }
-    }, [queueDisplay?.uuid, location.state]);
+    }, [location.state]);
+
+    const handleRemoveQueue = useCallback(async () => {
+        if (!employeeId) return;
+        setQueueAssignError("");
+        setAssigningQueue(true);
+        try {
+            await employeeService.updateEmployee(employeeId, { queue_id: null });
+            await fetchProfile();
+        } catch (err: any) {
+            setQueueAssignError(err?.response?.data?.detail?.message || err?.message || t("failedToLoadEmployees"));
+        } finally {
+            setAssigningQueue(false);
+        }
+    }, [employeeId, employeeService, fetchProfile, t]);
 
     const handleSaveEmployee = useCallback(async () => {
         if (!employeeId) return;
@@ -270,16 +290,13 @@ const EmployeeDetail = () => {
     }, [fetchProfile]);
 
     const tabItems = useMemo(() => {
-        const items: { id: TabType; label: string; icon: React.ReactNode }[] = [
-            { id: 'overview', label: t("basicInformation"), icon: iconOverview },
-            { id: 'location', label: t("location"), icon: iconLocation },
-            { id: 'schedule', label: t("schedule"), icon: iconSchedule },
+        return [
+            { id: 'overview' as TabType, label: t("basicInformation"), icon: iconOverview },
+            { id: 'location' as TabType, label: t("location"), icon: iconLocation },
+            { id: 'schedule' as TabType, label: t("schedule"), icon: iconSchedule },
+            { id: 'queue' as TabType, label: t("queue"), icon: iconQueue },
         ];
-        if (queueDisplay?.uuid) {
-            items.push({ id: 'queue', label: t("queue"), icon: iconQueue });
-        }
-        return items;
-    }, [t, queueDisplay?.uuid]);
+    }, [t]);
 
     if (!employeeId) {
         return (
@@ -392,68 +409,24 @@ const EmployeeDetail = () => {
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="info-grid">
-                                            <div className="info-field">
-                                                <label className="info-label">{t("fullName")}</label>
-                                                {editingOverview ? (
-                                                    <input
-                                                        type="text"
-                                                        className="info-input"
-                                                        value={employeeDisplay.fullName}
-                                                        onChange={e => setEmployeeDisplay(prev => ({ ...prev, fullName: e.target.value }))}
-                                                        placeholder={t("enterFullName")}
-                                                    />
-                                                ) : (
-                                                    <div className="info-value">{employeeDisplay.fullName || t("notAvailable")}</div>
-                                                )}
-                                            </div>
-                                            <div className="info-field">
-                                                <label className="info-label">{t("email")}</label>
-                                                {editingOverview ? (
-                                                    <input
-                                                        type="email"
-                                                        className="info-input"
-                                                        value={employeeDisplay.email}
-                                                        onChange={e => setEmployeeDisplay(prev => ({ ...prev, email: e.target.value }))}
-                                                        placeholder={t("enterEmail")}
-                                                    />
-                                                ) : (
-                                                    <div className="info-value">{employeeDisplay.email || t("notAvailable")}</div>
-                                                )}
-                                            </div>
-                                            {editingOverview && (
-                                                <div className="info-field">
-                                                    <label className="info-label">{t("countryCode")}</label>
-                                                    <input
-                                                        type="text"
-                                                        className="info-input"
-                                                        value={employeeCountryCode}
-                                                        onChange={e => setEmployeeCountryCode(e.target.value)}
-                                                        placeholder="+91"
-                                                    />
-                                                </div>
-                                            )}
-                                            <div className="info-field">
-                                                <label className="info-label">{t("phoneNumber")}</label>
-                                                {editingOverview ? (
-                                                    <input
-                                                        type="tel"
-                                                        className="info-input"
-                                                        value={employeePhoneNumber}
-                                                        onChange={e => setEmployeePhoneNumber(e.target.value.replace(/\D/g, "").slice(0, 15))}
-                                                        placeholder={t("enterPhoneNumber")}
-                                                    />
-                                                ) : (
-                                                    <div className="info-value">{employeeDisplay.phoneDisplay || t("notAvailable")}</div>
-                                                )}
-                                            </div>
-                                            <div className="info-field">
-                                                <label className="info-label">{t("isVerified")}</label>
-                                                <span className={`status-badge ${employeeDisplay.isVerified ? 'active' : 'pending'}`}>
-                                                    {employeeDisplay.isVerified ? t("verified") : t("unverified")}
-                                                </span>
-                                            </div>
-                                        </div>
+                                        <EmployeeOverviewForm
+                                            values={{
+                                                fullName: employeeDisplay.fullName,
+                                                email: employeeDisplay.email,
+                                                countryCode: employeeCountryCode,
+                                                phoneNumber: employeePhoneNumber,
+                                            }}
+                                            onChange={(field, value) => {
+                                                if (field === 'fullName') setEmployeeDisplay(prev => ({ ...prev, fullName: value }));
+                                                else if (field === 'email') setEmployeeDisplay(prev => ({ ...prev, email: value }));
+                                                else if (field === 'countryCode') setEmployeeCountryCode(value);
+                                                else if (field === 'phoneNumber') setEmployeePhoneNumber(value);
+                                            }}
+                                            disabled={saving}
+                                            readOnly={!editingOverview}
+                                            showVerified={true}
+                                            verified={employeeDisplay.isVerified}
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -631,10 +604,25 @@ const EmployeeDetail = () => {
 
                     {activeTab === 'queue' && (
                         <div className="profile-section queue-tab-section">
-                            <div className="section-header">
+                            <div className="section-header section-header-actions">
                                 <h2 className="section-title">{t("queue")}</h2>
+                                {queueDetail && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={handleRemoveQueue}
+                                        disabled={assigningQueue}
+                                    >
+                                        {assigningQueue ? t("saving") : t("removeQueue") || "Remove queue"}
+                                    </button>
+                                )}
                             </div>
                             <div className="section-content">
+                                {queueAssignError && (
+                                    <div className="employee-detail-save-error" role="alert">
+                                        {queueAssignError}
+                                    </div>
+                                )}
                                 {queueDetail ? (
                                     <>
                                         <div className="info-block queue-details-block">
@@ -652,18 +640,6 @@ const EmployeeDetail = () => {
                                                     <div className="info-field">
                                                         <label className="info-label">{t("queueLimit")}</label>
                                                         <div className="info-value">{queueDetail.limit}</div>
-                                                    </div>
-                                                )}
-                                                {queueDetail.start_time != null && queueDetail.start_time !== "" && (
-                                                    <div className="info-field">
-                                                        <label className="info-label">{t("startTime")}</label>
-                                                        <div className="info-value">{queueDetail.start_time}</div>
-                                                    </div>
-                                                )}
-                                                {queueDetail.end_time != null && queueDetail.end_time !== "" && (
-                                                    <div className="info-field">
-                                                        <label className="info-label">{t("endTime")}</label>
-                                                        <div className="info-value">{queueDetail.end_time}</div>
                                                     </div>
                                                 )}
                                                 {queueDetail.current_length != null && (
@@ -713,7 +689,9 @@ const EmployeeDetail = () => {
                                         )}
                                     </>
                                 ) : (
-                                    <div className="info-value">{t("notAvailable")}</div>
+                                    <div className="queue-empty-state">
+                                        <p className="queue-empty-message">{t("noQueueAssignedToEmployee")}</p>
+                                    </div>
                                 )}
                             </div>
                         </div>

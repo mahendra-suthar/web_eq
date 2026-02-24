@@ -10,6 +10,7 @@ from app.models.business import Business
 from app.models.queue import Queue, QueueService
 from app.schemas.employee import BusinessEmployeesInput, EmployeeUpdate
 from app.core.utils import generate_invitation_code, now_utc
+from app.services.schedule_service import ScheduleService
 
 
 class EmployeeService:
@@ -46,9 +47,17 @@ class EmployeeService:
                 emp.invitation_code_expires_at = expires_at
             invitation_codes = codes_list
 
+            schedule_svc = ScheduleService(self.db)
+            employee_ids = [emp.uuid for emp in employees]
+            all_new_schedules = schedule_svc.copy_business_schedule_to_employees(
+                data.business_id, employee_ids
+            )
+
             self.db.commit()
             for emp in employees:
                 self.db.refresh(emp)
+            for s in all_new_schedules:
+                self.db.refresh(s)
             return employees, invitation_codes
 
         except SQLAlchemyError:

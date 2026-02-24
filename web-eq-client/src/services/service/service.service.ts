@@ -24,4 +24,23 @@ export class ServiceService extends HttpClient {
             throw error;
         }
     }
+
+    async getAllServices(): Promise<ServiceData[]> {
+        try {
+            return await this.get<ServiceData[]>(`/service/get_all_services`);
+        } catch (error: any) {
+            console.error("Failed to fetch all services:", error);
+            throw error;
+        }
+    }
+
+    /** Services in the business's category (for queue detail add-service). */
+    async getServicesByBusiness(businessId: string): Promise<ServiceData[]> {
+        try {
+            return await this.get<ServiceData[]>(`/service/get_services_by_business/${businessId}`);
+        } catch (error: any) {
+            console.error("Failed to fetch services by business:", error);
+            throw error;
+        }
+    }
 }

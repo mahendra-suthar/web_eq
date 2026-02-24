@@ -7,7 +7,9 @@ from datetime import date
 from app.db.database import get_db
 from app.controllers.queue_controller import QueueController
 from app.schemas.queue import (
-    QueueCreate, QueueData, QueueUserData, QueueUserDetailResponse,
+    QueueCreate, QueueData, QueueDetailData, QueueServiceDetailData,
+    QueueUpdate, QueueServicesAdd, QueueServiceUpdate,
+    QueueUserData, QueueUserDetailResponse,
     AvailableSlotData, BookingCreateInput, BookingData, BookingPreviewData
 )
 from app.schemas.service import ServiceData
@@ -27,6 +29,43 @@ async def create_queue(payload: QueueCreate, db: Session = Depends(get_db)):
 async def get_queues(business_id: UUID, db: Session = Depends(get_db)):
     controller = QueueController(db)
     return await controller.get_queues(business_id)
+
+
+@queue_router.get("/get_queue/{queue_id}", response_model=QueueDetailData)
+async def get_queue_detail(queue_id: UUID, db: Session = Depends(get_db)):
+    controller = QueueController(db)
+    return await controller.get_queue_detail(queue_id)
+
+
+@queue_router.put("/update_queue/{queue_id}", response_model=QueueData)
+async def update_queue(
+    queue_id: UUID, business_id: UUID, payload: QueueUpdate, db: Session = Depends(get_db),
+):
+    controller = QueueController(db)
+    return await controller.update_queue(queue_id, business_id, payload)
+
+
+@queue_router.post("/add_services_to_queue/{queue_id}", response_model=List[QueueServiceDetailData])
+async def add_services_to_queue(
+    queue_id: UUID, business_id: UUID, payload: QueueServicesAdd, db: Session = Depends(get_db),
+):
+    controller = QueueController(db)
+    return await controller.add_services_to_queue(queue_id, business_id, payload)
+
+
+@queue_router.patch("/queue_service/{queue_service_id}", response_model=QueueServiceDetailData)
+async def update_queue_service(
+    queue_service_id: UUID, payload: QueueServiceUpdate, db: Session = Depends(get_db),
+):
+    controller = QueueController(db)
+    return await controller.update_queue_service(queue_service_id, payload)
+
+
+@queue_router.delete("/queue_service/{queue_service_id}")
+async def delete_queue_service(queue_service_id: UUID, db: Session = Depends(get_db)):
+    controller = QueueController(db)
+    await controller.delete_queue_service(queue_service_id)
+    return {"success": True}
 
 
 @queue_router.get("/queue-user/{queue_user_id}", response_model=QueueUserDetailResponse)

@@ -1,0 +1,420 @@
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import {
+    QueueService,
+    QueueDetailData,
+    QueueServiceDetailData,
+} from "../../services/queue/queue.service";
+import { ServiceService, ServiceData } from "../../services/service/service.service";
+import { EmployeeService, EmployeeResponse } from "../../services/employee/employee.service";
+import { RouterConstant } from "../../routers";
+import "./queue-detail.scss";
+
+const QueueDetail = () => {
+    const { t } = useTranslation();
+    const { queueId } = useParams<{ queueId: string }>();
+    const navigate = useNavigate();
+    const queueService = useMemo(() => new QueueService(), []);
+    const serviceService = useMemo(() => new ServiceService(), []);
+    const employeeService = useMemo(() => new EmployeeService(), []);
+
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [data, setData] = useState<QueueDetailData | null>(null);
+    const [allServices, setAllServices] = useState<ServiceData[]>([]);
+    const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
+
+    const [editingQueue, setEditingQueue] = useState(false);
+    const [editName, setEditName] = useState("");
+    const [editStatus, setEditStatus] = useState<number | "">("");
+    const [editLimit, setEditLimit] = useState<number | "">("");
+    const [editEmployeeId, setEditEmployeeId] = useState<string | null>(null);
+    const [savingQueue, setSavingQueue] = useState(false);
+    const [queueSaveError, setQueueSaveError] = useState("");
+
+    const [addFee, setAddFee] = useState<number | "">("");
+    const [addAvgTime, setAddAvgTime] = useState<number | "">("");
+    const [savingService, setSavingService] = useState(false);
+    const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
+    const [editSvcFee, setEditSvcFee] = useState<number | "">("");
+    const [editSvcAvgTime, setEditSvcAvgTime] = useState<number | "">("");
+
+    const loadDetail = useCallback(() => {
+        if (!queueId) return;
+        setLoading(true);
+        setError("");
+        queueService
+            .getQueueDetail(queueId)
+            .then((d) => {
+                setData(d);
+                setEditName(d.name);
+                setEditStatus(d.status ?? "");
+                setEditLimit(d.limit ?? "");
+                setEditEmployeeId(d.assigned_employee_id ?? null);
+            })
+            .catch((err: unknown) => {
+                const e = err as { response?: { data?: { detail?: string } }; message?: string };
+                setError(e?.response?.data?.detail || (e?.message as string) || t("failedToLoadQueue") || "Failed to load queue");
+                setData(null);
+            })
+            .finally(() => setLoading(false));
+    }, [queueId, queueService, t]);
+
+    useEffect(() => {
+        loadDetail();
+    }, [loadDetail]);
+
+    useEffect(() => {
+        if (!data?.business_id) return;
+        serviceService.getServicesByBusiness(data.business_id).then(setAllServices).catch(() => setAllServices([]));
+    }, [data?.business_id, serviceService]);
+
+    useEffect(() => {
+        if (!data?.business_id) return;
+        employeeService.getEmployees(data.business_id, 1, 500, "").then(setEmployees).catch(() => setEmployees([]));
+    }, [data?.business_id, employeeService]);
+
+    const handleSaveQueue = async () => {
+        if (!queueId || !data) return;
+        setQueueSaveError("");
+        setSavingQueue(true);
+        try {
+            await queueService.updateQueue(queueId, data.business_id, {
+                name: editName.trim(),
+                status: editStatus === "" ? undefined : Number(editStatus),
+                limit: editLimit === "" ? undefined : Number(editLimit),
+                employee_id: editEmployeeId || null,
+            });
+            loadDetail();
+            setEditingQueue(false);
+        } catch (err: unknown) {
+            const e = err as { response?: { data?: { detail?: string } }; message?: string };
+            setQueueSaveError(e?.response?.data?.detail || (e?.message as string) || t("failedToSave") || "Failed to save");
+        } finally {
+            setSavingQueue(false);
+        }
+    };
+
+    const handleAddService = async (serviceId: string) => {
+        if (!queueId || !data) return;
+        setSavingService(true);
+        try {
+            await queueService.addServicesToQueue(queueId, data.business_id, [
+                {
+                    service_id: serviceId,
+                    service_fee: addFee === "" ? undefined : Number(addFee),
+                    avg_service_time: addAvgTime === "" ? undefined : Number(addAvgTime),
+                },
+            ]);
+            setAddFee("");
+            setAddAvgTime("");
+            await loadDetail();
+        } catch {
+            // keep form open on error
+        }
+        setSavingService(false);
+    };
+
+    const handleUpdateService = async (svc: QueueServiceDetailData) => {
+        if (!editingServiceId) return;
+        setSavingService(true);
+        try {
+            await queueService.updateQueueService(editingServiceId, {
+                service_fee: editSvcFee === "" ? undefined : Number(editSvcFee),
+                avg_service_time: editSvcAvgTime === "" ? undefined : Number(editSvcAvgTime),
+            });
+            setEditingServiceId(null);
+            loadDetail();
+        } catch {
+            // keep form open on error
+        }
+        setSavingService(false);
+    };
+
+    const handleRemoveService = async (queueServiceId: string) => {
+        if (!window.confirm(t("confirmRemoveService") || "Remove this service from the queue?")) return;
+        setSavingService(true);
+        try {
+            await queueService.deleteQueueService(queueServiceId);
+            loadDetail();
+        } catch {
+            // show error could be added
+        }
+        setSavingService(false);
+    };
+
+    if (!queueId) {
+        return (
+            <div className="queue-detail-page">
+                <div className="content-card">
+                    <div className="error-message">{t("notAvailable")}</div>
+                    <button type="button" className="btn btn-secondary" onClick={() => navigate(RouterConstant.ROUTERS_PATH.QUEUES)}>
+                        {t("back")}
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (loading) {
+        return (
+            <div className="queue-detail-page">
+                <div className="content-card">
+                    <div className="loading-state">{t("loading")}</div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error || !data) {
+        return (
+            <div className="queue-detail-page">
+                <div className="content-card">
+                    <div className="error-message">{error || t("notAvailable")}</div>
+                    <button type="button" className="btn btn-secondary" onClick={() => navigate(RouterConstant.ROUTERS_PATH.QUEUES)}>
+                        {t("back")}
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    const services = data.services || [];
+    const availableToAdd = allServices.filter((s) => !services.some((qs) => qs.service_id === s.uuid));
+
+    return (
+        <div className="queue-detail-page">
+            <div className="content-card">
+                <div className="section-header section-header-actions">
+                    <h2 className="section-title">{t("queueDetails") || "Queue details"}</h2>
+                    <div className="header-buttons">
+                        {editingQueue ? (
+                            <>
+                                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingQueue(false)} disabled={savingQueue}>
+                                    {t("cancel")}
+                                </button>
+                                <button type="button" className="btn btn-primary btn-sm" onClick={handleSaveQueue} disabled={savingQueue}>
+                                    {savingQueue ? t("saving") : t("save")}
+                                </button>
+                            </>
+                        ) : (
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingQueue(true)}>
+                                {t("edit")}
+                            </button>
+                        )}
+                        <button type="button" className="btn btn-secondary" onClick={() => navigate(RouterConstant.ROUTERS_PATH.QUEUES)}>
+                            {t("back")}
+                        </button>
+                    </div>
+                </div>
+
+                {queueSaveError && <div className="error-message">{queueSaveError}</div>}
+
+                <div className="queue-detail-content">
+                    <div className="info-block queue-details-block">
+                        <h3 className="info-block-title">{t("queueInformation") || "Queue information"}</h3>
+                        {editingQueue ? (
+                            <div className="queue-edit-form">
+                                <div className="form-row">
+                                    <label className="form-label">{t("queueName")}</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={editName}
+                                        onChange={(e) => setEditName(e.target.value)}
+                                        disabled={savingQueue}
+                                    />
+                                </div>
+                                <div className="form-row">
+                                    <label className="form-label">{t("status")}</label>
+                                    <input
+                                        type="number"
+                                        className="form-input"
+                                        value={editStatus}
+                                        onChange={(e) => setEditStatus(e.target.value === "" ? "" : Number(e.target.value))}
+                                        disabled={savingQueue}
+                                    />
+                                </div>
+                                <div className="form-row">
+                                    <label className="form-label">{t("queueLimit")}</label>
+                                    <input
+                                        type="number"
+                                        className="form-input"
+                                        value={editLimit}
+                                        onChange={(e) => setEditLimit(e.target.value === "" ? "" : Number(e.target.value))}
+                                        disabled={savingQueue}
+                                    />
+                                </div>
+                                <div className="form-row">
+                                    <label className="form-label">{t("assignToEmployee") || "Assign to employee"}</label>
+                                    <select
+                                        className="form-input form-select"
+                                        value={editEmployeeId ?? ""}
+                                        onChange={(e) => setEditEmployeeId(e.target.value || null)}
+                                        disabled={savingQueue}
+                                    >
+                                        <option value="">— {t("none") || "None"} —</option>
+                                        {employees.map((emp) => (
+                                            <option key={emp.uuid} value={emp.uuid}>
+                                                {emp.full_name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="info-grid">
+                                <div className="info-field">
+                                    <label className="info-label">{t("queueName")}</label>
+                                    <div className="info-value">{data.name || t("notAvailable")}</div>
+                                </div>
+                                <div className="info-field">
+                                    <label className="info-label">{t("status")}</label>
+                                    <div className="info-value">{data.status != null ? String(data.status) : t("notAvailable")}</div>
+                                </div>
+                                <div className="info-field">
+                                    <label className="info-label">{t("queueLimit")}</label>
+                                    <div className="info-value">{data.limit != null ? String(data.limit) : "—"}</div>
+                                </div>
+                                {data.current_length != null && (
+                                    <div className="info-field">
+                                        <label className="info-label">{t("currentLength")}</label>
+                                        <div className="info-value">{data.current_length}</div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="info-block queue-services-block">
+                        <h3 className="info-block-title">{t("queueServices") || "Queue services"}</h3>
+
+                        {/* Add Queue Service: services from business category as selectable buttons; selecting adds to queue */}
+                        {availableToAdd.length > 0 && (
+                            <div className="add-queue-service-section">
+                                <p className="add-queue-service-intro">{t("addQueueServiceIntro") || "Add a service to this queue. Optional: set fee and avg time below, then click a service."}</p>
+                                <div className="add-service-optional-fields">
+                                    <input
+                                        type="number"
+                                        className="form-input small"
+                                        placeholder={t("fee")}
+                                        value={addFee}
+                                        onChange={(e) => setAddFee(e.target.value === "" ? "" : Number(e.target.value))}
+                                        disabled={savingService}
+                                    />
+                                    <input
+                                        type="number"
+                                        className="form-input small"
+                                        placeholder={t("minutes")}
+                                        value={addAvgTime}
+                                        onChange={(e) => setAddAvgTime(e.target.value === "" ? "" : Number(e.target.value))}
+                                        disabled={savingService}
+                                    />
+                                </div>
+                                <div className="service-buttons-grid">
+                                    {availableToAdd.map((s) => (
+                                        <button
+                                            key={s.uuid}
+                                            type="button"
+                                            className="btn btn-service-chip"
+                                            onClick={() => handleAddService(s.uuid)}
+                                            disabled={savingService}
+                                        >
+                                            {s.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {services.length === 0 ? (
+                            <p className="info-value">{t("noServicesAssigned") || "No services assigned to this queue."}</p>
+                        ) : (
+                            <div className="queue-services-table-wrap">
+                                <table className="data-table queue-services-table">
+                                    <thead>
+                                        <tr>
+                                            <th>{t("serviceName")}</th>
+                                            <th>{t("serviceDescription") || "Description"}</th>
+                                            <th>{t("fee")}</th>
+                                            <th>{t("averageServiceTime") || "Avg. time (min)"}</th>
+                                            <th>{t("actions")}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {services.map((svc) => (
+                                            <tr key={svc.uuid}>
+                                                <td>{svc.service_name ?? t("notAvailable")}</td>
+                                                <td>{svc.description ?? t("notAvailable")}</td>
+                                                {editingServiceId === svc.uuid ? (
+                                                    <>
+                                                        <td>
+                                                            <input
+                                                                type="number"
+                                                                className="form-input small"
+                                                                value={editSvcFee}
+                                                                onChange={(e) => setEditSvcFee(e.target.value === "" ? "" : Number(e.target.value))}
+                                                                disabled={savingService}
+                                                            />
+                                                        </td>
+                                                        <td>
+                                                            <input
+                                                                type="number"
+                                                                className="form-input small"
+                                                                value={editSvcAvgTime}
+                                                                onChange={(e) => setEditSvcAvgTime(e.target.value === "" ? "" : Number(e.target.value))}
+                                                                disabled={savingService}
+                                                            />
+                                                        </td>
+                                                        <td>
+                                                            <button type="button" className="btn btn-primary btn-sm" onClick={() => handleUpdateService(svc)} disabled={savingService}>
+                                                                {t("save")}
+                                                            </button>
+                                                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setEditingServiceId(null); }} disabled={savingService}>
+                                                                {t("cancel")}
+                                                            </button>
+                                                        </td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <td>{svc.service_fee != null ? String(svc.service_fee) : t("notAvailable")}</td>
+                                                        <td>{svc.avg_service_time != null ? `${svc.avg_service_time} ${t("minutes")}` : t("notAvailable")}</td>
+                                                        <td>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-ghost btn-sm"
+                                                                onClick={() => {
+                                                                    setEditingServiceId(svc.uuid);
+                                                                    setEditSvcFee(svc.service_fee ?? "");
+                                                                    setEditSvcAvgTime(svc.avg_service_time ?? "");
+                                                                }}
+                                                                disabled={savingService}
+                                                            >
+                                                                {t("edit")}
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-ghost btn-sm danger"
+                                                                onClick={() => handleRemoveService(svc.uuid)}
+                                                                disabled={savingService}
+                                                            >
+                                                                {t("remove")}
+                                                            </button>
+                                                        </td>
+                                                    </>
+                                                )}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default QueueDetail;

@@ -18,10 +18,13 @@ const Topbar = () => {
 
     const pageTitle = useMemo(() => {
         const path = location.pathname;
-        const isEmployeeDetail = path.startsWith(ROUTERS_PATH.EMPLOYEES + "/") && path !== ROUTERS_PATH.EMPLOYEES;
+        const isEmployeeAdd = path === ROUTERS_PATH.EMPLOYEES + "/new";
+        const isEmployeeDetail = path.startsWith(ROUTERS_PATH.EMPLOYEES + "/") && path !== ROUTERS_PATH.EMPLOYEES && !isEmployeeAdd;
 
         if (path === ROUTERS_PATH.DASHBOARD) {
             return t("dashboard");
+        } else if (isEmployeeAdd) {
+            return t("addEmployee");
         } else if (isEmployeeDetail) {
             return t("employeeDetail");
         } else if (path === ROUTERS_PATH.EMPLOYEES) {
@@ -30,10 +33,18 @@ const Topbar = () => {
             return t("userManagement");
         } else if (path === ROUTERS_PATH.BUSINESSPROFILE) {
             return t("businessProfile");
+        } else if (path === ROUTERS_PATH.QUEUES) {
+            return t("queues") || "Queues";
+        } else if (path === ROUTERS_PATH.QUEUES + "/new") {
+            return t("addQueue") || "Add queue";
+        } else if (path.startsWith(ROUTERS_PATH.QUEUES + "/") && path !== ROUTERS_PATH.QUEUES) {
+            return t("queueDetail") || "Queue detail";
         } else if (path === ROUTERS_PATH.QUEUEUSERS) {
             return t("queueUsers");
+        } else if (path.startsWith(ROUTERS_PATH.QUEUEUSERS + "/") && path !== ROUTERS_PATH.QUEUEUSERS) {
+            return t("queueUserDetail") || "Queue user detail";
         }
-        
+
         return t("dashboard");
     }, [location.pathname, t, ROUTERS_PATH]);
 

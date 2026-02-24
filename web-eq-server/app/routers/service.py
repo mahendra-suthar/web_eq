@@ -15,3 +15,15 @@ service_router = APIRouter()
 async def get_available_services(category_id: UUID, db: Session = Depends(get_db)):
     controller = ServiceController(db)
     return await controller.get_available_services(category_id)
+
+
+@service_router.get("/get_all_services", response_model=List[ServiceData])
+async def get_all_services(db: Session = Depends(get_db)):
+    controller = ServiceController(db)
+    return await controller.get_all_services()
+
+
+@service_router.get("/get_services_by_business/{business_id}", response_model=List[ServiceData])
+async def get_services_by_business(business_id: UUID, db: Session = Depends(get_db)):
+    controller = ServiceController(db)
+    return await controller.get_services_by_business(business_id)

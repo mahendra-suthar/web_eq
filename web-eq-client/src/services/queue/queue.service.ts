@@ -3,12 +3,32 @@ import { HttpClient } from "../api/httpclient.service";
 export interface QueueCreatePayload {
     business_id: string;
     name: string;
-    employee_id: string;
-    services: {
+    employee_id?: string | null;
+    services?: {
         service_id: string;
         avg_service_time?: number;
         service_fee?: number;
     }[];
+}
+
+export interface QueueUpdatePayload {
+    name?: string;
+    status?: number;
+    limit?: number;
+    employee_id?: string | null;
+}
+
+export interface QueueServiceAddItem {
+    service_id: string;
+    service_fee?: number;
+    avg_service_time?: number;
+    description?: string;
+}
+
+export interface QueueServiceUpdatePayload {
+    service_fee?: number;
+    avg_service_time?: number;
+    description?: string;
 }
 
 export interface QueueUserDetailUserInfo {
@@ -68,16 +88,123 @@ export interface QueueUserData {
     };
 }
 
+export interface QueueData {
+    uuid: string;
+    business_id: string;
+    name: string;
+    status?: number | null;
+    is_counter?: boolean | null;
+    limit?: number | null;
+    created_at?: string | null;
+}
+
+export interface QueueServiceDetailData {
+    uuid: string;
+    service_id: string;
+    service_name?: string | null;
+    description?: string | null;
+    service_fee?: number | null;
+    avg_service_time?: number | null;
+}
+
+export interface QueueDetailData {
+    uuid: string;
+    business_id: string;
+    name: string;
+    status?: number | null;
+    limit?: number | null;
+    current_length?: number | null;
+    assigned_employee_id?: string | null;
+    services: QueueServiceDetailData[];
+}
+
 export class QueueService extends HttpClient {
     constructor() {
         super();
     }
 
-    async createQueue(payload: QueueCreatePayload): Promise<any> {
+    async getQueues(businessId: string): Promise<QueueData[]> {
         try {
-            return await this.post<any>(`/queue/create_queue`, payload);
+            return await this.get<QueueData[]>(`/queue/get_queues/${businessId}`);
+        } catch (error: any) {
+            console.error("Failed to fetch queues:", error);
+            throw error;
+        }
+    }
+
+    async getQueueDetail(queueId: string): Promise<QueueDetailData> {
+        try {
+            return await this.get<QueueDetailData>(`/queue/get_queue/${queueId}`);
+        } catch (error: any) {
+            console.error("Failed to fetch queue detail:", error);
+            throw error;
+        }
+    }
+
+    async createQueue(payload: QueueCreatePayload): Promise<QueueData> {
+        try {
+            return await this.post<QueueData>(`/queue/create_queue`, {
+                ...payload,
+                services: payload.services ?? [],
+            });
         } catch (error: any) {
             console.error("Failed to create queue:", error);
+            throw error;
+        }
+    }
+
+    async updateQueue(
+        queueId: string,
+        businessId: string,
+        payload: QueueUpdatePayload
+    ): Promise<QueueData> {
+        try {
+            return await this.put<QueueData>(
+                `/queue/update_queue/${queueId}?business_id=${encodeURIComponent(businessId)}`,
+                payload
+            );
+        } catch (error: any) {
+            console.error("Failed to update queue:", error);
+            throw error;
+        }
+    }
+
+    async addServicesToQueue(
+        queueId: string,
+        businessId: string,
+        services: QueueServiceAddItem[]
+    ): Promise<QueueServiceDetailData[]> {
+        try {
+            return await this.post<QueueServiceDetailData[]>(
+                `/queue/add_services_to_queue/${queueId}?business_id=${encodeURIComponent(businessId)}`,
+                { services }
+            );
+        } catch (error: any) {
+            console.error("Failed to add services to queue:", error);
+            throw error;
+        }
+    }
+
+    async updateQueueService(
+        queueServiceId: string,
+        payload: QueueServiceUpdatePayload
+    ): Promise<QueueServiceDetailData> {
+        try {
+            return await this.patch<QueueServiceDetailData>(
+                `/queue/queue_service/${queueServiceId}`,
+                payload
+            );
+        } catch (error: any) {
+            console.error("Failed to update queue service:", error);
+            throw error;
+        }
+    }
+
+    async deleteQueueService(queueServiceId: string): Promise<void> {
+        try {
+            await this.delete(`/queue/queue_service/${queueServiceId}`);
+        } catch (error: any) {
+            console.error("Failed to delete queue service:", error);
             throw error;
         }
     }

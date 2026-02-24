@@ -3,12 +3,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
 from typing import List
 
+from app.core.constants import BIZ_EARLIEST_TIME, BIZ_LATEST_TIME
 from app.models.user import User
+from app.models.schedule import ScheduleEntityType
 from app.services.schedule_service import ScheduleService
 from app.services.business_service import BusinessService
 from app.services.employee_service import EmployeeService
-from app.models.schedule import ScheduleEntityType
-from app.schemas.schedule import ScheduleCreateInput, ScheduleData
+from app.schemas.schedule import ScheduleCreateInput, ScheduleData, ScheduleInput
 
 
 class ScheduleController:
@@ -27,6 +28,36 @@ class ScheduleController:
             return employee is not None and str(employee.uuid) == str(entity_id)
         return False
 
+    def get_business_schedule_data_for_validation(self, business_id):
+        return self.schedule_service.get_business_schedule_data_for_validation(business_id)
+
+    def validate_employee_schedule_within_business(
+        self,
+        employee_schedules: List[ScheduleInput],
+        is_always_open: bool,
+        business_by_day: dict,
+    ) -> str | None:
+        for inp in employee_schedules:
+            day = inp.day_of_week
+            biz = business_by_day.get(day)
+            if is_always_open:
+                continue
+            if biz is None or not getattr(biz, "is_open", False):
+                if inp.is_open:
+                    return f"Employee cannot be open on day {day}: business is closed that day."
+                continue
+            biz_open = getattr(biz, "opening_time", None) or BIZ_EARLIEST_TIME
+            biz_close = getattr(biz, "closing_time", None) or BIZ_LATEST_TIME
+            if not inp.is_open:
+                continue
+            emp_open = inp.opening_time or BIZ_EARLIEST_TIME
+            emp_close = inp.closing_time or BIZ_LATEST_TIME
+            if emp_open < biz_open:
+                return f"Employee opening time on day {day} must not be before business opening time."
+            if emp_close > biz_close:
+                return f"Employee closing time on day {day} must not be after business closing time."
+        return None
+
     async def create_schedules(self, payload: ScheduleCreateInput, user: User) -> List[ScheduleData]:
         try:
             entity_type_enum = ScheduleEntityType[payload.entity_type.upper()]
@@ -41,6 +72,19 @@ class ScheduleController:
                     is_always_open=payload.is_always_open,
                     current_step=2,
                 )
+
+            if entity_type_enum == ScheduleEntityType.EMPLOYEE:
+                employee = self.employee_service.get_employee_by_id(payload.entity_id)
+                if not employee:
+                    raise HTTPException(status_code=404, detail="Employee not found")
+                is_always_open, business_by_day = self.get_business_schedule_data_for_validation(
+                    employee.business_id
+                )
+                err = self.validate_employee_schedule_within_business(
+                    payload.schedules, is_always_open, business_by_day
+                )
+                if err:
+                    raise HTTPException(status_code=400, detail=err)
 
             self.schedule_service.delete_schedules_by_entity(payload.entity_id, entity_type_enum)
             created_schedules = self.schedule_service.create_schedules(

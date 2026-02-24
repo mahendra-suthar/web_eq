@@ -16,10 +16,37 @@ class QueueServiceCreate(BaseModel):
 class QueueCreate(BaseModel):
     business_id: UUID
     name: str
-    employee_id: UUID
-    services: List[QueueServiceCreate]
+    employee_id: Optional[UUID] = None
+    services: List[QueueServiceCreate] = []
     avg_service_time: Optional[int] = None
     fee: Optional[float] = None
+
+
+class QueueUpdate(BaseModel):
+    """Partial update for queue (name, status, limit, assigned employee)."""
+    name: Optional[str] = None
+    status: Optional[int] = None
+    limit: Optional[int] = None
+    employee_id: Optional[UUID] = None  # assign employee to queue; null to unassign
+
+
+class QueueServiceAddItem(BaseModel):
+    """One service to add to a queue."""
+    service_id: UUID
+    service_fee: Optional[float] = None
+    avg_service_time: Optional[int] = None
+    description: Optional[str] = None
+
+
+class QueueServicesAdd(BaseModel):
+    services: List[QueueServiceAddItem]
+
+
+class QueueServiceUpdate(BaseModel):
+    """Partial update for a queue_service row."""
+    service_fee: Optional[float] = None
+    avg_service_time: Optional[int] = None
+    description: Optional[str] = None
 
 
 class QueueData(BaseModel):
@@ -27,6 +54,9 @@ class QueueData(BaseModel):
     business_id: UUID
     name: str
     status: Optional[int] = None
+    is_counter: Optional[bool] = None
+    limit: Optional[int] = None
+    created_at: Optional[datetime] = None
 
     @classmethod
     def from_queue(cls, queue) -> "QueueData":
@@ -34,11 +64,36 @@ class QueueData(BaseModel):
             uuid=queue.uuid,
             business_id=queue.merchant_id,
             name=queue.name,
-            status=queue.status
+            status=queue.status,
+            is_counter=getattr(queue, "is_counter", None),
+            limit=getattr(queue, "limit", None),
+            created_at=getattr(queue, "created_at", None),
         )
 
     class Config:
         from_attributes = True
+
+
+class QueueServiceDetailData(BaseModel):
+    """Queue service row for queue detail (queue_services joined with service name)."""
+    uuid: UUID
+    service_id: UUID
+    service_name: Optional[str] = None
+    description: Optional[str] = None
+    service_fee: Optional[float] = None
+    avg_service_time: Optional[int] = None  # minutes
+
+
+class QueueDetailData(BaseModel):
+    """Full queue with associated queue services for detail page."""
+    uuid: UUID
+    business_id: UUID
+    name: str
+    status: Optional[int] = None
+    limit: Optional[int] = None
+    current_length: Optional[int] = None
+    assigned_employee_id: Optional[UUID] = None  # employee currently assigned to this queue
+    services: List[QueueServiceDetailData] = []
 
 
 class QueueUserData(BaseModel):
