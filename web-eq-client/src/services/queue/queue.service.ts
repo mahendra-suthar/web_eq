@@ -117,6 +117,32 @@ export interface QueueDetailData {
     assigned_employee_id?: string | null;
     services: QueueServiceDetailData[];
 }
+export interface LiveQueueUserItem {
+    uuid: string;
+    full_name?: string | null;
+    phone: string;
+    token?: string | null;
+    service_summary: string;
+    status: number;           // 1=waiting, 2=in_progress, 3=completed
+    enqueue_time?: string | null;
+    dequeue_time?: string | null;
+    position?: number | null; // 1-indexed, only for waiting users
+    estimated_wait_minutes?: number | null;   // for waiting users
+    estimated_appointment_time?: string | null; // e.g. "4:30 PM"
+}
+
+export interface LiveQueueData {
+    queue_id: string;
+    queue_name: string;
+    queue_status?: number | null;  // 1=registered, 2=running, 3=stopped
+    date: string;
+    waiting_count: number;
+    in_progress_count: number;
+    completed_count: number;
+    current_token?: string | null;
+    users: LiveQueueUserItem[];   // ordered: completed → in_progress → waiting
+    employee_on_leave?: boolean;  // true when queue's employee has no schedule / closed exception for this date
+}
 
 export class QueueService extends HttpClient {
     constructor() {
@@ -239,6 +265,46 @@ export class QueueService extends HttpClient {
             return await this.get<QueueUserData[]>(`/queue/get_users?${params.toString()}`);
         } catch (error: any) {
             console.error("Failed to get queue users:", error);
+            throw error;
+        }
+    }
+
+    async getLiveQueue(queueId: string): Promise<LiveQueueData> {
+        try {
+            return await this.get<LiveQueueData>(`/queue/${queueId}/live`);
+        } catch (error: any) {
+            console.error("Failed to get live queue:", error);
+            throw error;
+        }
+    }
+
+    async advanceQueue(queueId: string): Promise<LiveQueueData> {
+        try {
+            return await this.post<LiveQueueData>(`/queue/${queueId}/next`);
+        } catch (error: any) {
+            console.error("Failed to advance queue:", error);
+            throw error;
+        }
+    }
+
+    async startQueue(queueId: string, businessId: string): Promise<QueueData> {
+        try {
+            return await this.post<QueueData>(
+                `/queue/${queueId}/start?business_id=${encodeURIComponent(businessId)}`
+            );
+        } catch (error: any) {
+            console.error("Failed to start queue:", error);
+            throw error;
+        }
+    }
+
+    async stopQueue(queueId: string, businessId: string): Promise<QueueData> {
+        try {
+            return await this.post<QueueData>(
+                `/queue/${queueId}/stop?business_id=${encodeURIComponent(businessId)}`
+            );
+        } catch (error: any) {
+            console.error("Failed to stop queue:", error);
             throw error;
         }
     }

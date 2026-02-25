@@ -231,3 +231,29 @@ class BusinessQueueState(BaseModel):
     date: str
     queues: List[AvailableSlotData]
     total_waiting: int
+
+class LiveQueueUserItem(BaseModel):
+    uuid: str
+    full_name: Optional[str] = None
+    phone: str                    # "{country_code} {phone_number}"
+    token: Optional[str] = None
+    service_summary: str          # "Haircut · Beard trim"
+    status: int                   # 1=waiting, 2=in_progress, 3=completed
+    enqueue_time: Optional[datetime] = None
+    dequeue_time: Optional[datetime] = None
+    position: Optional[int] = None  # 1-indexed, only for waiting users
+    estimated_wait_minutes: Optional[int] = None   # for waiting: est. wait; for in_progress: 0
+    estimated_appointment_time: Optional[str] = None  # 12h e.g. "4:30 PM" (when expected to be served/done)
+
+
+class LiveQueueData(BaseModel):
+    queue_id: str
+    queue_name: str
+    queue_status: Optional[int] = None   # 1=registered, 2=running, 3=stopped
+    date: str
+    waiting_count: int
+    in_progress_count: int
+    completed_count: int
+    current_token: Optional[str] = None  # token of in_progress user
+    users: List[LiveQueueUserItem]        # ordered: completed → in_progress → waiting
+    employee_on_leave: bool = False     # True when queue's employee has no schedule / closed exception for this date

@@ -4,7 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Tuple, Dict, cast, Optional, Any
 from collections import defaultdict
 from uuid import UUID
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 
 from app.models.queue import Queue, QueueService as QueueServiceModel, QueueUser, QueueUserService
 from app.models.service import Service
@@ -313,7 +313,6 @@ class QueueService:
     def get_future_date_counts_batch(
         self, queue_ids: List[UUID], booking_date: date
     ) -> Dict[UUID, int]:
-        """Per-queue count of scheduled bookings for the date (one query)."""
         if not queue_ids:
             return {}
         try:
@@ -338,7 +337,6 @@ class QueueService:
         percentile: float,
         default_minutes: float,
     ) -> Dict[UUID, float]:
-        """Historical wait times (same day-of-week, past 4 weeks); percentile per queue (one query)."""
         if not queue_ids:
             return {}
         try:
@@ -380,7 +378,6 @@ class QueueService:
         percentile: float,
         default_minutes: float,
     ) -> float:
-        """Historical percentile wait for one queue (same day-of-week, past 4 weeks)."""
         result = self.get_historical_percentile_wait_batch(
             [queue_id], reference_date, percentile, default_minutes
         )
@@ -394,7 +391,6 @@ class QueueService:
         created_at: Optional[datetime],
         exclude_queue_user_id: UUID,
     ) -> Dict[str, Any]:
-        """Count and sum turn_time of users ahead of this one (same queue/date, ordered before)."""
         if enqueue_time is not None:
             order_ahead = (QueueUser.enqueue_time.isnot(None)) & (QueueUser.enqueue_time < enqueue_time)
         else:
@@ -445,6 +441,100 @@ class QueueService:
                 .first()
             )
         except SQLAlchemyError:
+            raise
+
+
+    def get_live_queue_users_raw(
+        self, queue_id: UUID, queue_date: date
+    ) -> Tuple[List[Tuple[QueueUser, User]], Dict[UUID, List[str]]]:
+        try:
+            rows = (
+                self.db.query(QueueUser, User)
+                .join(User, User.uuid == QueueUser.user_id)
+                .filter(
+                    QueueUser.queue_id == queue_id,
+                    QueueUser.queue_date == queue_date,
+                )
+                .all()
+            )
+            if not rows:
+                return [], {}
+
+            queue_user_ids = [qu.uuid for qu, _ in rows]
+            svc_rows = (
+                self.db.query(QueueUserService.queue_user_id, Service.name)
+                .join(QueueServiceModel, QueueServiceModel.uuid == QueueUserService.queue_service_id)
+                .join(Service, Service.uuid == QueueServiceModel.service_id)
+                .filter(QueueUserService.queue_user_id.in_(queue_user_ids))
+                .all()
+            )
+            svc_by_user: Dict[UUID, List[str]] = defaultdict(list)
+            for uid, name in svc_rows:
+                svc_by_user[uid].append(name)
+            return rows, dict(svc_by_user)
+        except SQLAlchemyError:
+            raise
+
+    def get_active_queue_users_with_lock(
+        self, queue_id: UUID, queue_date: date
+    ) -> List[QueueUser]:
+        """
+        Load IN_PROGRESS + REGISTERED queue users with FOR UPDATE lock.
+        Used by advance_queue; prefer calling advance_queue from controller.
+        """
+        return (
+            self.db.query(QueueUser)
+            .filter(
+                QueueUser.queue_id == queue_id,
+                QueueUser.queue_date == queue_date,
+                QueueUser.status.in_([QUEUE_USER_IN_PROGRESS, QUEUE_USER_REGISTERED]),
+            )
+            .with_for_update()
+            .order_by(
+                QueueUser.enqueue_time.asc().nullslast(),
+                QueueUser.created_at.asc(),
+            )
+            .all()
+        )
+
+    def advance_queue(self, queue_id: UUID, queue_date: date) -> None:
+        try:
+            active_users = self.get_active_queue_users_with_lock(queue_id, queue_date)
+            in_progress = next(
+                (u for u in active_users if u.status == QUEUE_USER_IN_PROGRESS), None
+            )
+            waiting = sorted(
+                [u for u in active_users if u.status == QUEUE_USER_REGISTERED],
+                key=lambda u: (u.enqueue_time or u.created_at or datetime.min),
+            )
+            if not in_progress and not waiting:
+                self.db.rollback()
+                raise ValueError("No users to serve")
+
+            now = datetime.now(timezone.utc)
+            if in_progress:
+                in_progress.status = QUEUE_USER_COMPLETED
+                in_progress.dequeue_time = now
+            if waiting:
+                first_waiting = waiting[0]
+                first_waiting.status = QUEUE_USER_IN_PROGRESS
+                first_waiting.enqueue_time = now
+
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+
+    def set_queue_status(self, queue_id: UUID, status: int) -> Optional[Queue]:
+        try:
+            queue = self.db.query(Queue).filter(Queue.uuid == queue_id).first()
+            if not queue:
+                return None
+            queue.status = status
+            self.db.commit()
+            return queue
+        except SQLAlchemyError:
+            self.db.rollback()
             raise
 
     def get_queues(self, business_id: UUID):  # type: ignore

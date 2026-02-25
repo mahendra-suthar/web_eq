@@ -11,7 +11,6 @@ from app.models.schedule import Schedule
 # ─────────────────────────────────────────────────────────────────────────────
 
 class BreakTimeInput(BaseModel):
-    """One break window submitted by the client."""
     break_start: time
     break_end: time
 

@@ -25,6 +25,7 @@ import Queues from "./pages/queues";
 import QueueAdd from "./pages/queue-add";
 import QueueDetail from "./pages/queue-detail";
 import UserDetail from "./pages/user-detail";
+import LiveQueue from "./pages/live-queue";
 
 const App = () => {
   const { ROUTERS_PATH } = RouterConstant;
@@ -53,6 +54,7 @@ const App = () => {
           <Route path={ROUTERS_PATH.QUEUES} element={<RoleGuard permission={Permission.VIEW_QUEUES}><Queues /></RoleGuard>} />
           <Route path={`${ROUTERS_PATH.QUEUES}/new`} element={<RoleGuard permission={Permission.VIEW_QUEUES}><QueueAdd /></RoleGuard>} />
           <Route path={`${ROUTERS_PATH.QUEUES}/:queueId`} element={<RoleGuard permission={Permission.VIEW_QUEUES}><QueueDetail /></RoleGuard>} />
+          <Route path={ROUTERS_PATH.LIVE_QUEUE} element={<RoleGuard permission={Permission.VIEW_LIVE_QUEUE}><LiveQueue /></RoleGuard>} />
           <Route path={ROUTERS_PATH.QUEUEUSERS} element={<QueueUsers />} />
           <Route path={`${ROUTERS_PATH.QUEUEUSERS}/:queueUserId`} element={<RoleGuard permission={Permission.VIEW_QUEUE_USERS}><QueueUserDetail /></RoleGuard>} />
         </Route>

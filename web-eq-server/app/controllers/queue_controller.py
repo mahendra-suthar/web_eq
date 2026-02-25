@@ -8,17 +8,29 @@ from datetime import date, datetime, time, timedelta
 from app.services.queue_service import QueueService
 from app.services.business_service import BusinessService
 from app.services.realtime.queue_manager import queue_manager
+from app.services.realtime.live_queue_manager import live_queue_manager
 from app.schemas.queue import (
     QueueCreate, QueueData, QueueDetailData, QueueServiceDetailData,
     QueueUpdate, QueueServicesAdd, QueueServiceUpdate,
     QueueUserData, QueueUserDetailResponse, QueueUserDetailUserInfo,
-    AvailableSlotData, BookingCreateInput, BookingData, BookingServiceData, BookingPreviewData
+    AvailableSlotData, BookingCreateInput, BookingData, BookingServiceData, BookingPreviewData,
+    LiveQueueData, LiveQueueUserItem,
 )
 from app.schemas.user import UserData
 from app.schemas.service import ServiceData
 from app.models.service import Service
 from app.models.queue import QueueUser, QueueUserService
-from app.core.constants import BUSINESS_REGISTERED, QUEUE_USER_REGISTERED
+from app.core.constants import (
+    BUSINESS_REGISTERED, QUEUE_USER_REGISTERED,
+    QUEUE_RUNNING, QUEUE_STOPPED,
+    QUEUE_USER_IN_PROGRESS, QUEUE_USER_COMPLETED,
+)
+from app.core.utils import (
+    build_live_queue_users_raw,
+    format_time_12h,
+    today_app_date,
+    wait_minutes_from_now,
+)
 from app.services.booking_calculation_service import BookingCalculationService
 
 
@@ -352,7 +364,7 @@ class QueueController:
                     raise HTTPException(status_code=404, detail="Queue not found")
                 queue_id = data.queue_id
 
-                if data.queue_date == date.today():
+                if data.queue_date == today_app_date():
                     metrics = calc_service.calculate_today_queue_metrics(
                         queue_id, data.queue_date, data.service_ids
                     )
@@ -379,8 +391,7 @@ class QueueController:
                 if not queue:
                     raise HTTPException(status_code=404, detail="Selected queue not found")
 
-            # Same-day duplicate check: if already in this queue for this date, return existing booking
-            if data.queue_date == date.today():
+            if data.queue_date == today_app_date():
                 existing_booking = self.get_existing_booking(
                     user_id=user_id,
                     queue_id=queue_id,
@@ -415,7 +426,7 @@ class QueueController:
                 status=QUEUE_USER_REGISTERED,
                 turn_time=total_service_time,
                 notes=data.notes,
-                is_scheduled=(data.queue_date > date.today()),
+                is_scheduled=(data.queue_date > today_app_date()),
                 estimated_enqueue_time=estimated_enqueue_dt,
                 estimated_dequeue_time=estimated_dequeue_dt
             )
@@ -430,7 +441,7 @@ class QueueController:
 
             self.db.commit()
 
-            if data.queue_date == date.today():
+            if data.queue_date == today_app_date():
                 await queue_manager.add_to_queue(
                     db=self.db,
                     queue_id=str(queue_id),
@@ -472,6 +483,188 @@ class QueueController:
         except Exception as e:
             self.db.rollback()
             raise HTTPException(status_code=500, detail=f"Failed to create booking: {str(e)}")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Live Queue (Employee real-time view)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def is_employee_on_leave(self, queue: Any, queue_date: date) -> bool:
+        calc = BookingCalculationService(self.db)
+        _, _, _, employee_available = calc.get_employee_window(queue, queue_date)
+        return not employee_available
+
+    async def get_live_queue(self, queue_id: UUID) -> LiveQueueData:
+        try:
+            queue = self.queue_service.get_queue_by_id(queue_id)
+            if not queue:
+                raise HTTPException(status_code=404, detail="Queue not found")
+
+            today = today_app_date()
+            rows, svc_by_user = self.queue_service.get_live_queue_users_raw(queue_id, today)
+            users_raw = build_live_queue_users_raw(rows, svc_by_user)
+            employee_on_leave = self.is_employee_on_leave(queue, today)
+
+            return self.build_live_queue_data(queue, today, users_raw, employee_on_leave)
+        except HTTPException:
+            raise
+        except SQLAlchemyError as e:
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to get live queue: {str(e)}")
+
+    async def advance_queue(self, queue_id: UUID) -> LiveQueueData:
+        try:
+            queue = self.queue_service.get_queue_by_id(queue_id)
+            if not queue:
+                raise HTTPException(status_code=404, detail="Queue not found")
+
+            today = today_app_date()
+            if self.is_employee_on_leave(queue, today):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Employee is on leave today. Queue cannot be advanced.",
+                )
+
+            self.queue_service.advance_queue(queue_id, today)
+
+            rows, svc_by_user = self.queue_service.get_live_queue_users_raw(queue_id, today)
+            users_raw = build_live_queue_users_raw(rows, svc_by_user)
+            employee_on_leave = self.is_employee_on_leave(queue, today)
+            live_data = self.build_live_queue_data(queue, today, users_raw, employee_on_leave)
+
+            # Broadcast to all connected WS clients
+            date_str = today.isoformat()
+            await live_queue_manager.broadcast(
+                str(queue_id), date_str, "live_queue_update", live_data.model_dump()
+            )
+
+            return live_data
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except HTTPException:
+            self.db.rollback()
+            raise
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        except Exception as e:
+            self.db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to advance queue: {str(e)}")
+
+    async def start_queue(self, queue_id: UUID, business_id: UUID) -> QueueData:
+        try:
+            queue = self.queue_service.get_queue_by_id_and_business(queue_id, business_id)
+            if not queue:
+                raise HTTPException(status_code=404, detail="Queue not found")
+
+            today = today_app_date()
+            if self.is_employee_on_leave(queue, today):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Employee is on leave today. Queue cannot be started.",
+                )
+
+            self.queue_service.set_queue_status(queue_id, QUEUE_RUNNING)
+
+            today_str = today_app_date().isoformat()
+            await live_queue_manager.broadcast(
+                str(queue_id), today_str, "queue_started",
+                {"queue_id": str(queue_id), "queue_status": QUEUE_RUNNING}
+            )
+
+            return QueueData.from_queue(queue)
+        except HTTPException:
+            self.db.rollback()
+            raise
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        except Exception as e:
+            self.db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to start queue: {str(e)}")
+
+    async def stop_queue(self, queue_id: UUID, business_id: UUID) -> QueueData:
+        try:
+            queue = self.queue_service.get_queue_by_id_and_business(queue_id, business_id)
+            if not queue:
+                raise HTTPException(status_code=404, detail="Queue not found")
+
+            today = today_app_date()
+            if self.is_employee_on_leave(queue, today):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Employee is on leave today. Queue cannot be stopped.",
+                )
+
+            self.queue_service.set_queue_status(queue_id, QUEUE_STOPPED)
+
+            today_str = today_app_date().isoformat()
+            await live_queue_manager.broadcast(
+                str(queue_id), today_str, "queue_stopped",
+                {"queue_id": str(queue_id), "queue_status": QUEUE_STOPPED}
+            )
+
+            return QueueData.from_queue(queue)
+        except HTTPException:
+            self.db.rollback()
+            raise
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        except Exception as e:
+            self.db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to stop queue: {str(e)}")
+
+    def build_live_queue_data(
+        self, queue: Any, queue_date: date, users_raw: list, employee_on_leave: bool = False
+    ) -> LiveQueueData:
+        waiting_count = sum(1 for u in users_raw if u["status"] == QUEUE_USER_REGISTERED)
+        in_progress_count = sum(1 for u in users_raw if u["status"] == QUEUE_USER_IN_PROGRESS)
+        completed_count = sum(1 for u in users_raw if u["status"] == QUEUE_USER_COMPLETED)
+
+        current_token: Optional[str] = None
+        for u in users_raw:
+            if u["status"] == QUEUE_USER_IN_PROGRESS:
+                current_token = u["token"]
+                break
+
+        return LiveQueueData(
+            queue_id=str(queue.uuid),
+            queue_name=queue.name,
+            queue_status=queue.status,
+            date=queue_date.isoformat(),
+            waiting_count=waiting_count,
+            in_progress_count=in_progress_count,
+            completed_count=completed_count,
+            current_token=current_token,
+            employee_on_leave=employee_on_leave,
+            users=[
+                LiveQueueUserItem(
+                    uuid=u["uuid"],
+                    full_name=u["full_name"],
+                    phone=u["phone"],
+                    token=u["token"],
+                    service_summary=u["service_summary"],
+                    status=u["status"],
+                    enqueue_time=u["enqueue_time"],
+                    dequeue_time=u["dequeue_time"],
+                    position=u["position"],
+                    estimated_wait_minutes=(
+                        wait_minutes_from_now(u.get("estimated_enqueue_time"))
+                        if u["status"] == QUEUE_USER_REGISTERED
+                        else None
+                    ),
+                    estimated_appointment_time=(
+                        format_time_12h(u.get("estimated_dequeue_time"))
+                        if u["status"] == QUEUE_USER_IN_PROGRESS and u.get("estimated_dequeue_time")
+                        else format_time_12h(u.get("estimated_enqueue_time"))
+                        if u["status"] == QUEUE_USER_REGISTERED and u.get("estimated_enqueue_time")
+                        else None
+                    ),
+                )
+                for u in users_raw
+            ],
+        )
 
     def get_existing_booking(
         self,

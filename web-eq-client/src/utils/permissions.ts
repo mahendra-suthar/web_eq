@@ -16,6 +16,7 @@ export const Permission = {
   VIEW_ALL_USERS: "VIEW_ALL_USERS",
   VIEW_QUEUE_USERS: "VIEW_QUEUE_USERS",
   VIEW_QUEUES: "VIEW_QUEUES",
+  VIEW_LIVE_QUEUE: "VIEW_LIVE_QUEUE",
   VIEW_BUSINESS_PROFILE: "VIEW_BUSINESS_PROFILE",
   VIEW_EMPLOYEE_PROFILE: "VIEW_EMPLOYEE_PROFILE",
 } as const;
@@ -29,6 +30,7 @@ export const ROLE_PERMISSIONS: Record<PermissionKey, AppRole[]> = {
   [Permission.VIEW_ALL_USERS]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   [Permission.VIEW_QUEUE_USERS]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   [Permission.VIEW_QUEUES]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
+  [Permission.VIEW_LIVE_QUEUE]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   [Permission.VIEW_BUSINESS_PROFILE]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   [Permission.VIEW_EMPLOYEE_PROFILE]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
 };
@@ -40,6 +42,7 @@ export const ROUTE_PERMISSION: Record<string, PermissionKey> = {
   [ROUTERS_PATH.ALLUSERS]: Permission.VIEW_ALL_USERS,
   [ROUTERS_PATH.QUEUEUSERS]: Permission.VIEW_QUEUE_USERS,
   [ROUTERS_PATH.QUEUES]: Permission.VIEW_QUEUES,
+  [ROUTERS_PATH.LIVE_QUEUE]: Permission.VIEW_LIVE_QUEUE,
   [ROUTERS_PATH.BUSINESSPROFILE]: Permission.VIEW_BUSINESS_PROFILE,
   [ROUTERS_PATH.EMPLOYEEPROFILE]: Permission.VIEW_EMPLOYEE_PROFILE,
 };
@@ -58,6 +61,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { path: ROUTERS_PATH.EMPLOYEES, label: "Employees", icon: "👷", permission: Permission.VIEW_EMPLOYEES, sectionTitle: "Employee Management" },
   { path: ROUTERS_PATH.ALLUSERS, label: "All Users", icon: "👥", permission: Permission.VIEW_ALL_USERS, sectionTitle: "User Management" },
   { path: ROUTERS_PATH.QUEUES, label: "Queues", icon: "📑", permission: Permission.VIEW_QUEUES, sectionTitle: "Queue Management" },
+  { path: ROUTERS_PATH.LIVE_QUEUE, label: "Live Queue", icon: "⚡", permission: Permission.VIEW_LIVE_QUEUE, sectionTitle: "Queue Management" },
   { path: ROUTERS_PATH.QUEUEUSERS, label: "Queue Users", icon: "📋", permission: Permission.VIEW_QUEUE_USERS, sectionTitle: "Queue Management" },
 ];
 

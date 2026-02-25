@@ -9,6 +9,7 @@ import {
 import { ServiceService, ServiceData } from "../../services/service/service.service";
 import { EmployeeService, EmployeeResponse } from "../../services/employee/employee.service";
 import { RouterConstant } from "../../routers";
+import { formatDurationMinutes } from "../../utils/utils";
 import "./queue-detail.scss";
 
 const QueueDetail = () => {
@@ -379,7 +380,7 @@ const QueueDetail = () => {
                                                 ) : (
                                                     <>
                                                         <td>{svc.service_fee != null ? String(svc.service_fee) : t("notAvailable")}</td>
-                                                        <td>{svc.avg_service_time != null ? `${svc.avg_service_time} ${t("minutes")}` : t("notAvailable")}</td>
+                                                        <td>{svc.avg_service_time != null ? formatDurationMinutes(svc.avg_service_time) : t("notAvailable")}</td>
                                                         <td>
                                                             <button
                                                                 type="button"

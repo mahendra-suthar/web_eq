@@ -39,6 +39,8 @@ const Topbar = () => {
             return t("addQueue") || "Add queue";
         } else if (path.startsWith(ROUTERS_PATH.QUEUES + "/") && path !== ROUTERS_PATH.QUEUES) {
             return t("queueDetail") || "Queue detail";
+        } else if (path === ROUTERS_PATH.LIVE_QUEUE) {
+            return t("liveQueue") || "Live Queue";
         } else if (path === ROUTERS_PATH.QUEUEUSERS) {
             return t("queueUsers");
         } else if (path.startsWith(ROUTERS_PATH.QUEUEUSERS + "/") && path !== ROUTERS_PATH.QUEUEUSERS) {

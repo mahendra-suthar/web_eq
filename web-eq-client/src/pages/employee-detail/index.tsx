@@ -8,7 +8,7 @@ import { BusinessService } from '../../services/business/business.service';
 import { Tabs } from '../../components/tabs/Tabs';
 import { EmployeeOverviewForm } from '../../components/employee/EmployeeOverviewForm';
 import { RouterConstant } from '../../routers/index';
-import { emailRegex } from '../../utils/utils';
+import { emailRegex, formatDurationMinutes } from '../../utils/utils';
 import './employee-detail.scss';
 import '../../components/employee/employee-overview-form.scss';
 
@@ -675,7 +675,7 @@ const EmployeeDetail = () => {
                                                                     <td>{svc.name || t("notAvailable")}</td>
                                                                     <td>{svc.description || t("notAvailable")}</td>
                                                                     <td>{svc.service_fee != null ? `${svc.service_fee}` : t("notAvailable")}</td>
-                                                                    <td>{svc.avg_service_time != null ? `${svc.avg_service_time} ${t("minutes")}` : t("notAvailable")}</td>
+                                                                    <td>{svc.avg_service_time != null ? formatDurationMinutes(svc.avg_service_time) : t("notAvailable")}</td>
                                                                 </tr>
                                                             ))}
                                                         </tbody>

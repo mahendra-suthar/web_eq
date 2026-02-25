@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { QueueService, QueueUserDetailResponse } from '../../services/queue/queue.service';
 import { RouterConstant } from '../../routers/index';
 import { QueueUserStatus } from '../../utils/constants';
+import { formatDurationMinutes } from '../../utils/utils';
 import './queue-user-detail.scss';
 
 const getStatusLabel = (status: number | undefined | null, t: (k: string) => string): string => {
@@ -184,7 +185,7 @@ const QueueUserDetail = () => {
                                 </div>
                                 <div className="info-field">
                                     <label className="info-label">{t("turnTime")}</label>
-                                    <div className="info-value">{data.turn_time != null ? `${data.turn_time} ${t("minutes")}` : t("notAvailable")}</div>
+                                    <div className="info-value">{data.turn_time != null ? formatDurationMinutes(data.turn_time) : t("notAvailable")}</div>
                                 </div>
                                 <div className="info-field">
                                     <label className="info-label">{t("estimatedEnqueueTime")}</label>

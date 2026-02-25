@@ -29,11 +29,9 @@ class ScheduleController:
             business = self.business_service.get_business_by_owner(user.uuid)
             return business is not None and str(business.uuid) == str(entity_id)
         if entity_type_enum == ScheduleEntityType.EMPLOYEE:
-            # Allow if the current user is the employee themselves
             employee = self.employee_service.get_employee_by_user_id(user.uuid)
             if employee is not None and str(employee.uuid) == str(entity_id):
                 return True
-            # Allow if the current user is the business owner of this employee
             employee = self.employee_service.get_employee_by_id(entity_id)
             if employee is None:
                 return False

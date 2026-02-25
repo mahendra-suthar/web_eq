@@ -11,6 +11,7 @@ from app.core.constants import (
     DEFAULT_AVG_TIME,
     DEFAULT_OPEN_TIME,
 )
+from app.core.utils import today_app_date
 from app.models.schedule import ScheduleEntityType
 
 
@@ -218,9 +219,6 @@ class BookingCalculationService:
             for queue in queues
         ]
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # Per-queue option builders
-    # ──────────────────────────────────────────────────────────────────────────
 
     def build_today_option(
         self,
@@ -322,9 +320,6 @@ class BookingCalculationService:
             "unavailability_reason": None,
         }
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # Single-queue metric methods (used by create_booking)
-    # ──────────────────────────────────────────────────────────────────────────
 
     def calculate_today_queue_metrics(
         self,
@@ -416,9 +411,6 @@ class BookingCalculationService:
             "appointment_time": appointment_dt.strftime(TIME_FORMAT_HM),
         }
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # Computation helpers
-    # ──────────────────────────────────────────────────────────────────────────
 
     @staticmethod
     def compute_wait(

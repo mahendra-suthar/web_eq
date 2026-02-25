@@ -64,3 +64,49 @@ export function getMapEmbedUrl(lat: number, lon: number): string {
 export function getGoogleMapsLink(lat: number, lon: number): string {
   return `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
 }
+
+// ============================================================================
+// Duration & Time Display (reusable)
+// ============================================================================
+
+/**
+ * Format minutes as readable duration: "45m" or "1h 15m" (hours when >= 60).
+ */
+export function formatDurationMinutes(minutes: number): string {
+  if (minutes < 0 || !Number.isFinite(minutes)) return "0m";
+  const m = Math.round(minutes);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem === 0 ? `${h}h` : `${h}h ${rem}m`;
+}
+
+/**
+ * Format time for display as 12-hour with AM/PM (e.g. "4:30 PM").
+ * Accepts ISO datetime, "HH:MM", or Date.
+ */
+export function formatTimeToDisplay(
+  value: string | Date | null | undefined
+): string {
+  if (value == null) return "";
+  try {
+    let date: Date;
+    if (value instanceof Date) {
+      date = value;
+    } else if (typeof value === "string") {
+      if (/^\d{1,2}:\d{2}$/.test(value.trim())) {
+        const [h, min] = value.trim().split(":").map(Number);
+        date = new Date();
+        date.setHours(h, min, 0, 0);
+      } else {
+        date = new Date(value);
+      }
+    } else {
+      return "";
+    }
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
+  } catch {
+    return "";
+  }
+}

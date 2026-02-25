@@ -1,17 +1,42 @@
 import secrets
 import hashlib
-from datetime import datetime, time as dt_time, timezone
-from typing import Optional
+from datetime import date, datetime, time as dt_time, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
-from app.core.constants import TIME_FORMAT
+import pytz
+
+from app.core.constants import (
+    QUEUE_USER_COMPLETED,
+    QUEUE_USER_IN_PROGRESS,
+    QUEUE_USER_REGISTERED,
+    TIME_FORMAT,
+    TIMEZONE,
+)
 
 ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+_APP_TZ = pytz.timezone(TIMEZONE)
+_UTC_MIN = datetime.min.replace(tzinfo=timezone.utc)
 
 
 def now_utc() -> datetime:
     """Return current UTC time (timezone-aware)."""
     return datetime.now(timezone.utc)
-    
+
+
+def now_app_tz() -> datetime:
+    """Return current time in the application timezone (Asia/Kolkata)."""
+    return datetime.now(_APP_TZ)
+
+
+def today_app_date() -> date:
+    """Return today's date in the application timezone (Asia/Kolkata).
+
+    Use this instead of date.today() so queries match IST-based queue_date values,
+    regardless of the server's UTC clock.
+    """
+    return now_app_tz().date()
+
 
 def generate_invitation_code(length: int = 8, expires_in_hours: Optional[int] = 48) -> str:
     """Generate a random invitation code (no ambiguous chars: 0, 1, I, L, O).
@@ -47,4 +72,110 @@ def format_time(t: Optional[dt_time]) -> Optional[str]:
     if not t:
         return None
     return t.strftime(TIME_FORMAT)
+
+
+def live_queue_key(queue_id: str, date_str: str) -> str:
+    """Channel key for live queue WebSocket clients: {queue_id}:{date_str}."""
+    return f"{queue_id}:{date_str}"
+
+
+def now_iso(tz_name: str = TIMEZONE) -> str:
+    """Current time in the given timezone as ISO string."""
+    tz = pytz.timezone(tz_name)
+    return datetime.now(tz).isoformat()
+
+
+def format_time_12h(dt: Optional[datetime]) -> str:
+    """Format datetime to 12-hour display string (e.g. '4:30 PM'). Naive treated as app TZ."""
+    if dt is None:
+        return ""
+    try:
+        if dt.tzinfo is None:
+            dt = _APP_TZ.localize(dt)
+        else:
+            dt = dt.astimezone(_APP_TZ)
+        s = dt.strftime("%I:%M %p")
+        return s.lstrip("0") if s[0] == "0" else s  # "04:30 PM" -> "4:30 PM"
+    except Exception:
+        return ""
+
+
+def wait_minutes_from_now(estimated_enqueue_time: Optional[datetime]) -> Optional[int]:
+    """Estimated wait in minutes from now until estimated_enqueue_time. Naive dt treated as app TZ."""
+    if estimated_enqueue_time is None:
+        return None
+    try:
+        if estimated_enqueue_time.tzinfo is None:
+            target = _APP_TZ.localize(estimated_enqueue_time)
+        else:
+            target = estimated_enqueue_time.astimezone(_APP_TZ)
+        now = now_app_tz()
+        delta_seconds = (target - now).total_seconds()
+        return max(0, int(round(delta_seconds / 60)))
+    except Exception:
+        return None
+
+
+def serialise_dt(val: Any) -> Optional[str]:
+    """Serialize a datetime (or None) to ISO string for JSON.
+
+    Timezone-aware datetimes are converted to the app timezone (IST) before
+    serialization so API consumers always receive local timestamps.
+    """
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        if val.tzinfo is not None:
+            val = val.astimezone(_APP_TZ)
+        return val.isoformat()
+    return str(val)
+
+
+def sort_key_live_queue_row(row: Tuple[Any, Any]) -> tuple:
+    """
+    Sort key for live queue (QueueUser, User) rows:
+    completed (0) → in_progress (1) → waiting (2), with secondary key by time.
+    Uses a tz-aware sentinel so comparison with DB timestamps never raises TypeError.
+    """
+    qu = row[0]
+    if qu.status == QUEUE_USER_COMPLETED:
+        return (0, qu.dequeue_time or qu.created_at or _UTC_MIN)
+    if qu.status == QUEUE_USER_IN_PROGRESS:
+        return (1, qu.enqueue_time or qu.created_at or _UTC_MIN)
+    return (2, qu.enqueue_time or qu.created_at or _UTC_MIN)
+
+
+def build_live_queue_users_raw(
+    rows: List[Tuple[Any, Any]], svc_by_user: Dict[Any, List[str]]
+) -> List[Dict[str, Any]]:
+    """
+    Build the list of user dicts for live queue from raw DB rows and service names.
+    Expects rows already sorted by sort_key_live_queue_row; will sort if not.
+    """
+    if not rows:
+        return []
+    rows = sorted(rows, key=sort_key_live_queue_row)
+    result: List[Dict[str, Any]] = []
+    waiting_pos = 0
+    for qu, user in rows:
+        if qu.status == QUEUE_USER_REGISTERED:
+            waiting_pos += 1
+            pos: Optional[int] = waiting_pos
+        else:
+            pos = None
+        names = svc_by_user.get(qu.uuid, [])
+        result.append({
+            "uuid": str(qu.uuid),
+            "full_name": user.full_name,
+            "phone": f"{user.country_code or ''} {user.phone_number or ''}".strip(),
+            "token": qu.token_number,
+            "service_summary": " · ".join(names) if names else "",
+            "status": qu.status,
+            "enqueue_time": qu.enqueue_time,
+            "dequeue_time": qu.dequeue_time,
+            "position": pos,
+            "estimated_enqueue_time": getattr(qu, "estimated_enqueue_time", None),
+            "estimated_dequeue_time": getattr(qu, "estimated_dequeue_time", None),
+        })
+    return result
 

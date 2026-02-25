@@ -16,6 +16,7 @@ export const ROUTERS_PATH = {
   QUEUE_USER_DETAIL: "/admin/queue-users/:queueUserId",
   QUEUES: "/admin/queues",
   QUEUE_DETAIL: "/admin/queues/:queueId",
+  LIVE_QUEUE: "/admin/live-queue",
 } as const;
 
 /** Redirect path when user is authenticated but next_step is not dashboard */

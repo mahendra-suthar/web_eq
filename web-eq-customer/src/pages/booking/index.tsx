@@ -7,7 +7,7 @@ import { useQueueWebSocket } from "../../hooks/useQueueWebSocket";
 import { BookingService } from "../../services/booking/booking.service";
 import { BusinessService, type BusinessServiceData } from "../../services/business/business.service";
 import { getNext7Days } from "../../utils/booking.utils";
-import { isDateInPast, formatDateDisplay } from "../../utils/util";
+import { isDateInPast, formatDateDisplay, formatDurationMinutes, formatTimeToDisplay } from "../../utils/util";
 import { HttpStatus } from "../../utils/constants";
 import Button from "../../components/button";
 import "./booking.scss";
@@ -301,7 +301,7 @@ export default function BookingPage() {
                 {selectedServices.map((service) => (
                   <tr key={service.uuid}>
                     <td className="bp-td-service">{service.name}</td>
-                    <td className="bp-td-duration">{service.duration ?? 0} min</td>
+                    <td className="bp-td-duration">{formatDurationMinutes(service.duration ?? 0)}</td>
                     <td className="bp-td-price">₹{service.price ?? 0}</td>
                   </tr>
                 ))}
@@ -309,7 +309,7 @@ export default function BookingPage() {
             </table>
             <div className="bp-services-total">
               <span className="bp-services-total-label">Total</span>
-              <span className="bp-services-total-duration">{totalDuration} min</span>
+              <span className="bp-services-total-duration">{formatDurationMinutes(totalDuration)}</span>
               <span className="bp-services-total-amount">₹{totalPrice}</span>
             </div>
           </div>
@@ -374,14 +374,14 @@ export default function BookingPage() {
                       </p>
                       <p className="bp-slot-row">
                         <span className="label">Est. wait</span>
-                        <span className="value">{option.estimated_wait_minutes} min</span>
+                        <span className="value">{formatDurationMinutes(option.estimated_wait_minutes)}</span>
                         {option.estimated_wait_range && (
                           <span className="value bp-slot-range"> ({option.estimated_wait_range})</span>
                         )}
                       </p>
                       <p className="bp-slot-row">
                         <span className="label">Expected at</span>
-                        <span className="value">{option.estimated_appointment_time}</span>
+                        <span className="value">{formatTimeToDisplay(option.estimated_appointment_time)}</span>
                       </p>
                     </div>
                   )}
@@ -410,13 +410,13 @@ export default function BookingPage() {
               {selectedServices.length} {selectedServices.length === 1 ? t("service") : t("services")} · {selectedDate ? formatDateDisplay(selectedDate) : ""}
             </p>
             <p className="bp-summary-queue">
-              {displayQueue.queue_name} · Wait ~{displayQueue.estimated_wait_minutes} min
+              {displayQueue.queue_name} · Wait ~{formatDurationMinutes(displayQueue.estimated_wait_minutes)}
               {selectedQueueOption?.estimated_wait_range && (
                 <span className="bp-summary-range"> ({selectedQueueOption.estimated_wait_range})</span>
               )}
             </p>
             <p className="bp-summary-meta">
-              Expected at: {displayQueue.estimated_appointment_time}
+              Expected at: {formatTimeToDisplay(displayQueue.estimated_appointment_time)}
             </p>
           </div>
           <Button
@@ -466,7 +466,7 @@ export default function BookingPage() {
               <p className="bp-modal-row">
                 <span className="bp-modal-label">Est. wait</span>
                 <span className="bp-modal-value">
-                  {alreadyInQueueData.estimated_wait_minutes} min
+                  {formatDurationMinutes(alreadyInQueueData.estimated_wait_minutes)}
                   {alreadyInQueueData.estimated_wait_range && (
                     <span className="bp-modal-range"> ({alreadyInQueueData.estimated_wait_range})</span>
                   )}
@@ -474,7 +474,7 @@ export default function BookingPage() {
               </p>
               <p className="bp-modal-row">
                 <span className="bp-modal-label">Expected at</span>
-                <span className="bp-modal-value">{alreadyInQueueData.estimated_appointment_time}</span>
+                <span className="bp-modal-value">{formatTimeToDisplay(alreadyInQueueData.estimated_appointment_time)}</span>
               </p>
             </div>
             <div className="bp-modal-actions">

@@ -5,7 +5,7 @@ import {
   type BusinessDetailData,
   type BusinessServiceData,
 } from "../../services/business/business.service";
-import { formatFullAddress, getMapEmbedUrl, getGoogleMapsLink } from "../../utils/util";
+import { formatFullAddress, getMapEmbedUrl, getGoogleMapsLink, formatDurationMinutes } from "../../utils/util";
 import { DAY_NAMES } from "../../utils/constants";
 import Button from "../../components/button";
 import "./business-details.scss";
@@ -184,7 +184,7 @@ export default function BusinessDetailsPage() {
                 )}
                 <div className="bds-service-meta">
                   {service.duration != null && (
-                    <span className="bds-service-duration">⏱ {service.duration} min</span>
+                    <span className="bds-service-duration">⏱ {formatDurationMinutes(service.duration)}</span>
                   )}
                   {service.price != null && (
                     <span className="bds-service-price">₹{service.price}</span>

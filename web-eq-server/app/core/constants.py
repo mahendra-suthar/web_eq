@@ -14,7 +14,9 @@ UNPROTECTED_ROUTE_PATHS = [
     "/api/review/business/",  # Public review viewing
     "/api/docs",
     "/api/openapi.json",
-    "/api/redoc"
+    "/api/redoc",
+    "/api/ws/booking/",  # WebSocket – auth handled in handler
+    "/api/ws/live/",     # WebSocket – auth handled in handler
 ]
 
 # Mobile User-Agent patterns for client type detection

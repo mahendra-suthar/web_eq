@@ -10,7 +10,8 @@ from app.schemas.queue import (
     QueueCreate, QueueData, QueueDetailData, QueueServiceDetailData,
     QueueUpdate, QueueServicesAdd, QueueServiceUpdate,
     QueueUserData, QueueUserDetailResponse,
-    AvailableSlotData, BookingCreateInput, BookingData, BookingPreviewData
+    AvailableSlotData, BookingCreateInput, BookingData, BookingPreviewData,
+    LiveQueueData,
 )
 from app.schemas.service import ServiceData
 from app.middleware.permissions import get_current_user, require_roles
@@ -101,10 +102,6 @@ async def get_queue_users(
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Customer Booking Endpoints
-# ─────────────────────────────────────────────────────────────────────────────
-
 @queue_router.post("/booking-preview", response_model=BookingPreviewData)
 async def get_booking_preview(
     business_id: UUID = Query(..., description="Business UUID"),
@@ -141,26 +138,54 @@ async def get_available_slots(
     )
 
 
+@queue_router.get("/{queue_id}/live", response_model=LiveQueueData)
+async def get_live_queue(
+    queue_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    controller = QueueController(db)
+    return await controller.get_live_queue(queue_id)
+
+
+@queue_router.post("/{queue_id}/next", response_model=LiveQueueData)
+async def advance_queue(
+    queue_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    controller = QueueController(db)
+    return await controller.advance_queue(queue_id)
+
+
+@queue_router.post("/{queue_id}/start", response_model=QueueData)
+async def start_queue(
+    queue_id: UUID,
+    business_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    controller = QueueController(db)
+    return await controller.start_queue(queue_id, business_id)
+
+
+@queue_router.post("/{queue_id}/stop", response_model=QueueData)
+async def stop_queue(
+    queue_id: UUID,
+    business_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    controller = QueueController(db)
+    return await controller.stop_queue(queue_id, business_id)
+
+
 @queue_router.post("/book", response_model=BookingData)
 async def create_booking(
     payload: BookingCreateInput,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Create a booking for the authenticated user.
-    
-    Requires authentication. 
-    - If queue_id provided: Use that queue (validates availability)
-    - If queue_id NOT provided: Auto-select optimal queue (shortest wait)
-    
-    After booking:
-    - User is added to the queue
-    - Token number is generated
-    - Position and wait time are calculated
-    - For today's bookings: Added to Redis + WebSocket updates
-    - For future bookings: Saved to DB only
-    """
     controller = QueueController(db)
     return await controller.create_booking(
         user_id=current_user.uuid,

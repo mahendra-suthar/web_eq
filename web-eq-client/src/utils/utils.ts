@@ -90,6 +90,54 @@ export const getCountryInfo = (countryCode: string) => {
 };
 
 // ============================================================================
+// Time & Duration Formatting (reusable)
+// ============================================================================
+
+/**
+ * Format minutes as readable duration: "45m" or "1h 15m" (hours only when >= 60).
+ * @param minutes - Duration in minutes
+ * @returns Human-readable string, e.g. "45m", "1h 15m", "2h 0m"
+ */
+export function formatDurationMinutes(minutes: number): string {
+  if (minutes < 0 || !Number.isFinite(minutes)) return "0m";
+  const m = Math.round(minutes);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem === 0 ? `${h}h` : `${h}h ${rem}m`;
+}
+
+/**
+ * Format a time for display as 12-hour with AM/PM (e.g. "4:30 PM").
+ * Accepts ISO datetime string, "HH:MM" string, or Date.
+ */
+export function formatTimeToDisplay(
+  value: string | Date | null | undefined
+): string {
+  if (value == null) return "";
+  try {
+    let date: Date;
+    if (value instanceof Date) {
+      date = value;
+    } else if (typeof value === "string") {
+      if (/^\d{1,2}:\d{2}$/.test(value.trim())) {
+        const [h, min] = value.trim().split(":").map(Number);
+        date = new Date();
+        date.setHours(h, min, 0, 0);
+      } else {
+        date = new Date(value);
+      }
+    } else {
+      return "";
+    }
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
+  } catch {
+    return "";
+  }
+}
+
+// ============================================================================
 // Employee Utilities
 // ============================================================================
 
