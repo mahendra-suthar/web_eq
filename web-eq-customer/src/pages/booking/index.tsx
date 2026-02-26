@@ -9,6 +9,7 @@ import { BusinessService, type BusinessServiceData } from "../../services/busine
 import { getNext7Days } from "../../utils/booking.utils";
 import { isDateInPast, formatDateDisplay, formatDurationMinutes, formatTimeToDisplay } from "../../utils/util";
 import { HttpStatus } from "../../utils/constants";
+import { saveBookingReturnState, getBookingReturnState, clearBookingReturnState } from "../../utils/bookingReturnState";
 import Button from "../../components/button";
 import "./booking.scss";
 
@@ -19,20 +20,44 @@ export default function BookingPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
 
-  const initialSelectedServices = (location.state?.selectedServices as string[]) || [];
-  const initialSelectedServicesData = (location.state?.selectedServicesData as BusinessServiceData[]) || [];
-  const initialBusinessName = (location.state?.businessName as string) || "";
+  // Restore from location.state or sessionStorage (survives OTP redirect/refresh)
+  const { initialSelectedServices, initialSelectedServicesData, initialBusinessName } = useMemo(() => {
+    const fromLocation = {
+      initialSelectedServices: (location.state?.selectedServices as string[]) || [],
+      initialSelectedServicesData: (location.state?.selectedServicesData as BusinessServiceData[]) || [],
+      initialBusinessName: (location.state?.businessName as string) || "",
+    };
+    if (fromLocation.initialSelectedServices.length > 0 || fromLocation.initialSelectedServicesData.length > 0) {
+      return fromLocation;
+    }
+    const stored = getBookingReturnState();
+    if (stored?.returnTo && (stored.selectedServices?.length > 0 || stored.selectedServicesData?.length > 0)) {
+      return {
+        initialSelectedServices: stored.selectedServices || [],
+        initialSelectedServicesData: (stored.selectedServicesData || []) as BusinessServiceData[],
+        initialBusinessName: stored.businessName || "",
+      };
+    }
+    return fromLocation;
+  }, [location.state]);
+
+  useEffect(() => {
+    if (initialSelectedServices.length > 0 || initialSelectedServicesData.length > 0) {
+      clearBookingReturnState();
+    }
+  }, [initialSelectedServices.length, initialSelectedServicesData.length]);
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      navigate("/send-otp", {
-        state: {
-          returnTo: `/business/${businessId}/book`,
-          selectedServices: initialSelectedServices,
-          selectedServicesData: initialSelectedServicesData,
-          businessName: initialBusinessName,
-        },
-      });
+      const returnTo = `/business/${businessId}/book`;
+      const state = {
+        returnTo,
+        selectedServices: initialSelectedServices,
+        selectedServicesData: initialSelectedServicesData,
+        businessName: initialBusinessName,
+      };
+      saveBookingReturnState(state);
+      navigate("/send-otp", { state });
       return;
     }
   }, [isAuthenticated, businessId, navigate, initialSelectedServices, initialSelectedServicesData, initialBusinessName]);

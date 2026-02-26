@@ -1,10 +1,12 @@
 import re
 from pydantic import BaseModel, validator
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
 from uuid import UUID
 from datetime import datetime, date
 
 from app.schemas.user import UserData
+from app.core.utils import format_time_12h, wait_minutes_from_now
+from app.core.constants import QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_COMPLETED
 
 
 class QueueServiceCreate(BaseModel):
@@ -83,6 +85,34 @@ class QueueServiceDetailData(BaseModel):
     service_fee: Optional[float] = None
     avg_service_time: Optional[int] = None  # minutes
 
+    @classmethod
+    def from_queue_service_and_service(cls, queue_service: Any, service: Any) -> "QueueServiceDetailData":
+        """Build from QueueService ORM and Service ORM (or None for service)."""
+        name = getattr(service, "name", None) if service else None
+        return cls(
+            uuid=queue_service.uuid,
+            service_id=queue_service.service_id,
+            service_name=name,
+            description=getattr(queue_service, "description", None),
+            service_fee=getattr(queue_service, "service_fee", None),
+            avg_service_time=getattr(queue_service, "avg_service_time", None),
+        )
+
+    @classmethod
+    def from_queue_service(cls, queue_service: Any, service_name: Optional[str] = None) -> "QueueServiceDetailData":
+        """Build from QueueService ORM and optional service name (e.g. from lookup)."""
+        return cls(
+            uuid=queue_service.uuid,
+            service_id=queue_service.service_id,
+            service_name=service_name,
+            description=getattr(queue_service, "description", None),
+            service_fee=getattr(queue_service, "service_fee", None),
+            avg_service_time=getattr(queue_service, "avg_service_time", None),
+        )
+
+    class Config:
+        from_attributes = True
+
 
 class QueueDetailData(BaseModel):
     """Full queue with associated queue services for detail page."""
@@ -95,6 +125,30 @@ class QueueDetailData(BaseModel):
     assigned_employee_id: Optional[UUID] = None  # employee currently assigned to this queue
     services: List[QueueServiceDetailData] = []
 
+    @classmethod
+    def from_queue_and_services(
+        cls,
+        queue: Any,
+        services: List[QueueServiceDetailData],
+    ) -> "QueueDetailData":
+        """Build from Queue ORM and list of QueueServiceDetailData."""
+        assigned = None
+        if getattr(queue, "employees", None):
+            assigned = queue.employees[0].uuid if queue.employees else None
+        return cls(
+            uuid=queue.uuid,
+            business_id=queue.merchant_id,
+            name=queue.name,
+            status=queue.status,
+            limit=getattr(queue, "limit", None),
+            current_length=getattr(queue, "current_length", None),
+            assigned_employee_id=assigned,
+            services=services,
+        )
+
+    class Config:
+        from_attributes = True
+
 
 class QueueUserData(BaseModel):
     uuid: UUID
@@ -106,6 +160,21 @@ class QueueUserData(BaseModel):
     priority: bool = False
     enqueue_time: Optional[datetime] = None
     dequeue_time: Optional[datetime] = None
+
+    @classmethod
+    def from_row(cls, queue_user: Any, user: Any) -> "QueueUserData":
+        """Build from (QueueUser, User) row from get_queue_users."""
+        return cls(
+            uuid=queue_user.uuid,
+            user=UserData.from_user(user),
+            queue_id=queue_user.queue_id,
+            queue_date=queue_user.queue_date,
+            token_number=queue_user.token_number,
+            status=queue_user.status,
+            priority=bool(queue_user.priority),
+            enqueue_time=queue_user.enqueue_time,
+            dequeue_time=queue_user.dequeue_time,
+        )
 
     class Config:
         from_attributes = True
@@ -139,6 +208,43 @@ class QueueUserDetailResponse(BaseModel):
     notes: Optional[str] = None
     cancellation_reason: Optional[str] = None
     reschedule_count: int = 0
+
+    @classmethod
+    def from_queue_user(cls, queue_user: Any) -> "QueueUserDetailResponse":
+        """Build from loaded QueueUser (with user, queue, queue_user_services)."""
+        service_names = [
+            rel.queue_service.service.name
+            for rel in (queue_user.queue_user_services or [])
+            if rel.queue_service and rel.queue_service.service
+        ]
+        employee_id = str(queue_user.queue.employees[0].uuid) if queue_user.queue.employees else None
+        return cls(
+            user=QueueUserDetailUserInfo(
+                full_name=queue_user.user.full_name,
+                email=queue_user.user.email,
+                phone_number=queue_user.user.phone_number,
+                country_code=queue_user.user.country_code,
+                profile_picture=queue_user.user.profile_picture,
+            ),
+            queue_name=queue_user.queue.name,
+            service_names=service_names,
+            queue_user_id=str(queue_user.uuid),
+            token_number=queue_user.token_number,
+            queue_date=queue_user.queue_date,
+            enqueue_time=queue_user.enqueue_time,
+            dequeue_time=queue_user.dequeue_time,
+            status=queue_user.status,
+            priority=queue_user.priority,
+            turn_time=queue_user.turn_time,
+            estimated_enqueue_time=queue_user.estimated_enqueue_time,
+            estimated_dequeue_time=queue_user.estimated_dequeue_time,
+            joined_queue=queue_user.joined_queue,
+            is_scheduled=queue_user.is_scheduled,
+            notes=queue_user.notes,
+            cancellation_reason=queue_user.cancellation_reason,
+            reschedule_count=queue_user.reschedule_count,
+            employee_id=employee_id,
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -213,6 +319,68 @@ class BookingData(BaseModel):
     created_at: datetime
     already_in_queue: Optional[bool] = False
 
+    @classmethod
+    def from_booking_created(
+        cls,
+        queue_user: Any,
+        queue_id: str,
+        queue_name: str,
+        business_id: str,
+        business_name: str,
+        queue_date: date,
+        metrics: Dict[str, Any],
+        services_data: List["BookingServiceData"],
+        token_number: str,
+    ) -> "BookingData":
+        """Build for a newly created booking."""
+        return cls(
+            uuid=str(queue_user.uuid),
+            token_number=token_number,
+            queue_id=queue_id,
+            queue_name=queue_name,
+            business_id=business_id,
+            business_name=business_name,
+            queue_date=queue_date,
+            position=metrics["position"],
+            estimated_wait_minutes=metrics["wait_minutes"],
+            estimated_wait_range=metrics["wait_range"],
+            estimated_appointment_time=metrics["appointment_time"],
+            services=services_data,
+            status="confirmed",
+            created_at=datetime.now(),
+        )
+
+    @classmethod
+    def from_existing_booking(
+        cls,
+        existing_full: Any,
+        queue_id: str,
+        queue_name: str,
+        business_id: str,
+        business_name: str,
+        queue_date: date,
+        metrics: Dict[str, Any],
+        services_data: List["BookingServiceData"],
+    ) -> "BookingData":
+        """Build for an existing queue user (already in queue)."""
+        return cls(
+            uuid=str(existing_full.uuid),
+            token_number=existing_full.token_number or "",
+            queue_id=queue_id,
+            queue_name=queue_name,
+            business_id=business_id,
+            business_name=business_name,
+            queue_date=queue_date,
+            position=metrics["position"],
+            estimated_wait_minutes=metrics["wait_minutes"],
+            estimated_wait_range=metrics["wait_range"],
+            estimated_appointment_time=metrics["appointment_time"],
+            services=services_data,
+            status="confirmed",
+            created_at=existing_full.created_at or datetime.now(),
+            already_in_queue=True,
+        )
+
     class Config:
         from_attributes = True
 
@@ -245,6 +413,36 @@ class LiveQueueUserItem(BaseModel):
     estimated_wait_minutes: Optional[int] = None   # for waiting: est. wait; for in_progress: 0
     estimated_appointment_time: Optional[str] = None  # 12h e.g. "4:30 PM" (when expected to be served/done)
 
+    @classmethod
+    def from_user_dict(cls, u: Dict[str, Any]) -> "LiveQueueUserItem":
+        """Build from a user dict produced by build_live_queue_users_raw (or equivalent)."""
+        est_wait = (
+            wait_minutes_from_now(u.get("estimated_enqueue_time"))
+            if u.get("status") == QUEUE_USER_REGISTERED
+            else None
+        )
+        est_dt = u.get("estimated_dequeue_time")
+        enq_dt = u.get("estimated_enqueue_time")
+        if u.get("status") == QUEUE_USER_IN_PROGRESS and est_dt:
+            appt_time = format_time_12h(est_dt)
+        elif u.get("status") == QUEUE_USER_REGISTERED and enq_dt:
+            appt_time = format_time_12h(enq_dt)
+        else:
+            appt_time = None
+        return cls(
+            uuid=u["uuid"],
+            full_name=u.get("full_name"),
+            phone=u.get("phone", ""),
+            token=u.get("token"),
+            service_summary=u.get("service_summary", ""),
+            status=u["status"],
+            enqueue_time=u.get("enqueue_time"),
+            dequeue_time=u.get("dequeue_time"),
+            position=u.get("position"),
+            estimated_wait_minutes=est_wait,
+            estimated_appointment_time=appt_time,
+        )
+
 
 class LiveQueueData(BaseModel):
     queue_id: str
@@ -257,3 +455,76 @@ class LiveQueueData(BaseModel):
     current_token: Optional[str] = None  # token of in_progress user
     users: List[LiveQueueUserItem]        # ordered: completed → in_progress → waiting
     employee_on_leave: bool = False     # True when queue's employee has no schedule / closed exception for this date
+
+    @classmethod
+    def from_build(
+        cls,
+        queue: Any,
+        queue_date: date,
+        users_raw: List[Dict[str, Any]],
+        employee_on_leave: bool = False,
+    ) -> "LiveQueueData":
+        """Build from queue, date, raw user dicts (e.g. from build_live_queue_users_raw), and leave flag."""
+        waiting_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_REGISTERED)
+        in_progress_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_IN_PROGRESS)
+        completed_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_COMPLETED)
+        current_token: Optional[str] = None
+        for u in users_raw:
+            if u.get("status") == QUEUE_USER_IN_PROGRESS:
+                current_token = u.get("token")
+                break
+        return cls(
+            queue_id=str(queue.uuid),
+            queue_name=queue.name,
+            queue_status=getattr(queue, "status", None),
+            date=queue_date.isoformat(),
+            waiting_count=waiting_count,
+            in_progress_count=in_progress_count,
+            completed_count=completed_count,
+            current_token=current_token,
+            employee_on_leave=employee_on_leave,
+            users=[LiveQueueUserItem.from_user_dict(u) for u in users_raw],
+        )
+
+
+class CustomerTodayAppointmentResponse(BaseModel):
+    """Today's active appointment for the logged-in customer (waiting or in_progress)."""
+    queue_user_id: str
+    queue_id: str
+    queue_name: str
+    business_id: str
+    business_name: str
+    token_number: str
+    status: int  # 1=waiting, 2=in_progress
+    position: Optional[int] = None
+    estimated_wait_minutes: Optional[int] = None
+    estimated_wait_range: Optional[str] = None
+    estimated_appointment_time: Optional[str] = None  # 12h e.g. "4:30 PM"
+    service_summary: Optional[str] = None
+
+    @classmethod
+    def from_queue_user_and_metrics(
+        cls,
+        qu: Any,
+        queue: Any,
+        business_id: str,
+        business_name: str,
+        metrics: Dict[str, Any],
+        service_summary: Optional[str],
+        appointment_time_12h: Optional[str],
+    ) -> "CustomerTodayAppointmentResponse":
+        """Build from queue user, queue, business ids/names, computed metrics, service summary, and formatted time."""
+        return cls(
+            queue_user_id=str(qu.uuid),
+            queue_id=str(qu.queue_id),
+            queue_name=queue.name if queue else "",
+            business_id=business_id,
+            business_name=business_name,
+            token_number=qu.token_number or "",
+            status=qu.status,
+            position=metrics.get("position"),
+            estimated_wait_minutes=metrics.get("wait_minutes"),
+            estimated_wait_range=metrics.get("wait_range"),
+            estimated_appointment_time=appointment_time_12h,
+            service_summary=service_summary,
+        )

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AuthService } from "../../services/auth/auth.service";
 import { PHONE_NUMBER_LENGTH, DEFAULT_COUNTRY_CODE, VALID_PHONE_START_DIGITS, OTPErrorCode, ProfileType } from "../../utils/constants";
+import { saveBookingReturnState } from "../../utils/bookingReturnState";
 import Button from "../../components/button";
 import "./send-otp.scss";
 
@@ -18,6 +19,17 @@ export default function SendOTPPage() {
   const selectedServices = (location.state?.selectedServices as string[]) || null;
   const selectedServicesData = location.state?.selectedServicesData ?? null;
   const businessName = (location.state?.businessName as string) || null;
+
+  useEffect(() => {
+    if (returnTo && (selectedServices?.length || selectedServicesData?.length)) {
+      saveBookingReturnState({
+        returnTo,
+        selectedServices: selectedServices || [],
+        selectedServicesData: selectedServicesData || [],
+        businessName: businessName || "",
+      });
+    }
+  }, [returnTo, selectedServices, selectedServicesData, businessName]);
 
   const validatePhone = (phoneNumber: string): boolean => {
     const digits = phoneNumber.replace(/\D/g, "");

@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 from pydantic import BaseModel, field_validator
 from enum import Enum
 from typing import Optional, Literal
@@ -148,7 +149,6 @@ class UserRegistrationInput(BaseModel):
     def validate_date_of_birth(cls, v: Optional[str]) -> Optional[str]:
         if v:
             try:
-                from datetime import datetime
                 birth_date = datetime.strptime(v, '%Y-%m-%d')
                 if birth_date > datetime.now():
                     raise ValueError("Date of birth cannot be in the future")

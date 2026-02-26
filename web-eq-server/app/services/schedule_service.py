@@ -105,13 +105,14 @@ class ScheduleService:
             Schedule.entity_type == entity_type,
         ).delete()
 
-    def create_schedules(
+    def create_schedules_for_entity(
         self,
         entity_id: UUID,
         entity_type: ScheduleEntityType,
         schedules: List[ScheduleInput],
     ) -> List[Schedule]:
-        """Create schedule rows and their ScheduleBreak children in one operation."""
+        """Delete existing schedules for the entity and create new ones. Commits the transaction. Returns created schedules."""
+        self.delete_schedules_by_entity(entity_id, entity_type)
         new_schedules: List[Schedule] = []
         for s in schedules:
             schedule = Schedule(
@@ -134,6 +135,13 @@ class ScheduleService:
 
             new_schedules.append(schedule)
         return new_schedules
+        try:
+            self.db.commit()
+            return new_schedules
+        except Exception:
+            self.db.rollback()
+            raise
+
 
     def copy_business_schedule_to_employees(
         self, business_id: UUID, employee_ids: List[UUID]

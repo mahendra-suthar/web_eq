@@ -29,7 +29,7 @@ export const ROLE_PERMISSIONS: Record<PermissionKey, AppRole[]> = {
   [Permission.VIEW_EMPLOYEES]: [ProfileType.BUSINESS],
   [Permission.VIEW_ALL_USERS]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   [Permission.VIEW_QUEUE_USERS]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
-  [Permission.VIEW_QUEUES]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
+  [Permission.VIEW_QUEUES]: [ProfileType.BUSINESS], // Employees see their queue in profile → Queue tab only
   [Permission.VIEW_LIVE_QUEUE]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   [Permission.VIEW_BUSINESS_PROFILE]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   [Permission.VIEW_EMPLOYEE_PROFILE]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],

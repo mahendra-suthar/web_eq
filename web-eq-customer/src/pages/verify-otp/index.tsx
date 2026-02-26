@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AuthService } from "../../services/auth/auth.service";
 import { useAuthStore } from "../../store/auth.store";
 import { OTP_COUNTDOWN_SECONDS, OTP_LENGTH, OTPErrorCode, DEFAULT_COUNTRY_CODE } from "../../utils/constants";
+import { getBookingReturnState } from "../../utils/bookingReturnState";
 import Button from "../../components/button";
 import "./verify-otp.scss";
 
@@ -16,10 +17,28 @@ export default function VerifyOTPPage() {
   const phone = (location.state?.phone as string) || "";
   const phoneNumber = (location.state?.phoneNumber as string) || "";
   const countryCode = (location.state?.countryCode as string) || DEFAULT_COUNTRY_CODE;
-  const returnTo = (location.state?.returnTo as string) || null;
-  const selectedServices = (location.state?.selectedServices as string[]) || null;
-  const selectedServicesData = location.state?.selectedServicesData ?? null;
-  const businessName = (location.state?.businessName as string) || null;
+  // Restore booking return state from location or sessionStorage (survives refresh)
+  const { returnTo, selectedServices, selectedServicesData, businessName } = useMemo(() => {
+    const fromLocation = {
+      returnTo: (location.state?.returnTo as string) || null,
+      selectedServices: (location.state?.selectedServices as string[]) || null,
+      selectedServicesData: location.state?.selectedServicesData ?? null,
+      businessName: (location.state?.businessName as string) || null,
+    };
+    if (fromLocation.returnTo && (fromLocation.selectedServices?.length || fromLocation.selectedServicesData?.length)) {
+      return fromLocation;
+    }
+    const stored = getBookingReturnState();
+    if (stored?.returnTo) {
+      return {
+        returnTo: stored.returnTo,
+        selectedServices: stored.selectedServices || null,
+        selectedServicesData: stored.selectedServicesData?.length ? stored.selectedServicesData : null,
+        businessName: stored.businessName || null,
+      };
+    }
+    return fromLocation;
+  }, [location.state]);
 
   const [otp, setOtp] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);

@@ -3,9 +3,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
 from typing import List, Optional, Dict, Tuple
 from uuid import UUID
-from datetime import datetime, time
 from collections import defaultdict
-import pytz
 
 from app.services.business_service import BusinessService
 from app.services.address_service import AddressService
@@ -28,8 +26,7 @@ from app.schemas.business import (
 )
 from app.controllers.role_controller import RoleController
 from app.controllers.user_controller import UserController
-from app.core.utils import format_time
-from app.core.constants import TIMEZONE
+from app.core.utils import format_time, current_time_app_tz, day_of_week_app_tz
 from app.models.user import User
 
 
@@ -38,6 +35,7 @@ class BusinessController:
         self.db = db
         self.business_service = BusinessService(db)
         self.address_service = AddressService(db)
+        self.queue_service = QueueService(db)
         self.schedule_service = ScheduleService(db)
         self.role_controller = RoleController(db)
         self.user_controller = UserController(db)
@@ -106,11 +104,8 @@ class BusinessController:
                     addresses_by_business[bid] = address
 
             business_ids = list(businesses_map.keys())
-
-            now = datetime.now(pytz.timezone(TIMEZONE))
-            current_time = now.time()
-            # Use JS convention (0=Sun … 6=Sat) to match how day_of_week is stored by the frontend.
-            day_of_week = (now.weekday() + 1) % 7
+            current_time = current_time_app_tz()
+            day_of_week = day_of_week_app_tz()
             schedules_map = self.business_service.get_schedules_by_businesses(business_ids, day_of_week)
             review_stats = self.business_service.get_review_stats_by_businesses(business_ids)
 
@@ -195,9 +190,7 @@ class BusinessController:
 
     def get_business_services(self, business_id: UUID) -> List[BusinessServiceData]:
         try:
-            queue_service = QueueService(self.db)
-            services_data = queue_service.get_business_services(business_id)
-
+            services_data = self.queue_service.get_business_services(business_id)
             return [
                 BusinessServiceData.from_queue_service_and_service(queue_svc, service)
                 for queue_svc, service in services_data

@@ -55,7 +55,18 @@ class QueueService:
             )
 
         self.db.add_all(queue_services)
-        return new_queue
+        try:
+            self.db.commit()
+            return new_queue
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def get_services_by_ids(self, service_ids: List[UUID]) -> List[Service]:
+        """Return Service models for the given UUIDs. Used by controller for response building."""
+        if not service_ids:
+            return []
+        return self.db.query(Service).filter(Service.uuid.in_(service_ids)).all()
 
     def update_queue(self, queue_id: UUID, business_id: UUID, data: QueueUpdate) -> Optional[Queue]:
         queue = self.get_queue_by_id_and_business(queue_id, business_id)
@@ -116,7 +127,6 @@ class QueueService:
     def update_queue_service(
         self, queue_service_id: UUID, data: QueueServiceUpdate
     ) -> Optional[QueueServiceModel]:
-        """Update a queue_service row. Returns updated row or None."""
         qs = self.db.query(QueueServiceModel).filter(QueueServiceModel.uuid == queue_service_id).first()
         if not qs:
             return None
@@ -131,7 +141,6 @@ class QueueService:
             raise
 
     def delete_queue_service(self, queue_service_id: UUID) -> bool:
-        """Remove a queue_service (removes service from queue). Returns True if deleted."""
         qs = self.db.query(QueueServiceModel).filter(QueueServiceModel.uuid == queue_service_id).first()
         if not qs:
             return False
@@ -161,7 +170,6 @@ class QueueService:
     def get_queue_services_for_booking(
         self, service_ids: List[UUID], business_id: UUID
     ) -> List[QueueServiceModel]:
-        """Return QueueService records for the given service_ids and business_id (for booking validation)."""
         try:
             return (
                 self.db.query(QueueServiceModel)
@@ -177,7 +185,6 @@ class QueueService:
     def get_booking_services_data(
         self, queue_services: List[QueueServiceModel]
     ) -> List[dict]:
-        """Build booking services payload from queue_services with a single batch load of Service (no query in loop)."""
         if not queue_services:
             return []
         service_ids = [qs.service_id for qs in queue_services]
@@ -194,8 +201,45 @@ class QueueService:
             if qs.service_id in by_id
         ]
 
+    def create_booking(
+        self,
+        user_id: UUID,
+        queue_id: UUID,
+        queue_date: date,
+        token_number: str,
+        turn_time: int,
+        notes: Optional[str],
+        is_scheduled: bool,
+        estimated_enqueue_time: Optional[datetime],
+        estimated_dequeue_time: Optional[datetime],
+        queue_services: List[QueueServiceModel],
+    ) -> QueueUser:
+        """Create a QueueUser and its QueueUserService links. Commits the transaction. Returns the created QueueUser."""
+        queue_user = QueueUser(
+            user_id=user_id,
+            queue_id=queue_id,
+            queue_date=queue_date,
+            token_number=token_number,
+            status=QUEUE_USER_REGISTERED,
+            turn_time=turn_time,
+            notes=notes,
+            is_scheduled=is_scheduled,
+            estimated_enqueue_time=estimated_enqueue_time,
+            estimated_dequeue_time=estimated_dequeue_time,
+        )
+        self.db.add(queue_user)
+        self.db.flush()
+        for qs in queue_services:
+            self.db.add(
+                QueueUserService(
+                    queue_user_id=queue_user.uuid,
+                    queue_service_id=qs.uuid,
+                )
+            )
+        self.db.commit()
+        return queue_user
+
     def get_queues_by_business_id(self, business_id: UUID) -> List[Queue]:
-        """Return all Queue models for a business (for realtime/aggregation use)."""
         try:
             return (
                 self.db.query(Queue)
@@ -206,14 +250,12 @@ class QueueService:
             raise
 
     def get_queue_by_id(self, queue_id: UUID) -> Optional[Queue]:
-        """Return a Queue by id, or None."""
         try:
             return self.db.query(Queue).filter(Queue.uuid == queue_id).first()
         except SQLAlchemyError:
             raise
 
     def get_queue_services_with_service(self, queue_id: UUID) -> List[Tuple[QueueServiceModel, Service]]:
-        """Return queue_services for a queue with Service joined (for detail view)."""
         try:
             return (
                 self.db.query(QueueServiceModel, Service)
@@ -227,7 +269,6 @@ class QueueService:
     def get_queue_by_id_and_business(
         self, queue_id: UUID, business_id: UUID
     ) -> Optional[Queue]:
-        """Return a Queue by id and business_id (for validation), or None."""
         try:
             return (
                 self.db.query(Queue)
@@ -240,7 +281,6 @@ class QueueService:
     def get_queues_offering_service_ids(
         self, business_id: UUID, queue_service_ids: List[UUID]
     ) -> List[Queue]:
-        """Return queues that offer the given queue service IDs (for booking metrics)."""
         if not queue_service_ids:
             return []
         try:
@@ -258,7 +298,6 @@ class QueueService:
             raise
 
     def get_queue_to_service_ids(self, queue_ids: List[UUID]) -> Dict[UUID, List[UUID]]:
-        """Return mapping queue_id -> list of service_id for the given queues (one query)."""
         if not queue_ids:
             return {}
         try:
@@ -277,7 +316,6 @@ class QueueService:
     def get_today_queue_metrics_batch(
         self, queue_ids: List[UUID], booking_date: date
     ) -> Dict[UUID, Dict[str, Any]]:
-        """Per-queue: registered count, in-progress count, sum of turn_time (one query)."""
         if not queue_ids:
             return {}
         try:
@@ -443,6 +481,48 @@ class QueueService:
         except SQLAlchemyError:
             raise
 
+    def get_today_active_appointment_for_user(
+        self, user_id: UUID, today: date
+    ) -> Optional[QueueUser]:
+        """Return latest active (waiting or in_progress) queue user for this user and date, or None.
+        Optimized for index (user_id, queue_date, status)."""
+        try:
+            return (
+                self.db.query(QueueUser)
+                .options(
+                    joinedload(QueueUser.queue).joinedload(Queue.business),
+                    joinedload(QueueUser.queue).joinedload(Queue.employees),
+                    selectinload(QueueUser.queue_user_services).joinedload(QueueUserService.queue_service).joinedload(QueueServiceModel.service),
+                )
+                .filter(
+                    QueueUser.user_id == user_id,
+                    QueueUser.queue_date == today,
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                )
+                .order_by(QueueUser.created_at.desc())
+                .first()
+            )
+        except SQLAlchemyError:
+            raise
+
+    def get_user_ids_in_queue_for_date(
+        self, queue_id: UUID, queue_date: date
+    ) -> List[UUID]:
+        """Return user_ids of users with active (registered or in_progress) appointment in this queue on this date."""
+        try:
+            rows = (
+                self.db.query(QueueUser.user_id)
+                .filter(
+                    QueueUser.queue_id == queue_id,
+                    QueueUser.queue_date == queue_date,
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                )
+                .distinct()
+                .all()
+            )
+            return [r[0] for r in rows]
+        except SQLAlchemyError:
+            raise
 
     def get_live_queue_users_raw(
         self, queue_id: UUID, queue_date: date

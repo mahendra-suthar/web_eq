@@ -3,7 +3,9 @@ WebSocket endpoint for real-time queue updates.
 Scoped per business - customers see all queues for a business.
 """
 import asyncio
+import json
 import logging
+from uuid import UUID
 from fastapi import WebSocket, WebSocketDisconnect, APIRouter, Depends
 from starlette.websockets import WebSocketState
 from sqlalchemy.orm import Session
@@ -13,6 +15,7 @@ from datetime import datetime
 from app.db.database import get_db
 from app.services.realtime.queue_manager import queue_manager
 from app.services.realtime.live_queue_manager import live_queue_manager
+from app.services.realtime.customer_appointment_manager import customer_appointment_manager
 from app.core.config import SECRET_KEY, ALGORITHM
 
 logger = logging.getLogger(__name__)
@@ -102,7 +105,6 @@ async def booking_websocket(
                 
                 # Handle client messages (e.g., ping, refresh request)
                 try:
-                    import json
                     data = json.loads(message)
                     
                     if data.get("type") == "ping":
@@ -189,8 +191,7 @@ async def live_queue_websocket(
                     timeout=30.0,
                 )
                 try:
-                    import json as _json
-                    data = _json.loads(message)
+                    data = json.loads(message)
                     if data.get("type") == "ping":
                         await websocket.send_json({"type": "pong"})
                     elif data.get("type") == "refresh":

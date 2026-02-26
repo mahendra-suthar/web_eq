@@ -1,6 +1,6 @@
 import secrets
 import hashlib
-from datetime import date, datetime, time as dt_time, timezone
+from datetime import date, datetime, time as dt_time, timezone, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 import pytz
@@ -38,6 +38,16 @@ def today_app_date() -> date:
     return now_app_tz().date()
 
 
+def current_time_app_tz() -> dt_time:
+    """Return current time (time only) in the application timezone. For open/closed checks."""
+    return now_app_tz().time()
+
+
+def day_of_week_app_tz() -> int:
+    """Return current day of week in app TZ using JS convention: 0=Sunday, 1=Monday, …, 6=Saturday."""
+    return (now_app_tz().weekday() + 1) % 7
+
+
 def generate_invitation_code(length: int = 8, expires_in_hours: Optional[int] = 48) -> str:
     """Generate a random invitation code (no ambiguous chars: 0, 1, I, L, O).
     expires_in_hours is for API consistency; callers can use it when storing/validating expiry.
@@ -66,6 +76,29 @@ def parse_time_string(time_str: Optional[str]) -> Optional[dt_time]:
     except (ValueError, IndexError):
         pass
     return None
+
+
+def format_date_iso(d: date) -> str:
+    """Format date as ISO string (YYYY-MM-DD) for API/keys."""
+    return d.isoformat()
+
+
+def appointment_time_to_enqueue_dequeue(
+    appointment_time_str: Optional[str],
+    appointment_date: date,
+    duration_minutes: int,
+) -> Tuple[Optional[datetime], Optional[datetime]]:
+    """
+    Parse HH:MM appointment time and return (enqueue datetime, dequeue datetime)
+    for the given date and duration. Naive datetimes (for DB storage).
+    """
+    t = parse_time_string(appointment_time_str)
+    if t is None:
+        return (None, None)
+    enqueue = datetime.combine(appointment_date, t)
+    dequeue = enqueue + timedelta(minutes=duration_minutes)
+    return (enqueue, dequeue)
+
 
 def format_time(t: Optional[dt_time]) -> Optional[str]:
     """Format time object to 12-hour string like '09:00 AM'"""

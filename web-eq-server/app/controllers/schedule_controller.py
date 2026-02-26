@@ -103,27 +103,19 @@ class ScheduleController:
                 if err:
                     raise HTTPException(status_code=400, detail=err)
 
-            # Delete existing schedules (CASCADE removes their breaks/exceptions)
-            self.schedule_service.delete_schedules_by_entity(payload.entity_id, entity_type_enum)
-            self.schedule_service.create_schedules(
+            self.schedule_service.replace_schedules_for_entity(
                 payload.entity_id, entity_type_enum, payload.schedules
             )
-            self.db.commit()
-
-            # Reload with breaks eagerly so ScheduleData.from_schedule works
             schedules_with_breaks = self.schedule_service.get_schedules_with_breaks(
                 payload.entity_id, entity_type_enum
             )
             return [ScheduleData.from_schedule(s) for s in schedules_with_breaks]
 
         except HTTPException:
-            self.db.rollback()
             raise
         except SQLAlchemyError:
-            self.db.rollback()
             raise HTTPException(status_code=500, detail="Database error")
         except Exception as e:
-            self.db.rollback()
             raise HTTPException(status_code=500, detail=f"Failed to create schedules: {str(e)}")
 
     async def get_schedules(

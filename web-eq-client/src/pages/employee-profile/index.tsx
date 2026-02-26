@@ -5,7 +5,8 @@ import { ProfileService, UnifiedProfileResponse } from '../../services/profile/p
 import { BusinessService } from '../../services/business/business.service';
 import { EmployeeService } from '../../services/employee/employee.service';
 import { OTPService } from '../../services/otp/otp.service';
-import { emailRegex } from '../../utils/utils';
+import { QueueService, QueueDetailData } from '../../services/queue/queue.service';
+import { emailRegex, formatDurationMinutes } from '../../utils/utils';
 import { Tabs } from '../../components/tabs/Tabs';
 import './employee-profile.scss';
 
@@ -21,11 +22,10 @@ interface EmployeeProfileData {
     phoneDisplay: string;
     profilePicture?: string | null;
     businessName: string;
-    queueName: string;
     isVerified: boolean;
 }
 
-type TabType = 'overview' | 'location' | 'schedule';
+type TabType = 'overview' | 'location' | 'schedule' | 'queue';
 
 const EmployeeProfile = () => {
     const { t } = useTranslation();
@@ -40,6 +40,7 @@ const EmployeeProfile = () => {
     const businessService = useMemo(() => new BusinessService(), []);
     const employeeService = useMemo(() => new EmployeeService(), []);
     const otpService = useMemo(() => new OTPService(), []);
+    const queueService = useMemo(() => new QueueService(), []);
 
     const [employeeId, setEmployeeId] = useState<string>("");
     const [ownerCountryCode, setOwnerCountryCode] = useState<string>("");
@@ -59,9 +60,13 @@ const EmployeeProfile = () => {
         phoneDisplay: "",
         profilePicture: null,
         businessName: "",
-        queueName: "",
         isVerified: false,
     });
+
+    const [queueId, setQueueId] = useState<string | null>(null);
+    const [queueDetail, setQueueDetail] = useState<QueueDetailData | null>(null);
+    const [queueDetailLoading, setQueueDetailLoading] = useState(false);
+    const [queueDetailError, setQueueDetailError] = useState<string>("");
 
     const [locationData, setLocationData] = useState<AddressData>({
         unit_number: "",
@@ -116,13 +121,13 @@ const EmployeeProfile = () => {
                 ? `${emp.country_code} ${emp.phone_number}` : (emp?.phone_number || "");
             setEmployeeCountryCode(emp?.country_code || "");
             setEmployeePhoneNumber(emp?.phone_number || "");
+            setQueueId(emp?.queue_id ?? (emp?.queue as { uuid?: string })?.uuid ?? null);
             setEmployeeData({
                 fullName: emp?.full_name?.trim() || "",
                 email: emp?.email?.trim() || "",
                 phoneDisplay: empPhoneDisplay,
                 profilePicture: emp?.profile_picture || profile.user?.profile_picture || null,
                 businessName: profile.business?.name || "",
-                queueName: emp?.queue?.name || "",
                 isVerified: emp?.is_verified ?? false,
             });
             setLocationData(profile.address ? {
@@ -163,6 +168,25 @@ const EmployeeProfile = () => {
     useEffect(() => {
         fetchProfile();
     }, [fetchProfile]);
+
+    useEffect(() => {
+        if (!queueId) {
+            setQueueDetail(null);
+            setQueueDetailError("");
+            return;
+        }
+        setQueueDetailLoading(true);
+        setQueueDetailError("");
+        queueService
+            .getQueueDetail(queueId)
+            .then(setQueueDetail)
+            .catch((err: unknown) => {
+                const e = err as { response?: { data?: { detail?: string } }; message?: string };
+                setQueueDetailError(e?.response?.data?.detail || (e?.message as string) || t("failedToLoadQueue") || "Failed to load queue");
+                setQueueDetail(null);
+            })
+            .finally(() => setQueueDetailLoading(false));
+    }, [queueId, queueService, t]);
 
     const handleSaveOverview = async () => {
         const userFullName = userData.fullName.trim();
@@ -304,6 +328,7 @@ const EmployeeProfile = () => {
                         { id: 'overview', label: t("basicInformation") },
                         { id: 'location', label: t("location") },
                         { id: 'schedule', label: t("schedule") },
+                        { id: 'queue', label: t("queue") },
                     ]}
                     activeTabId={activeTab}
                     onTabChange={(id) => setActiveTab(id as TabType)}
@@ -413,12 +438,6 @@ const EmployeeProfile = () => {
                                                 <div className="info-field">
                                                     <label className="info-label">{t("business")}</label>
                                                     <div className="info-value info-value-readonly">{employeeData.businessName}</div>
-                                                </div>
-                                            )}
-                                            {employeeData.queueName && (
-                                                <div className="info-field">
-                                                    <label className="info-label">{t("queue")}</label>
-                                                    <div className="info-value info-value-readonly">{employeeData.queueName}</div>
                                                 </div>
                                             )}
                                             <div className="info-field">
@@ -586,6 +605,79 @@ const EmployeeProfile = () => {
                                         ))}
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'queue' && (
+                        <div className="profile-section">
+                            <div className="section-header">
+                                <h2 className="section-title">{t("queue")}</h2>
+                            </div>
+                            <div className="section-content">
+                                {!queueId ? (
+                                    <p className="info-value">{t("noQueueAssigned") || "No queue assigned."}</p>
+                                ) : queueDetailLoading ? (
+                                    <div className="loading-state" style={{ padding: "1.5rem", textAlign: "center" }}>
+                                        {t("loading")}
+                                    </div>
+                                ) : queueDetailError ? (
+                                    <p className="error-message" style={{ color: "var(--danger, #dc3545)" }}>{queueDetailError}</p>
+                                ) : queueDetail ? (
+                                    <>
+                                        <div className="info-block">
+                                            <div className="info-grid">
+                                                <div className="info-field">
+                                                    <label className="info-label">{t("queueName")}</label>
+                                                    <div className="info-value">{queueDetail.name || t("notAvailable")}</div>
+                                                </div>
+                                                <div className="info-field">
+                                                    <label className="info-label">{t("status")}</label>
+                                                    <div className="info-value">{queueDetail.status != null ? String(queueDetail.status) : t("notAvailable")}</div>
+                                                </div>
+                                                <div className="info-field">
+                                                    <label className="info-label">{t("queueLimit")}</label>
+                                                    <div className="info-value">{queueDetail.limit != null ? String(queueDetail.limit) : "—"}</div>
+                                                </div>
+                                                {queueDetail.current_length != null && (
+                                                    <div className="info-field">
+                                                        <label className="info-label">{t("currentLength")}</label>
+                                                        <div className="info-value">{queueDetail.current_length}</div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="info-block queue-services-block">
+                                            <h3 className="info-block-title">{t("queueServices") || "Queue services"}</h3>
+                                            {!queueDetail.services || queueDetail.services.length === 0 ? (
+                                                <p className="info-value">{t("noServicesAssigned") || "No services assigned to this queue."}</p>
+                                            ) : (
+                                                <div className="queue-services-table-wrap">
+                                                    <table className="data-table queue-services-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>{t("serviceName")}</th>
+                                                                <th>{t("serviceDescription") || "Description"}</th>
+                                                                <th>{t("fee")}</th>
+                                                                <th>{t("averageServiceTime") || "Avg. time"}</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {queueDetail.services.map((svc) => (
+                                                                <tr key={svc.uuid}>
+                                                                    <td>{svc.service_name ?? t("notAvailable")}</td>
+                                                                    <td>{svc.description ?? t("notAvailable")}</td>
+                                                                    <td>{svc.service_fee != null ? String(svc.service_fee) : t("notAvailable")}</td>
+                                                                    <td>{svc.avg_service_time != null ? formatDurationMinutes(svc.avg_service_time) : t("notAvailable")}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                ) : null}
                             </div>
                         </div>
                     )}
