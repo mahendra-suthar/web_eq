@@ -1,15 +1,45 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import CategoryCard from "../../components/category-card";
 import BusinessCard from "../../components/business-card";
 import { mockBusinesses } from "../../mock/businesses";
 import Button from "../../components/button";
 import { CategoryService, type CategoryWithServicesData } from "../../services/category/category.service";
+import { AppointmentService, type TodayAppointmentResponse } from "../../services/appointment/appointment.service";
+import { useAuthStore } from "../../store/auth.store";
+import { formatDurationMinutes, formatTimeToDisplay } from "../../utils/util";
 import "./landing.scss";
 
 export default function LandingPage() {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuthStore();
   const [categories, setCategories] = useState<CategoryWithServicesData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [todayAppointment, setTodayAppointment] = useState<TodayAppointmentResponse | null | undefined>(undefined);
+  const [todayLoading, setTodayLoading] = useState(false);
+
+  const fetchTodayAppointment = useCallback(async () => {
+    if (!isAuthenticated()) {
+      setTodayAppointment(null);
+      return;
+    }
+    setTodayLoading(true);
+    try {
+      const appointmentService = new AppointmentService();
+      const data = await appointmentService.getTodayAppointment();
+      setTodayAppointment(data ?? null);
+    } catch (err) {
+      console.error("Failed to fetch today's appointment:", err);
+      setTodayAppointment(null);
+    } finally {
+      setTodayLoading(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    fetchTodayAppointment();
+  }, [fetchTodayAppointment]);
 
   useEffect(() => {
     fetchCategories();
@@ -49,7 +79,7 @@ export default function LandingPage() {
               color="blue"
               size="lg"
               onClick={() => {
-                document.querySelector(".landing-section")?.scrollIntoView({ behavior: "smooth" });
+                document.querySelector(".landing-section-categories")?.scrollIntoView({ behavior: "smooth" });
               }}
             />
             <Button
@@ -64,7 +94,62 @@ export default function LandingPage() {
         </div>
       </div>
 
-      <div className="landing-section">
+      {isAuthenticated() && (todayLoading || todayAppointment) && (
+        <div className="landing-section landing-section-today">
+          <div className="landing-section-header">
+            <h2 className="landing-section-title">Today&apos;s appointment</h2>
+            <p className="landing-section-subtitle">
+              Your current queue status and expected time.
+            </p>
+          </div>
+          {todayLoading ? (
+            <div className="landing-today-loading">
+              <div className="landing-spinner" aria-hidden />
+              <p>Loading your appointment…</p>
+            </div>
+          ) : todayAppointment ? (
+            <div
+              className="landing-today-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate(`/business/${todayAppointment.business_id}`)}
+              onKeyDown={(e) => e.key === "Enter" && navigate(`/business/${todayAppointment.business_id}`)}
+              aria-label={`View ${todayAppointment.business_name} – token ${todayAppointment.token_number}`}
+            >
+              <div className="landing-today-card-header">
+                <span className="landing-today-business">{todayAppointment.business_name}</span>
+                <span className={`landing-today-status status-${todayAppointment.status === 1 ? "waiting" : "in-progress"}`}>
+                  {todayAppointment.status === 1 ? "Waiting" : "In progress"}
+                </span>
+              </div>
+              <p className="landing-today-queue">{todayAppointment.queue_name}</p>
+              {todayAppointment.service_summary && (
+                <p className="landing-today-services">{todayAppointment.service_summary}</p>
+              )}
+              <div className="landing-today-details">
+                <span className="landing-today-token">Token #{todayAppointment.token_number}</span>
+                {todayAppointment.position != null && (
+                  <span className="landing-today-position">Position #{todayAppointment.position}</span>
+                )}
+                {todayAppointment.estimated_wait_minutes != null && todayAppointment.estimated_wait_minutes > 0 && (
+                  <span className="landing-today-wait">
+                    Est. wait {formatDurationMinutes(todayAppointment.estimated_wait_minutes)}
+                    {todayAppointment.estimated_wait_range && ` (${todayAppointment.estimated_wait_range})`}
+                  </span>
+                )}
+                {todayAppointment.estimated_appointment_time && (
+                  <span className="landing-today-time">
+                    Expected at {formatTimeToDisplay(todayAppointment.estimated_appointment_time)}
+                  </span>
+                )}
+              </div>
+              <p className="landing-today-cta">Tap to view business →</p>
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      <div className="landing-section landing-section-categories">
         <div className="landing-section-header">
           <h2 className="landing-section-title">Browse by category</h2>
           <p className="landing-section-subtitle">Tap a category to see businesses near you.</p>

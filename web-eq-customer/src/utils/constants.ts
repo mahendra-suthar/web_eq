@@ -101,3 +101,15 @@ export const DAY_NAMES = [
   "Saturday",
   "Sunday",
 ];
+
+// ============================================================================
+// Profile dropdown menu
+// ============================================================================
+
+export const PROFILE_DROPDOWN_MENU_ITEMS = [
+  { id: "profile", label: "Profile", path: "/profile?tab=profile" },
+  { id: "appointments", label: "Appointments", path: "/profile?tab=appointments" },
+  { id: "settings", label: "Settings", path: "/profile?tab=settings" },
+] as const;
+
+export const PROFILE_DROPDOWN_FIRST_ITEM_ID = "profile-dropdown-item-profile";

@@ -1,0 +1,275 @@
+.profile-page {
+  min-height: 60vh;
+  padding: 1.5rem 1rem 3rem;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.profile-page__inner {
+  width: 100%;
+}
+
+.profile-page__heading {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #004d40;
+  margin-bottom: 1rem;
+}
+
+.profile-page__tabs {
+  margin-top: 0.5rem;
+}
+
+// --- Section common ---
+.profile-section {
+  padding: 0.25rem 0;
+}
+
+.profile-section--loading,
+.profile-section__empty {
+  color: #6b7280;
+  font-size: 0.9375rem;
+}
+
+.profile-section__title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 1rem;
+}
+
+.profile-section__error {
+  padding: 0.75rem 1rem;
+  background: #fef2f2;
+  color: #b91c1c;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.profile-section__success {
+  padding: 0.75rem 1rem;
+  background: #f0fdf4;
+  color: #166534;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+// --- Profile form ---
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.profile-form__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.profile-form__row label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.profile-form__row input,
+.profile-form__row select {
+  padding: 0.6rem 0.75rem;
+  font-size: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  max-width: 320px;
+}
+
+.profile-form__row input:focus,
+.profile-form__row select:focus {
+  outline: none;
+  border-color: #004d40;
+  box-shadow: 0 0 0 2px rgba(0, 77, 64, 0.15);
+}
+
+.profile-form__row--readonly span {
+  font-size: 1rem;
+  color: #374151;
+}
+
+.profile-form__actions {
+  margin-top: 0.5rem;
+}
+
+.profile-form__submit {
+  padding: 0.6rem 1.25rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #fff;
+  background: #004d40;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.profile-form__submit:hover:not(:disabled) {
+  background: #003d33;
+}
+
+.profile-form__submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+// --- Appointments list ---
+.profile-section__loading {
+  color: #6b7280;
+  font-size: 0.9375rem;
+}
+
+.appointment-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.appointment-list__item {
+  margin: 0;
+}
+
+.appointment-card {
+  width: 100%;
+  text-align: left;
+  padding: 1rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.appointment-card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.appointment-card__business {
+  font-weight: 600;
+  color: #111827;
+  font-size: 1rem;
+}
+
+.appointment-card__status {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.appointment-card__status--1 {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.appointment-card__status--2 {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.appointment-card__status--3 {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.appointment-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.appointment-card__meta span + span::before {
+  content: " · ";
+  margin-right: 0.25rem;
+  color: #9ca3af;
+}
+
+.appointment-card__services {
+  width: 100%;
+  margin-top: 0.15rem;
+}
+
+.appointment-card__details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  color: #374151;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.appointment-card__detail {
+  display: inline-block;
+}
+
+.appointment-list__load-more {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.appointment-list__load-more-btn {
+  padding: 0.6rem 1.5rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #004d40;
+  background: #fff;
+  border: 1px solid #004d40;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.appointment-list__load-more-btn:hover:not(:disabled) {
+  background: #004d40;
+  color: #fff;
+}
+
+.appointment-list__load-more-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.appointment-list__count {
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+// --- Responsive ---
+@media (min-width: 600px) {
+  .profile-page {
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  .profile-page__heading {
+    font-size: 1.75rem;
+  }
+}
+
+@media (min-width: 900px) {
+  .profile-page {
+    max-width: 800px;
+  }
+}

@@ -18,6 +18,33 @@ export interface UserData {
   gender?: number | null;
 }
 
+export interface CustomerProfileAddress {
+  unit_number?: string | null;
+  building?: string | null;
+  floor?: string | null;
+  street_1: string;
+  street_2?: string | null;
+  city: string;
+  district?: string | null;
+  state: string;
+  postal_code: string;
+  country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export interface CustomerProfileResponse {
+  user: UserData & { profile_picture?: string | null };
+  address?: CustomerProfileAddress | null;
+}
+
+export interface CustomerProfileUpdateInput {
+  full_name?: string | null;
+  email?: string | null;
+  date_of_birth?: string | null;
+  gender?: number | null;
+}
+
 export interface LoginResponse {
   token?: Token | null;
   user?: UserData | null;
@@ -80,16 +107,31 @@ export class AuthService extends HttpClient {
   }
 
   /**
-   * Get customer profile (personal details only). Requires customer auth.
+   * Get customer profile (personal details + address). Requires customer auth.
    */
-  async getCustomerProfile(): Promise<{ user: UserData; address?: unknown }> {
+  async getCustomerProfile(): Promise<CustomerProfileResponse> {
     try {
-      return await this.get<{ user: UserData; address?: unknown }>('/auth/profile/customer');
+      return await this.get<CustomerProfileResponse>('/customer/profile');
     } catch (error: any) {
       error.customMessage =
         error?.response?.data?.detail?.message ||
         error?.response?.data?.detail ||
         'Failed to fetch profile';
+      throw error;
+    }
+  }
+
+  /**
+   * Update customer profile (partial). Requires customer auth.
+   */
+  async updateCustomerProfile(data: CustomerProfileUpdateInput): Promise<CustomerProfileResponse> {
+    try {
+      return await this.patch<CustomerProfileResponse>('/customer/profile', data);
+    } catch (error: any) {
+      error.customMessage =
+        error?.response?.data?.detail?.message ||
+        error?.response?.data?.detail ||
+        'Failed to update profile';
       throw error;
     }
   }

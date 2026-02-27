@@ -167,6 +167,54 @@ class QueueService:
         except SQLAlchemyError:
             raise
 
+    def get_appointments_for_user(
+        self, user_id: UUID, limit: int = 50, offset: int = 0
+    ) -> List[Tuple[QueueUser, Queue, Business]]:
+        try:
+            rows = (
+                self.db.query(QueueUser, Queue, Business)
+                .join(Queue, Queue.uuid == QueueUser.queue_id)
+                .join(Business, Business.uuid == Queue.merchant_id)
+                .options(
+                    selectinload(QueueUser.queue_user_services).joinedload(QueueUserService.queue_service).joinedload(QueueServiceModel.service),
+                )
+                .filter(QueueUser.user_id == user_id)
+                .order_by(QueueUser.queue_date.desc(), QueueUser.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+                .all()
+            )
+            return [(qu, q, b) for qu, q, b in rows]
+        except SQLAlchemyError:
+            raise
+
+    def count_appointments_for_user(self, user_id: UUID) -> int:
+        try:
+            return self.db.query(QueueUser).filter(QueueUser.user_id == user_id).count()
+        except SQLAlchemyError:
+            raise
+
+    def get_appointment_by_id_for_user(
+        self, user_id: UUID, queue_user_id: UUID
+    ) -> Optional[QueueUser]:
+        try:
+            qu = (
+                self.db.query(QueueUser)
+                .options(
+                    joinedload(QueueUser.user),
+                    joinedload(QueueUser.queue).joinedload(Queue.business),
+                    selectinload(QueueUser.queue_user_services).joinedload(QueueUserService.queue_service).joinedload(QueueServiceModel.service),
+                )
+                .filter(
+                    QueueUser.uuid == queue_user_id,
+                    QueueUser.user_id == user_id,
+                )
+                .first()
+            )
+            return qu
+        except SQLAlchemyError:
+            raise
+
     def get_queue_services_for_booking(
         self, service_ids: List[UUID], business_id: UUID
     ) -> List[QueueServiceModel]:

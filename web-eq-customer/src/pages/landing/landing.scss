@@ -100,3 +100,124 @@
     }
   }
 }
+
+// Today's appointment section (authenticated users)
+.landing-section-today {
+  padding-top: 32px;
+}
+
+.landing-today-loading,
+.landing-today-empty {
+  text-align: center;
+  padding: 2rem;
+  color: $text-secondary;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+
+  .landing-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #E0E0E0;
+    border-top-color: $primary;
+    border-radius: 50%;
+    animation: landing-spin 0.8s linear infinite;
+  }
+}
+
+@keyframes landing-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.landing-today-card {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px;
+  background: #fff;
+  border: 1px solid #E0F2F1;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 105, 92, 0.08);
+  cursor: pointer;
+  transition: box-shadow 0.2s, border-color 0.2s;
+
+  &:hover {
+    border-color: $primary;
+    box-shadow: 0 4px 12px rgba(0, 105, 92, 0.12);
+  }
+
+  &:focus {
+    outline: 2px solid $primary;
+    outline-offset: 2px;
+  }
+
+  .landing-today-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .landing-today-business {
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: $primary-dark;
+  }
+
+  .landing-today-status {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    flex-shrink: 0;
+
+    &.status-waiting {
+      background: #E3F2FD;
+      color: #1565C0;
+    }
+
+    &.status-in-progress {
+      background: #E8F5E9;
+      color: #2E7D32;
+    }
+  }
+
+  .landing-today-queue {
+    font-size: 15px;
+    color: $text-secondary;
+    margin: 0 0 4px 0;
+  }
+
+  .landing-today-services {
+    font-size: 14px;
+    color: $primary;
+    margin: 0 0 12px 0;
+  }
+
+  .landing-today-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    font-size: 14px;
+    color: $text-secondary;
+
+    .landing-today-token,
+    .landing-today-position,
+    .landing-today-wait,
+    .landing-today-time {
+      font-weight: 500;
+      color: $primary-dark;
+    }
+  }
+
+  .landing-today-cta {
+    margin: 16px 0 0 0;
+    font-size: 14px;
+    color: $primary;
+    font-weight: 600;
+  }
+}

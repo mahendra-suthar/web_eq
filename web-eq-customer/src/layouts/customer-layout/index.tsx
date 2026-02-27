@@ -1,6 +1,7 @@
 import { useNavigate, Outlet } from "react-router-dom";
 import { useAuthStore } from "../../store/auth.store";
 import Button from "../../components/button";
+import ProfileDropdown from "../../components/profile-dropdown";
 import "./layout.scss";
 
 export default function CustomerLayout() {
@@ -9,8 +10,6 @@ export default function CustomerLayout() {
 
   const handleLogout = () => {
     resetUser();
-    // Clear cookies by making a logout request (if endpoint exists)
-    // For now, just clear local storage
     navigate("/");
   };
 
@@ -26,18 +25,10 @@ export default function CustomerLayout() {
             <div style={{ flex: 1 }} />
 
             {isAuthenticated() ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                {userInfo?.full_name && (
-                  <span style={{ color: "#00695C", fontSize: "14px", fontFamily: '"Noto Sans Hebrew", serif' }}>
-                    {userInfo.full_name}
-                  </span>
-                )}
-                <Button
-                  text="Logout"
-                  color="outline-blue"
-                  onClick={handleLogout}
-                />
-              </div>
+              <ProfileDropdown
+                userName={userInfo?.full_name ?? undefined}
+                onLogout={handleLogout}
+              />
             ) : (
               <Button
                 text="Login"
