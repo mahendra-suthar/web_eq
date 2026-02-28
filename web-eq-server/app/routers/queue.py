@@ -7,7 +7,7 @@ from datetime import date
 from app.db.database import get_db
 from app.controllers.queue_controller import QueueController
 from app.schemas.queue import (
-    QueueCreate, QueueData, QueueDetailData, QueueServiceDetailData,
+    QueueCreate, QueueCreateBatch, QueueData, QueueDetailData, QueueServiceDetailData,
     QueueUpdate, QueueServicesAdd, QueueServiceUpdate,
     QueueUserData, QueueUserDetailResponse,
     AvailableSlotData, BookingCreateInput, BookingData, BookingPreviewData,
@@ -25,6 +25,12 @@ queue_router = APIRouter()
 async def create_queue(payload: QueueCreate, db: Session = Depends(get_db)):
     controller = QueueController(db)
     return await controller.create_queue(payload)
+
+
+@queue_router.post("/create_queues_batch", response_model=List[QueueData])
+async def create_queues_batch(payload: QueueCreateBatch, db: Session = Depends(get_db)):
+    controller = QueueController(db)
+    return await controller.create_queues_batch(payload)
 
 @queue_router.get("/get_queues/{business_id}", response_model=List[QueueData])
 async def get_queues(business_id: UUID, db: Session = Depends(get_db)):

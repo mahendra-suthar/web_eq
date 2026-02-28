@@ -11,6 +11,21 @@ export interface QueueCreatePayload {
     }[];
 }
 
+export interface QueueCreateItemPayload {
+    name: string;
+    employee_id?: string | null;
+    services: {
+        service_id: string;
+        avg_service_time?: number;
+        service_fee?: number;
+    }[];
+}
+
+export interface QueueCreateBatchPayload {
+    business_id: string;
+    queues: QueueCreateItemPayload[];
+}
+
 export interface QueueUpdatePayload {
     name?: string;
     status?: number;
@@ -175,6 +190,22 @@ export class QueueService extends HttpClient {
             });
         } catch (error: any) {
             console.error("Failed to create queue:", error);
+            throw error;
+        }
+    }
+
+    async createQueuesBatch(payload: QueueCreateBatchPayload): Promise<QueueData[]> {
+        try {
+            return await this.post<QueueData[]>(`/queue/create_queues_batch`, {
+                business_id: payload.business_id,
+                queues: payload.queues.map((q) => ({
+                    name: q.name,
+                    employee_id: q.employee_id || null,
+                    services: q.services ?? [],
+                })),
+            });
+        } catch (error: any) {
+            console.error("Failed to create queues:", error);
             throw error;
         }
     }

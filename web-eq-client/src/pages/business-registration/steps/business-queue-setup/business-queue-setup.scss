@@ -64,6 +64,53 @@
   flex-direction: column;
 }
 
+.queues-list {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.queue-block {
+  padding: 24px;
+  background: rgba(145, 158, 171, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(145, 158, 171, 0.15);
+}
+
+.queue-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.queue-block-title {
+  color: $primary-dark;
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.queue-block-remove {
+  background: none;
+  border: none;
+  color: #FF5630;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+
+  &:hover {
+    background: rgba(255, 86, 48, 0.1);
+  }
+}
+
+.add-queue-row {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(145, 158, 171, 0.2);
+}
+
 .business-queue-setup-form-fields {
   display: flex;
   flex-direction: column;

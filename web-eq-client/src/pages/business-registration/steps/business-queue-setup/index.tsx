@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useLayoutContext } from "../../../../layouts/general-layout";
 import { toast } from "react-toastify";
 import Button from "../../../../components/button";
@@ -12,17 +12,60 @@ interface Employee {
   full_name: string;
 }
 
+interface QueueBlockState {
+  id: string;
+  name: string;
+  employee_id: string;
+  selectedServices: string[];
+  serviceSettings: Record<string, { avg_service_time: string; fee: string }>;
+}
+
 interface BusinessQueueSetupProps {
-  onNext: (queueData: QueueData) => void;
+  onNext: (queues: QueueData[]) => void;
   onBack?: () => void;
   employees: Employee[];
   businessId: string | null;
   categoryId?: string;
-  initialData?: QueueData;
+  initialData?: QueueData[];
+}
+
+function createEmptyQueueBlock(id: string): QueueBlockState {
+  return {
+    id,
+    name: "",
+    employee_id: "",
+    selectedServices: [],
+    serviceSettings: {},
+  };
+}
+
+function queueBlockFromData(id: string, data: QueueData): QueueBlockState {
+  return {
+    id,
+    name: data.name || "",
+    employee_id: data.employee_id || "",
+    selectedServices: data.services?.map((s) => s.service_id) || [],
+    serviceSettings:
+      data.services?.reduce(
+        (acc, s) => ({
+          ...acc,
+          [s.service_id]: {
+            avg_service_time: s.avg_service_time?.toString() || "",
+            fee: s.fee?.toString() || "",
+          },
+        }),
+        {} as Record<string, { avg_service_time: string; fee: string }>
+      ) || {},
+  };
 }
 
 export default function BusinessQueueSetup({
-  onNext, onBack, employees, businessId, categoryId, initialData,
+  onNext,
+  onBack,
+  employees,
+  businessId,
+  categoryId,
+  initialData,
 }: BusinessQueueSetupProps) {
   const { t } = useLayoutContext();
   const queueService = new QueueService();
@@ -36,174 +79,178 @@ export default function BusinessQueueSetup({
   useEffect(() => {
     if (categoryId) {
       setLoadingServices(true);
-      serviceService.getServicesByCategory(categoryId)
-        .then((services) => {
-          setAvailableServices(services);
-        })
-        .catch((error) => {
-          console.error("Failed to fetch services:", error);
+      serviceService
+        .getServicesByCategory(categoryId)
+        .then(setAvailableServices)
+        .catch((err) => {
+          console.error("Failed to fetch services:", err);
           setAvailableServices([]);
         })
         .finally(() => setLoadingServices(false));
     } else {
-      console.warn("No categoryId provided for service loading");
       setAvailableServices([]);
     }
   }, [categoryId]);
 
-  const [name, setName] = useState<string>(initialData?.name || "");
-  const [selectedEmployee, setSelectedEmployee] = useState<string>(initialData?.employee_id || "");
-  const [selectedServices, setSelectedServices] = useState<string[]>(initialData?.services?.map(s => s.service_id) || []);
-  const [serviceSettings, setServiceSettings] = useState<Record<string, { avg_service_time: string; fee: string }>>(
-    initialData?.services?.reduce((acc, s) => ({
-      ...acc,
-      [s.service_id]: {
-        avg_service_time: s.avg_service_time?.toString() || "",
-        fee: s.fee?.toString() || ""
-      }
-    }), {}) || {}
-  );
-
-  const [errors, setErrors] = useState<{
-    name?: string; employee?: string; services?: string;
-    [key: string]: string | undefined;
-  }>({});
-
-  const [touched, setTouched] = useState<{
-    name: boolean; employee: boolean; services: boolean;
-    [key: string]: boolean;
-  }>({
-    name: false, employee: false, services: false,
+  const [queues, setQueues] = useState<QueueBlockState[]>(() => {
+    if (initialData?.length) {
+      return initialData.map((q, i) => queueBlockFromData(`q-${i}`, q));
+    }
+    return [createEmptyQueueBlock("q-0")];
   });
 
-  const handleServiceToggle = (serviceId: string) => {
-    setSelectedServices((prev) => {
-      const isSelected = prev.includes(serviceId);
-      if (isSelected) {
-        const newSettings = { ...serviceSettings };
-        delete newSettings[serviceId];
-        setServiceSettings(newSettings);
-        return prev.filter((id) => id !== serviceId);
-      } else {
-        setServiceSettings({
-          ...serviceSettings,
-          [serviceId]: { avg_service_time: "", fee: "" }
-        });
-        return [...prev, serviceId];
-      }
+  const [errors, setErrors] = useState<Record<string, { name?: string; employee?: string; services?: string }>>({});
+  const [touched, setTouched] = useState<Record<string, { name: boolean; employee: boolean; services: boolean }>>({});
+
+  const addQueue = useCallback(() => {
+    setQueues((prev) => [...prev, createEmptyQueueBlock(`q-${Date.now()}`)]);
+  }, []);
+
+  const removeQueue = useCallback((id: string) => {
+    if (queues.length <= 1) return;
+    setQueues((prev) => prev.filter((q) => q.id !== id));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
     });
+    setTouched((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, [queues.length]);
 
-    if (touched.services) {
-      validateField("services", selectedServices.includes(serviceId)
-        ? selectedServices.filter((id) => id !== serviceId)
-        : [...selectedServices, serviceId]);
-    }
-  };
+  const updateQueue = useCallback((id: string, updates: Partial<QueueBlockState>) => {
+    setQueues((prev) =>
+      prev.map((q) => (q.id === id ? { ...q, ...updates } : q))
+    );
+  }, []);
 
-  const updateServiceSetting = (serviceId: string, field: "avg_service_time" | "fee", value: string) => {
-    setServiceSettings((prev) => ({
-      ...prev,
-      [serviceId]: {
-        ...prev[serviceId],
-        [field]: value
-      }
-    }));
-  };
+  const validateQueue = useCallback(
+    (block: QueueBlockState): { name?: string; employee?: string; services?: string } => {
+      const errs: { name?: string; employee?: string; services?: string } = {};
+      if (!block.name?.trim()) errs.name = t("enterQueueName");
+      if (!block.employee_id) errs.employee = t("selectEmployee");
+      if (!block.selectedServices?.length) errs.services = t("selectAtLeastOneService");
+      return errs;
+    },
+    [t]
+  );
 
-  const validateField = (field: string, value: any): boolean => {
-    const newErrors = { ...errors };
-
-    switch (field) {
-      case "name":
-        if (!value || !value.trim()) {
-          newErrors.name = t("enterQueueName");
-        } else {
-          delete newErrors.name;
-        }
-        break;
-      case "employee":
-        if (!value) {
-          newErrors.employee = t("selectEmployee");
-        } else {
-          delete newErrors.employee;
-        }
-        break;
-      case "services":
-        if (!value || value.length === 0) {
-          newErrors.services = t("selectAtLeastOneService");
-        } else {
-          delete newErrors.services;
-        }
-        break;
-    }
-
+  const validateAll = useCallback((): boolean => {
+    let valid = true;
+    const newErrors: Record<string, { name?: string; employee?: string; services?: string }> = {};
+    const newTouched: Record<string, { name: boolean; employee: boolean; services: boolean }> = {};
+    queues.forEach((q) => {
+      const errs = validateQueue(q);
+      if (Object.keys(errs).length) valid = false;
+      newErrors[q.id] = errs;
+      newTouched[q.id] = { name: true, employee: true, services: true };
+    });
     setErrors(newErrors);
-    return !newErrors[field as keyof typeof newErrors];
-  };
+    setTouched(newTouched);
+    return valid;
+  }, [queues, validateQueue]);
 
-  const handleBlur = (field: string) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
-    const value = field === "name" ? name : field === "employee" ? selectedEmployee : selectedServices;
-    validateField(field, value);
-  };
-
-  const validateForm = (): boolean => {
-    let isValid = true;
-
-    const fields = ["name", "employee", "services"] as const;
-    fields.forEach((field) => {
-      setTouched((prev) => ({ ...prev, [field]: true }));
-      const value = field === "name" ? name : field === "employee" ? selectedEmployee : selectedServices;
-      if (!validateField(field, value)) {
-        isValid = false;
+  const handleServiceToggle = useCallback(
+    (queueId: string, serviceId: string) => {
+      const block = queues.find((q) => q.id === queueId);
+      if (!block) return;
+      const isSelected = block.selectedServices.includes(serviceId);
+      if (isSelected) {
+        const newSettings = { ...block.serviceSettings };
+        delete newSettings[serviceId];
+        updateQueue(queueId, {
+          selectedServices: block.selectedServices.filter((id) => id !== serviceId),
+          serviceSettings: newSettings,
+        });
+      } else {
+        updateQueue(queueId, {
+          selectedServices: [...block.selectedServices, serviceId],
+          serviceSettings: {
+            ...block.serviceSettings,
+            [serviceId]: { avg_service_time: "", fee: "" },
+          },
+        });
       }
-    });
+    },
+    [queues, updateQueue]
+  );
 
-    return isValid;
-  };
+  const updateServiceSetting = useCallback(
+    (queueId: string, serviceId: string, field: "avg_service_time" | "fee", value: string) => {
+      const block = queues.find((q) => q.id === queueId);
+      if (!block) return;
+      updateQueue(queueId, {
+        serviceSettings: {
+          ...block.serviceSettings,
+          [serviceId]: {
+            ...block.serviceSettings[serviceId],
+            [field]: value,
+          },
+        },
+      });
+    },
+    [queues, updateQueue]
+  );
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-
-    if (!validateForm()) {
+    if (!validateAll() || !businessId) {
+      if (!businessId) {
+        setSubmitError(t("businessIdMissing"));
+        toast.error(t("businessIdMissing"));
+      }
       return;
     }
 
-    const queueData: QueueData = {
-      name: name.trim(),
-      employee_id: selectedEmployee,
-      services: selectedServices.map((service_id) => {
-        const settings = serviceSettings[service_id];
-        const avgTime = settings?.avg_service_time?.trim();
-        const fee = settings?.fee?.trim();
-        
-        return {
-          service_id,
-          avg_service_time: avgTime && !isNaN(parseInt(avgTime, 10)) ? parseInt(avgTime, 10) : undefined,
-          service_fee: fee && !isNaN(parseFloat(fee)) ? parseFloat(fee) : undefined,
-        };
-      }),
-    };
-
-    if (businessId) {
-      setIsSubmitting(true);
-      setSubmitError("");
-      try {
-        await queueService.createQueue({ business_id: businessId, ...queueData });
-        onNext(queueData);
-      } catch (error: any) {
-        const errorMessage = error?.response?.data?.detail?.message || 
-                           error?.response?.data?.detail || 
-                           error?.message || 
-                           t("queueCreationFailed");
-        setSubmitError(errorMessage);
-        toast.error(errorMessage);
-      } finally {
-        setIsSubmitting(false);
-      }
-    } else {
-      setSubmitError(t("businessIdMissing"));
-      toast.error(t("businessIdMissing"));
+    setSubmitError("");
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        business_id: businessId,
+        queues: queues.map((q) => ({
+          name: q.name.trim(),
+          employee_id: q.employee_id || null,
+          services: q.selectedServices.map((service_id) => {
+            const s = q.serviceSettings[service_id];
+            const avgTime = s?.avg_service_time?.trim();
+            const fee = s?.fee?.trim();
+            return {
+              service_id,
+              avg_service_time: avgTime && !isNaN(parseInt(avgTime, 10)) ? parseInt(avgTime, 10) : undefined,
+              service_fee: fee && !isNaN(parseFloat(fee)) ? parseFloat(fee) : undefined,
+            };
+          }),
+        })),
+      };
+      const created = await queueService.createQueuesBatch(payload);
+      const queuesForStore: QueueData[] = queues.map((q) => ({
+        name: q.name.trim(),
+        employee_id: q.employee_id,
+        services: q.selectedServices.map((sid) => {
+          const s = q.serviceSettings[sid];
+          return {
+            service_id: sid,
+            avg_service_time: s?.avg_service_time && !isNaN(parseInt(s.avg_service_time, 10))
+              ? parseInt(s.avg_service_time, 10)
+              : undefined,
+            fee: s?.fee && !isNaN(parseFloat(s.fee)) ? parseFloat(s.fee) : undefined,
+          };
+        }),
+      }));
+      onNext(queuesForStore);
+    } catch (error: any) {
+      const msg =
+        error?.response?.data?.detail?.message ||
+        error?.response?.data?.detail ||
+        error?.message ||
+        t("queueCreationFailed");
+      setSubmitError(msg);
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -211,7 +258,7 @@ export default function BusinessQueueSetup({
     <div className="business-queue-setup-page">
       <div className="business-queue-setup-header">
         {onBack && (
-          <button className="back-button" onClick={onBack}>
+          <button type="button" className="back-button" onClick={onBack}>
             ←
           </button>
         )}
@@ -223,138 +270,185 @@ export default function BusinessQueueSetup({
 
       <form className="business-queue-setup-form" onSubmit={handleSubmit}>
         {submitError && (
-          <div className="error-message" style={{ color: "red", marginBottom: "1rem", padding: "0.5rem", backgroundColor: "#fee", borderRadius: "4px" }}>
+          <div
+            className="error-message"
+            style={{
+              color: "red",
+              marginBottom: "1rem",
+              padding: "0.5rem",
+              backgroundColor: "#fee",
+              borderRadius: "4px",
+            }}
+          >
             {submitError}
           </div>
         )}
-        <div className="business-queue-setup-form-fields">
-          {/* Queue Name */}
-          <div className="form-field-wrapper">
-            <label className="form-label">{t("queueName")} *</label>
-            <div className={`form-field ${touched.name && errors.name ? "error" : ""}`}>
-              <input
-                type="text"
-                placeholder={t("enterQueueName")}
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  if (touched.name) {
-                    validateField("name", e.target.value);
-                  }
-                }}
-                onBlur={() => handleBlur("name")}
-                maxLength={100}
-              />
-              {touched.name && errors.name && (
-                <div className="error-text">{errors.name}</div>
-              )}
-            </div>
-          </div>
 
-          {/* Employee Selection */}
-          <div className="form-field-wrapper">
-            <label className="form-label">{t("selectEmployee")} *</label>
-            <div className={`form-field ${touched.employee && errors.employee ? "error" : ""}`}>
-              <select
-                value={selectedEmployee}
-                onChange={(e) => {
-                  setSelectedEmployee(e.target.value);
-                  if (touched.employee) {
-                    validateField("employee", e.target.value);
-                  }
-                }}
-                onBlur={() => handleBlur("employee")}
-              >
-                <option value="">{t("selectEmployee")}</option>
-                {employees.map((employee) => (
-                  <option key={employee.id} value={employee.id}>
-                    {employee.full_name}
-                  </option>
-                ))}
-              </select>
-              {touched.employee && errors.employee && (
-                <div className="error-text">{errors.employee}</div>
-              )}
-            </div>
-          </div>
+        <div className="queues-list">
+          {queues.map((block, index) => (
+            <div key={block.id} className="queue-block">
+              <div className="queue-block-header">
+                <h3 className="queue-block-title">
+                  {t("queue")} {index + 1}
+                </h3>
+                {queues.length > 1 && (
+                  <button
+                    type="button"
+                    className="queue-block-remove"
+                    onClick={() => removeQueue(block.id)}
+                    aria-label={t("removeQueue")}
+                  >
+                    × {t("removeQueue")}
+                  </button>
+                )}
+              </div>
 
-          {/* Service Selection (Multi-select) */}
-          <div className="form-field-wrapper">
-            <label className="form-label">{t("selectServices")} *</label>
-            <div className={`service-selection ${touched.services && errors.services ? "error" : ""}`}>
-              {loadingServices ? (
-                <p>{t("loadingServices")}...</p>
-              ) : (
-                <div className="service-checkboxes">
-                  {availableServices.map((service) => {
-                    const serviceId = service.service_uuid || service.uuid;
-                    return (
-                      <label key={serviceId} className="service-checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={selectedServices.includes(serviceId)}
-                          onChange={() => handleServiceToggle(serviceId)}
-                          onBlur={() => handleBlur("services")}
-                        />
-                        <span>{service.name}</span>
-                      </label>
-                    );
-                  })}
-                  {availableServices.length === 0 && (
-                    <p className="no-services-text">{t("noServicesAvailable")}</p>
-                  )}
+              <div className="business-queue-setup-form-fields">
+                <div className="form-field-wrapper">
+                  <label className="form-label">{t("queueName")} *</label>
+                  <div className={`form-field ${touched[block.id]?.name && errors[block.id]?.name ? "error" : ""}`}>
+                    <input
+                      type="text"
+                      placeholder={t("enterQueueName")}
+                      value={block.name}
+                      onChange={(e) => updateQueue(block.id, { name: e.target.value })}
+                      onBlur={() =>
+                        setTouched((p) => ({
+                          ...p,
+                          [block.id]: { ...p[block.id], name: true },
+                        }))
+                      }
+                      maxLength={100}
+                    />
+                    {touched[block.id]?.name && errors[block.id]?.name && (
+                      <div className="error-text">{errors[block.id]?.name}</div>
+                    )}
+                  </div>
                 </div>
-              )}
-              {touched.services && errors.services && (
-                <div className="error-text">{errors.services}</div>
-              )}
-            </div>
-          </div>
 
-          {/* Per-Service Configuration */}
-          {selectedServices.length > 0 && (
-            <div className="per-service-config">
-              <h3 className="section-title">{t("serviceSpecificSettings")}</h3>
-              <div className="service-settings-list">
-                {selectedServices.map((serviceId) => {
-                  const service = availableServices.find(s => (s.service_uuid || s.uuid) === serviceId);
-                  if (!service) return null;
-                  return (
-                    <div key={serviceId} className="service-setting-item">
-                      <h4 className="service-name">{service.name}</h4>
-                      <div className="service-setting-fields">
-                        <div className="form-field-wrapper">
-                          <label className="form-label">{t("avgServiceTime")} ({t("min")})</label>
-                          <div className="form-field">
-                            <input
-                              type="number"
-                              placeholder="15"
-                              value={serviceSettings[serviceId]?.avg_service_time || ""}
-                              onChange={(e) => updateServiceSetting(serviceId, "avg_service_time", e.target.value)}
-                              min="1"
-                            />
-                          </div>
-                        </div>
-                        <div className="form-field-wrapper">
-                          <label className="form-label">{t("fee")} ({t("currency")})</label>
-                          <div className="form-field">
-                            <input
-                              type="number"
-                              placeholder="0.00"
-                              value={serviceSettings[serviceId]?.fee || ""}
-                              onChange={(e) => updateServiceSetting(serviceId, "fee", e.target.value)}
-                              min="0"
-                              step="0.01"
-                            />
-                          </div>
-                        </div>
+                <div className="form-field-wrapper">
+                  <label className="form-label">{t("selectEmployee")} *</label>
+                  <div
+                    className={`form-field ${touched[block.id]?.employee && errors[block.id]?.employee ? "error" : ""}`}
+                  >
+                    <select
+                      value={block.employee_id}
+                      onChange={(e) => updateQueue(block.id, { employee_id: e.target.value })}
+                      onBlur={() =>
+                        setTouched((p) => ({
+                          ...p,
+                          [block.id]: { ...p[block.id], employee: true },
+                        }))
+                      }
+                    >
+                      <option value="">{t("selectEmployee")}</option>
+                      {employees.map((emp) => (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.full_name}
+                        </option>
+                      ))}
+                    </select>
+                    {touched[block.id]?.employee && errors[block.id]?.employee && (
+                      <div className="error-text">{errors[block.id]?.employee}</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="form-field-wrapper">
+                  <label className="form-label">{t("selectServices")} *</label>
+                  <div
+                    className={`service-selection ${touched[block.id]?.services && errors[block.id]?.services ? "error" : ""}`}
+                  >
+                    {loadingServices ? (
+                      <p>{t("loading")}...</p>
+                    ) : (
+                      <div className="service-checkboxes">
+                        {availableServices.map((service) => {
+                          const sid = service.service_uuid || service.uuid;
+                          return (
+                            <label key={sid} className="service-checkbox-label">
+                              <input
+                                type="checkbox"
+                                checked={block.selectedServices.includes(sid)}
+                                onChange={() => handleServiceToggle(block.id, sid)}
+                                onBlur={() =>
+                                  setTouched((p) => ({
+                                    ...p,
+                                    [block.id]: { ...p[block.id], services: true },
+                                  }))
+                                }
+                              />
+                              <span>{service.name}</span>
+                            </label>
+                          );
+                        })}
+                        {availableServices.length === 0 && (
+                          <p className="no-services-text">{t("noServicesAvailable")}</p>
+                        )}
                       </div>
+                    )}
+                    {touched[block.id]?.services && errors[block.id]?.services && (
+                      <div className="error-text">{errors[block.id]?.services}</div>
+                    )}
+                  </div>
+                </div>
+
+                {block.selectedServices.length > 0 && (
+                  <div className="per-service-config">
+                    <h4 className="section-title">{t("serviceSpecificSettings")}</h4>
+                    <div className="service-settings-list">
+                      {block.selectedServices.map((serviceId) => {
+                        const service = availableServices.find(
+                          (s) => (s.service_uuid || s.uuid) === serviceId
+                        );
+                        if (!service) return null;
+                        return (
+                          <div key={serviceId} className="service-setting-item">
+                            <span className="service-name">{service.name}</span>
+                            <div className="service-setting-fields">
+                              <div className="form-field-wrapper">
+                                <label className="form-label">
+                                  {t("averageServiceTime")} ({t("minutes")})
+                                </label>
+                                <input
+                                  type="number"
+                                  placeholder="15"
+                                  value={block.serviceSettings[serviceId]?.avg_service_time || ""}
+                                  onChange={(e) =>
+                                    updateServiceSetting(block.id, serviceId, "avg_service_time", e.target.value)
+                                  }
+                                  min={1}
+                                />
+                              </div>
+                              <div className="form-field-wrapper">
+                                <label className="form-label">
+                                  {t("fee")} ({t("currency")})
+                                </label>
+                                <input
+                                  type="number"
+                                  placeholder="0.00"
+                                  value={block.serviceSettings[serviceId]?.fee || ""}
+                                  onChange={(e) =>
+                                    updateServiceSetting(block.id, serviceId, "fee", e.target.value)
+                                  }
+                                  min={0}
+                                  step="0.01"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                  </div>
+                )}
               </div>
             </div>
-          )}
+          ))}
+        </div>
+
+        <div className="add-queue-row">
+          <Button type="button" text={t("addQueue")} color="transparent" onClick={addQueue} />
         </div>
 
         <div className="business-queue-setup-form-action">

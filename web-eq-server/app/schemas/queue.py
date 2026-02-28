@@ -24,6 +24,17 @@ class QueueCreate(BaseModel):
     fee: Optional[float] = None
 
 
+class QueueCreateItem(BaseModel):
+    name: str
+    employee_id: Optional[UUID] = None
+    services: List[QueueServiceCreate] = []
+
+
+class QueueCreateBatch(BaseModel):
+    business_id: UUID
+    queues: List[QueueCreateItem]
+
+
 class QueueUpdate(BaseModel):
     """Partial update for queue (name, status, limit, assigned employee)."""
     name: Optional[str] = None

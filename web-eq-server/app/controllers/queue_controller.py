@@ -10,7 +10,7 @@ from app.services.business_service import BusinessService
 from app.services.realtime.queue_manager import queue_manager
 from app.services.realtime.live_queue_manager import live_queue_manager
 from app.schemas.queue import (
-    QueueCreate, QueueData, QueueDetailData, QueueServiceDetailData,
+    QueueCreate, QueueCreateBatch, QueueData, QueueDetailData, QueueServiceDetailData,
     QueueUpdate, QueueServicesAdd, QueueServiceUpdate,
     QueueUserData, QueueUserDetailResponse,
     AvailableSlotData, BookingCreateInput, BookingData, BookingServiceData, BookingPreviewData,
@@ -58,6 +58,22 @@ class QueueController:
             raise HTTPException(status_code=500, detail=f"Database error occurred while creating queue: {str(e)}")
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to create queue: {str(e)}")
+
+    async def create_queues_batch(self, data: QueueCreateBatch) -> List[QueueData]:
+        if not data.queues:
+            raise HTTPException(400, "At least one queue is required")
+        try:
+            queues = self.queue_service.create_queues_batch(data.business_id, data.queues)
+            self.business_service.update_registration_state(
+                business_id=data.business_id, status=BUSINESS_REGISTERED, current_step=None
+            )
+            return [QueueData.from_queue(q) for q in queues]
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except SQLAlchemyError as e:
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to create queues: {str(e)}")
 
     async def get_queues(self, business_id: UUID) -> List[QueueData]:
         try:

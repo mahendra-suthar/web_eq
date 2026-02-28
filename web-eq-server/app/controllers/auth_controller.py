@@ -343,6 +343,10 @@ class AuthController:
         schedules = self.schedule_service.get_schedules_by_entity(entity_id, entity_type)
         if not schedules:
             return None
+        if entity_type == ScheduleEntityType.EMPLOYEE:
+            days_covered = {s.day_of_week for s in schedules}
+            all_open = all(getattr(s, "is_open", False) for s in schedules)
+            is_always_open = len(days_covered) == 7 and all_open
         return ScheduleInfo(
             is_always_open=is_always_open,
             schedules=[ScheduleData.from_schedule(s) for s in schedules],
@@ -474,8 +478,8 @@ class AuthController:
                 address=address,
                 schedule=ScheduleInfo(
                     is_always_open=bool(business.is_always_open),  # type: ignore[arg-type]
-                    schedules=[ScheduleData.from_schedule(s) for s in schedules]
-                ) if schedules else None
+                    schedules=[ScheduleData.from_schedule(s) for s in schedules],
+                ),
             )
 
         if user_type == "EMPLOYEE":

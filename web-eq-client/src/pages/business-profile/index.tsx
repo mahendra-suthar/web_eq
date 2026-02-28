@@ -250,12 +250,14 @@ const BusinessProfile = () => {
         setSaving(true);
         setSaveError("");
         try {
-            const schedules = scheduleData.schedule.map(d => ({
-                day_of_week: d.day_of_week,
-                is_open: d.is_open,
-                opening_time: d.is_open && d.opening_time ? d.opening_time : undefined,
-                closing_time: d.is_open && d.closing_time ? d.closing_time : undefined,
-            }));
+            const schedules = scheduleData.isAlwaysOpen
+                ? []
+                : scheduleData.schedule.map(d => ({
+                    day_of_week: d.day_of_week,
+                    is_open: d.is_open,
+                    opening_time: d.is_open && d.opening_time ? d.opening_time : undefined,
+                    closing_time: d.is_open && d.closing_time ? d.closing_time : undefined,
+                }));
             await businessService.upsertSchedules(businessId, "BUSINESS", schedules, scheduleData.isAlwaysOpen);
             await fetchProfile();
             setEditingTab(null);
@@ -589,7 +591,16 @@ const BusinessProfile = () => {
                                                 <input
                                                     type="checkbox"
                                                     checked={scheduleData.isAlwaysOpen}
-                                                    onChange={e => setScheduleData(prev => ({ ...prev, isAlwaysOpen: e.target.checked }))}
+                                                    onChange={e => {
+                                                        const checked = e.target.checked;
+                                                        setScheduleData(prev => ({
+                                                            ...prev,
+                                                            isAlwaysOpen: checked,
+                                                            schedule: checked
+                                                                ? prev.schedule.map(d => ({ ...d, is_open: true, opening_time: "09:00", closing_time: "18:00" }))
+                                                                : prev.schedule.map(d => ({ ...d, is_open: false, opening_time: "", closing_time: "" })),
+                                                        }));
+                                                    }}
                                                 />
                                                 <span>{scheduleData.isAlwaysOpen ? t("yes") : t("no")}</span>
                                             </label>

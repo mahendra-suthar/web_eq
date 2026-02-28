@@ -6,7 +6,7 @@ import { BusinessService } from '../../services/business/business.service';
 import { EmployeeService } from '../../services/employee/employee.service';
 import { OTPService } from '../../services/otp/otp.service';
 import { QueueService, QueueDetailData } from '../../services/queue/queue.service';
-import { emailRegex, formatDurationMinutes } from '../../utils/utils';
+import { emailRegex, formatDurationMinutes, getQueueStatusLabel } from '../../utils/utils';
 import { Tabs } from '../../components/tabs/Tabs';
 import './employee-profile.scss';
 
@@ -544,8 +544,20 @@ const EmployeeProfile = () => {
                                         <label className="info-label">{t("alwaysOpen")}</label>
                                         {isEditing ? (
                                             <label className="schedule-toggle-label">
-                                                <input type="checkbox" checked={scheduleData.isAlwaysOpen}
-                                                    onChange={e => setScheduleData(prev => ({ ...prev, isAlwaysOpen: e.target.checked }))} />
+                                                <input
+                                                    type="checkbox"
+                                                    checked={scheduleData.isAlwaysOpen}
+                                                    onChange={e => {
+                                                        const checked = e.target.checked;
+                                                        setScheduleData(prev => ({
+                                                            ...prev,
+                                                            isAlwaysOpen: checked,
+                                                            schedule: checked
+                                                                ? prev.schedule.map(d => ({ ...d, is_open: true, opening_time: "00:00", closing_time: "23:59" }))
+                                                                : prev.schedule.map(d => ({ ...d, is_open: false, opening_time: "", closing_time: "" })),
+                                                        }));
+                                                    }}
+                                                />
                                                 <span>{scheduleData.isAlwaysOpen ? t("yes") : t("no")}</span>
                                             </label>
                                         ) : (
@@ -633,7 +645,7 @@ const EmployeeProfile = () => {
                                                 </div>
                                                 <div className="info-field">
                                                     <label className="info-label">{t("status")}</label>
-                                                    <div className="info-value">{queueDetail.status != null ? String(queueDetail.status) : t("notAvailable")}</div>
+                                                    <div className="info-value">{getQueueStatusLabel(queueDetail.status, t)}</div>
                                                 </div>
                                                 <div className="info-field">
                                                     <label className="info-label">{t("queueLimit")}</label>

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import date as date_type
 from sqlalchemy import delete
 from sqlalchemy.orm import Session, joinedload
@@ -7,6 +8,7 @@ from typing import List, Dict, Tuple, Optional
 from app.models.schedule import Schedule, ScheduleBreak, ScheduleException, ScheduleEntityType
 from app.models.business import Business
 from app.schemas.schedule import ScheduleInput, BreakTimeInput, ScheduleExceptionCreate, ScheduleExceptionUpdate
+from app.core.constants import BIZ_EARLIEST_TIME, BIZ_LATEST_TIME
 
 
 class ScheduleService:
@@ -105,14 +107,17 @@ class ScheduleService:
             Schedule.entity_type == entity_type,
         ).delete()
 
-    def create_schedules_for_entity(
+    def replace_schedules_for_entity(
         self,
         entity_id: UUID,
         entity_type: ScheduleEntityType,
         schedules: List[ScheduleInput],
     ) -> List[Schedule]:
-        """Delete existing schedules for the entity and create new ones. Commits the transaction. Returns created schedules."""
         self.delete_schedules_by_entity(entity_id, entity_type)
+
+        if not schedules:
+            return []
+
         new_schedules: List[Schedule] = []
         for s in schedules:
             schedule = Schedule(
@@ -124,36 +129,49 @@ class ScheduleService:
                 is_open=s.is_open,
             )
             self.db.add(schedule)
-            self.db.flush()  # populate schedule.uuid before creating breaks
-
-            for br in s.break_times:
-                self.db.add(ScheduleBreak(
-                    schedule_id=schedule.uuid,
-                    break_start=br.break_start,
-                    break_end=br.break_end,
-                ))
-
             new_schedules.append(schedule)
+        self.db.flush()  # populate uuid for all schedules in one round-trip
+
+        # Create breaks (need schedule.uuid from flush)
+        for schedule, s in zip(new_schedules, schedules):
+            for br in s.break_times:
+                self.db.add(
+                    ScheduleBreak(
+                        schedule_id=schedule.uuid,
+                        break_start=br.break_start,
+                        break_end=br.break_end,
+                    )
+                )
+
         return new_schedules
-        try:
-            self.db.commit()
-            return new_schedules
-        except Exception:
-            self.db.rollback()
-            raise
 
 
     def copy_business_schedule_to_employees(
         self, business_id: UUID, employee_ids: List[UUID]
     ) -> List[Schedule]:
-        """Copy business schedule rows (+ breaks) to each employee."""
         if not employee_ids:
             return []
         business_schedules = self.get_schedules_with_breaks(
             business_id, ScheduleEntityType.BUSINESS
         )
         if not business_schedules:
-            return []
+            business = self.db.query(Business).filter(Business.uuid == business_id).first()
+            if business and getattr(business, "is_always_open", False):
+
+                @dataclass
+                class _AlwaysOpenDay:
+                    day_of_week: int
+                    opening_time: object
+                    closing_time: object
+                    is_open: bool
+                    breaks: list
+
+                business_schedules = [
+                    _AlwaysOpenDay(d, BIZ_EARLIEST_TIME, BIZ_LATEST_TIME, True, [])
+                    for d in range(7)
+                ]
+            else:
+                return []
 
         new_schedules: List[Schedule] = []
         for emp_id in employee_ids:
@@ -239,8 +257,6 @@ class ScheduleService:
         entity_type: ScheduleEntityType,
         lookup_date: date_type,
     ) -> Optional[ScheduleException]:
-        """Find any exception for this entity on the given date (joining via Schedule)."""
-        # Use JS convention (0=Sun … 6=Sat) to match how day_of_week is stored by the frontend.
         day_of_week = (lookup_date.weekday() + 1) % 7
         schedule = (
             self.db.query(Schedule)

@@ -6,6 +6,7 @@ import { ProfileService } from "../../services/profile/profile.service";
 import { useUserStore } from "../../utils/userStore";
 import { ProfileType } from "../../utils/constants";
 import { RouterConstant } from "../../routers";
+import { getQueueStatusLabel, getQueueStatusBadgeClass } from "../../utils/utils";
 import "./queues.scss";
 
 const Queues = () => {
@@ -128,14 +129,8 @@ const Queues = () => {
                             </thead>
                             <tbody>
                                 {queues.map((q) => {
-                                    const statusLabel =
-                                        q.status === 1
-                                            ? t("active") || "Active"
-                                            : q.status === 0
-                                                ? t("inactive") || "Inactive"
-                                                : q.status != null
-                                                    ? String(q.status)
-                                                    : t("notAvailable");
+                                    const statusLabel = getQueueStatusLabel(q.status, t);
+                                    const statusBadgeClass = getQueueStatusBadgeClass(q.status);
                                     const createdLabel =
                                         q.created_at != null
                                             ? new Date(q.created_at).toLocaleString(undefined, {
@@ -147,7 +142,7 @@ const Queues = () => {
                                         <tr key={q.uuid}>
                                             <td>{q.name}</td>
                                             <td>
-                                                <span className={`status-badge ${q.status === 1 ? "active" : "inactive"}`}>
+                                                <span className={`status-badge ${statusBadgeClass}`}>
                                                     {statusLabel}
                                                 </span>
                                             </td>

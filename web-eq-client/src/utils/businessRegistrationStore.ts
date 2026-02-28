@@ -73,7 +73,7 @@ export interface RegistrationData {
     address: AddressData;
     employees: EmployeeData[];
     services: ServiceData[];
-    queue: QueueData;
+    queues: QueueData[];
 }
 
 interface BusinessRegistrationState {
@@ -98,6 +98,7 @@ export const useBusinessRegistrationStore = create(
                 schedule: [],
                 employees: [],
                 services: [],
+                queues: [],
             },
 
             setStep: (step) => set({ currentStep: step }),
@@ -119,6 +120,7 @@ export const useBusinessRegistrationStore = create(
                     schedule: [],
                     employees: [],
                     services: [],
+                    queues: [],
                 },
             }),
         }),

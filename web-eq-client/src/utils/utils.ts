@@ -141,6 +141,43 @@ export function formatTimeToDisplay(
 // Employee Utilities
 // ============================================================================
 
+// ============================================================================
+// Queue Status (admin) Utilities
+// ============================================================================
+
+/** Translation keys for queue status (1=Registered, 2=Running, 3=Stopped) */
+export const QUEUE_STATUS_KEYS: Record<number, string> = {
+  1: "queueStatusRegistered",
+  2: "queueStatusRunning",
+  3: "queueStatusStopped",
+};
+
+/**
+ * Get translated label for queue status.
+ */
+export function getQueueStatusLabel(
+  status: number | null | undefined,
+  t: (key: string) => string
+): string {
+  if (status == null) return t("notAvailable");
+  const key = QUEUE_STATUS_KEYS[status];
+  return key ? t(key) : String(status);
+}
+
+/**
+ * Get CSS badge class for queue status (registered, running, stopped).
+ */
+export function getQueueStatusBadgeClass(status: number | null | undefined): string {
+  if (status === 1) return "registered";
+  if (status === 2) return "running";
+  if (status === 3) return "stopped";
+  return "unknown";
+}
+
+// ============================================================================
+// Employee Utilities
+// ============================================================================
+
 /**
  * Generate initials from a full name
  * @param name - Full name string

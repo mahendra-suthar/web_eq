@@ -212,8 +212,8 @@ export default function BusinessRegistration() {
       case 5:
         return (
           <BusinessQueueSetup
-            onNext={(queueData: QueueData) => {
-              updateRegistrationData({ queue: queueData });
+            onNext={(queuesData: QueueData[]) => {
+              updateRegistrationData({ queues: queuesData });
               handleSubmit();
             }}
             onBack={handleBack}
@@ -225,7 +225,13 @@ export default function BusinessRegistration() {
             }
             businessId={businessId}
             categoryId={registrationData.category_id}
-            initialData={registrationData.queue}
+            initialData={
+              registrationData.queues?.length
+                ? registrationData.queues
+                : (registrationData as { queue?: QueueData }).queue
+                  ? [(registrationData as { queue: QueueData }).queue]
+                  : undefined
+            }
           />
         );
       default:

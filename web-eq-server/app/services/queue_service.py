@@ -13,6 +13,7 @@ from app.models.user import User
 from app.models.business import Business
 from app.schemas.queue import (
     QueueCreate,
+    QueueCreateItem,
     QueueUpdate,
     QueueServiceAddItem,
     QueueServiceUpdate,
@@ -28,24 +29,30 @@ class QueueService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_queue(self, data: QueueCreate, services: List[Service]) -> Queue:
-        service_configs = {s.service_id: s for s in data.services}
-        new_queue = Queue(merchant_id=data.business_id, name=data.name, status=1)
+    def create_single_queue(
+        self,
+        business_id: UUID,
+        name: str,
+        employee_id: Optional[UUID],
+        services: List[Service],
+        service_configs: Dict[UUID, Any],
+    ) -> Queue:
+        new_queue = Queue(merchant_id=business_id, name=name, status=1)
         self.db.add(new_queue)
         self.db.flush()
 
-        if data.employee_id:
-            self.db.query(Employee).filter(Employee.uuid == data.employee_id).update({"queue_id": new_queue.uuid})
+        if employee_id:
+            self.db.query(Employee).filter(Employee.uuid == employee_id).update({"queue_id": new_queue.uuid})
 
         queue_services: list[QueueServiceModel] = []
         for s in services:
-            cfg = service_configs.get(s.uuid)  # type: ignore
+            cfg = service_configs.get(s.uuid)
             if not cfg:
                 continue
             queue_services.append(
                 QueueServiceModel(
                     service_id=s.uuid,
-                    business_id=data.business_id,
+                    business_id=business_id,
                     queue_id=new_queue.uuid,
                     description=s.description,
                     service_fee=cfg.service_fee,
@@ -53,11 +60,51 @@ class QueueService:
                     status=1,
                 )
             )
-
         self.db.add_all(queue_services)
+        return new_queue
+
+    def create_queue(self, data: QueueCreate, services: List[Service]) -> Queue:
+        service_configs = {s.service_id: s for s in data.services}
+        new_queue = self.create_single_queue(
+            business_id=data.business_id,
+            name=data.name,
+            employee_id=data.employee_id,
+            services=services,
+            service_configs=service_configs,
+        )
         try:
             self.db.commit()
             return new_queue
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def create_queues_batch(
+        self,
+        business_id: UUID,
+        items: List[QueueCreateItem],
+    ) -> List[Queue]:
+        all_service_ids = list({s.service_id for item in items for s in item.services})
+        services_by_id = {s.uuid: s for s in self.get_services_by_ids(all_service_ids)}
+
+        created: List[Queue] = []
+        try:
+            for item in items:
+                service_ids = [s.service_id for s in item.services]
+                services = [services_by_id[sid] for sid in service_ids if sid in services_by_id]
+                if len(services) != len(service_ids):
+                    raise ValueError(f"One or more services not found for queue '{item.name}'")
+                service_configs = {c.service_id: c for c in item.services}
+                queue = self.create_single_queue(
+                    business_id=business_id,
+                    name=item.name,
+                    employee_id=item.employee_id,
+                    services=services,
+                    service_configs=service_configs,
+                )
+                created.append(queue)
+            self.db.commit()
+            return created
         except Exception:
             self.db.rollback()
             raise

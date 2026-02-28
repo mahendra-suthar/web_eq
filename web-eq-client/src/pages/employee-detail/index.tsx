@@ -8,7 +8,7 @@ import { BusinessService } from '../../services/business/business.service';
 import { Tabs } from '../../components/tabs/Tabs';
 import { EmployeeOverviewForm } from '../../components/employee/EmployeeOverviewForm';
 import { RouterConstant } from '../../routers/index';
-import { emailRegex, formatDurationMinutes } from '../../utils/utils';
+import { emailRegex, formatDurationMinutes, getQueueStatusLabel } from '../../utils/utils';
 import './employee-detail.scss';
 import '../../components/employee/employee-overview-form.scss';
 
@@ -529,7 +529,16 @@ const EmployeeDetail = () => {
                                                 <input
                                                     type="checkbox"
                                                     checked={scheduleData.isAlwaysOpen}
-                                                    onChange={e => setScheduleData(prev => ({ ...prev, isAlwaysOpen: e.target.checked }))}
+                                                    onChange={e => {
+                                                        const checked = e.target.checked;
+                                                        setScheduleData(prev => ({
+                                                            ...prev,
+                                                            isAlwaysOpen: checked,
+                                                            schedule: checked
+                                                                ? prev.schedule.map(d => ({ ...d, is_open: true, opening_time: "00:00", closing_time: "23:59" }))
+                                                                : prev.schedule.map(d => ({ ...d, is_open: false, opening_time: "", closing_time: "" })),
+                                                        }));
+                                                    }}
                                                 />
                                                 <span>{scheduleData.isAlwaysOpen ? t("yes") : t("no")}</span>
                                             </label>
@@ -651,7 +660,7 @@ const EmployeeDetail = () => {
                                                 {queueDetail.status != null && (
                                                     <div className="info-field">
                                                         <label className="info-label">{t("status")}</label>
-                                                        <div className="info-value">{queueDetail.status}</div>
+                                                        <div className="info-value">{getQueueStatusLabel(queueDetail.status, t)}</div>
                                                     </div>
                                                 )}
                                             </div>

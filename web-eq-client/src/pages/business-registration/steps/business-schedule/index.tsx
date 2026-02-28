@@ -139,12 +139,14 @@ export default function BusinessSchedule({
       setError("");
 
       try {
-        const scheduleInputs: ScheduleInput[] = schedule.map((day) => ({
-          day_of_week: day.day_of_week,
-          opening_time: day.is_open && day.opening_time ? day.opening_time : null,
-          closing_time: day.is_open && day.closing_time ? day.closing_time : null,
-          is_open: day.is_open,
-        }));
+        const scheduleInputs: ScheduleInput[] = isAlwaysOpen
+          ? []
+          : schedule.map((day) => ({
+              day_of_week: day.day_of_week,
+              opening_time: day.is_open && day.opening_time ? day.opening_time : null,
+              closing_time: day.is_open && day.closing_time ? day.closing_time : null,
+              is_open: day.is_open,
+            }));
 
         await businessService.createBusinessSchedules(
           businessId,
