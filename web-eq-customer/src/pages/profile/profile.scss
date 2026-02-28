@@ -174,19 +174,41 @@
   flex-shrink: 0;
 }
 
-.appointment-card__status--1 {
+.appointment-card__status--1,
+.appointment-card__status--waiting {
   background: #fef3c7;
   color: #92400e;
 }
 
-.appointment-card__status--2 {
+.appointment-card__status--2,
+.appointment-card__status--in_progress {
   background: #dbeafe;
   color: #1e40af;
 }
 
-.appointment-card__status--3 {
+.appointment-card__status--3,
+.appointment-card__status--completed {
   background: #d1fae5;
   color: #065f46;
+}
+
+.appointment-card__status--4,
+.appointment-card__status--failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.appointment-card__status--5,
+.appointment-card__status--cancelled {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.appointment-card__status--7,
+.appointment-card__status--expired {
+  background: #f3f4f6;
+  color: #9ca3af;
+  font-style: italic;
 }
 
 .appointment-card__meta {

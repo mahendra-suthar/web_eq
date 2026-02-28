@@ -130,6 +130,7 @@ export interface QueueDetailData {
     limit?: number | null;
     current_length?: number | null;
     assigned_employee_id?: string | null;
+    assigned_employee_name?: string | null;
     services: QueueServiceDetailData[];
 }
 export interface LiveQueueUserItem {

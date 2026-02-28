@@ -302,6 +302,7 @@
   "failedToLoadQueue": "Failed to load queue",
   "failedToSave": "Failed to save",
   "confirmRemoveService": "Remove this service from the queue?",
+  "confirmRemoveQueue": "Remove this employee from the queue? They will no longer be assigned to this queue.",
   "queueDetail": "Queue detail",
   "queueInformation": "Queue information",
   "assignToEmployee": "Assign to employee",

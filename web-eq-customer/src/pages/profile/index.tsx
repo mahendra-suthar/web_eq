@@ -187,11 +187,16 @@ function AppointmentsSection() {
     loadPage(list.length, true);
   };
 
-  const statusLabel = (status: number) => {
-    if (status === 1) return "Waiting";
-    if (status === 2) return "In progress";
-    if (status === 3) return "Completed";
-    return "Unknown";
+  const statusLabel = (status: number): string => {
+    const map: Record<number, string> = {
+      1: "Waiting",
+      2: "In progress",
+      3: "Completed",
+      4: "Failed",
+      5: "Cancelled",
+      7: "Expired",
+    };
+    return map[status] ?? "Unknown";
   };
 
   const formatDate = (d: string) => {

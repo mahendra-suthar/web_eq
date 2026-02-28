@@ -489,17 +489,16 @@ class AuthController:
             business = employee.business
             addresses = self.address_service.get_addresses_by_entity(EntityType.EMPLOYEE, UUID(str(employee.uuid)))  # type: ignore[arg-type]
             address = AddressData.from_address(addresses[0]) if addresses else None
-            schedules = self.schedule_service.get_schedules_by_entity(UUID(str(employee.uuid)), ScheduleEntityType.EMPLOYEE)  # type: ignore[arg-type]
+            schedule = self.get_schedule_info(
+                UUID(str(employee.uuid)), ScheduleEntityType.EMPLOYEE, False
+            )
             return UnifiedProfileResponse(
                 profile_type="EMPLOYEE",
                 user=user_info,
                 business=BusinessInfo.from_business(business) if business else None,
                 employee=EmployeeInfo.from_employee(employee, queue=employee.queue),
                 address=address,
-                schedule=ScheduleInfo(
-                    is_always_open=False,
-                    schedules=[ScheduleData.from_schedule(s) for s in schedules]
-                ) if schedules else None
+                schedule=schedule,
             )
 
         addresses = self.address_service.get_addresses_by_entity(EntityType.USER, entity_id)

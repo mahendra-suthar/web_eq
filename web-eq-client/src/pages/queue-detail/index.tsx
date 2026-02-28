@@ -302,6 +302,15 @@ const QueueDetail = () => {
                                     <div className="info-value">{data.name || t("notAvailable")}</div>
                                 </div>
                                 <div className="info-field">
+                                    <label className="info-label">{t("assignToEmployee") || "Assigned employee"}</label>
+                                    <div className="info-value">
+                                        {data.assigned_employee_name ??
+                                            (data.assigned_employee_id
+                                                ? employees.find((e) => e.uuid === data.assigned_employee_id)?.full_name ?? t("notAvailable")
+                                                : "—")}
+                                    </div>
+                                </div>
+                                <div className="info-field">
                                     <label className="info-label">{t("status")}</label>
                                     <div className="info-value">{getQueueStatusLabel(data.status, t)}</div>
                                 </div>

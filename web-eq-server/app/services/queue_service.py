@@ -22,6 +22,7 @@ from app.core.constants import (
     QUEUE_USER_REGISTERED,
     QUEUE_USER_IN_PROGRESS,
     QUEUE_USER_COMPLETED,
+    QUEUE_USER_EXPIRED,
 )
 
 
@@ -241,6 +242,28 @@ class QueueService:
         except SQLAlchemyError:
             raise
 
+    def expire_past_day_appointments(self, before_date: date) -> int:
+        try:
+            updated = (
+                self.db.query(QueueUser)
+                .filter(
+                    QueueUser.queue_date < before_date,
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                )
+                .update(
+                    {
+                        QueueUser.status: QUEUE_USER_EXPIRED,
+                        QueueUser.cancellation_reason: "auto_expired",
+                    },
+                    synchronize_session=False,
+                )
+            )
+            self.db.commit()
+            return updated
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+
     def get_appointment_by_id_for_user(
         self, user_id: UUID, queue_user_id: UUID
     ) -> Optional[QueueUser]:
@@ -347,6 +370,17 @@ class QueueService:
     def get_queue_by_id(self, queue_id: UUID) -> Optional[Queue]:
         try:
             return self.db.query(Queue).filter(Queue.uuid == queue_id).first()
+        except SQLAlchemyError:
+            raise
+
+    def get_queue_by_id_with_employees(self, queue_id: UUID) -> Optional[Queue]:
+        try:
+            return (
+                self.db.query(Queue)
+                .options(joinedload(Queue.employees))
+                .filter(Queue.uuid == queue_id)
+                .first()
+            )
         except SQLAlchemyError:
             raise
 

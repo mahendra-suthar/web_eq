@@ -619,7 +619,11 @@ const EmployeeDetail = () => {
                                     <button
                                         type="button"
                                         className="btn btn-secondary btn-sm"
-                                        onClick={handleRemoveQueue}
+                                        onClick={() => {
+                                            if (window.confirm(t("confirmRemoveQueue") || "Remove this employee from the queue?")) {
+                                                handleRemoveQueue();
+                                            }
+                                        }}
                                         disabled={assigningQueue}
                                     >
                                         {assigningQueue ? t("saving") : t("removeQueue") || "Remove queue"}

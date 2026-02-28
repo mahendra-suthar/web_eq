@@ -88,7 +88,7 @@ class QueueController:
 
     async def get_queue_detail(self, queue_id: UUID) -> QueueDetailData:
         try:
-            queue = self.queue_service.get_queue_by_id(queue_id)
+            queue = self.queue_service.get_queue_by_id_with_employees(queue_id)
             if not queue:
                 raise HTTPException(status_code=404, detail="Queue not found")
             rows = self.queue_service.get_queue_services_with_service(queue_id)

@@ -23,7 +23,7 @@ class CustomerAppointmentListItem(BaseModel):
     business_id: str
     business_name: str
     queue_date: date
-    status: int  # 1=waiting, 2=in_progress, 3=completed
+    status: int  # 1=waiting, 2=in_progress, 3=completed, 4=failed, 5=cancelled, 7=expired
     token_number: Optional[str] = None
     service_summary: Optional[str] = None
     created_at: Optional[datetime] = None

@@ -54,6 +54,7 @@ QUEUE_USER_COMPLETED = 3
 QUEUE_USER_FAILED = 4
 QUEUE_USER_CANCELLED = 5
 QUEUE_USER_PRIORITY_REQUESTED = 6
+QUEUE_USER_EXPIRED = 7          # Auto-expired by scheduler: past-day, never served
 
 # Customer API defaults (appointments list pagination)
 CUSTOMER_APPOINTMENTS_DEFAULT_LIMIT = 5

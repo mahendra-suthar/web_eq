@@ -16,4 +16,5 @@ aiohttp
 redis>=5.0.0
 websockets>=10.0
 pytz
+apscheduler>=3.10.0
 

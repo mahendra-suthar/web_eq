@@ -134,6 +134,7 @@ class QueueDetailData(BaseModel):
     limit: Optional[int] = None
     current_length: Optional[int] = None
     assigned_employee_id: Optional[UUID] = None  # employee currently assigned to this queue
+    assigned_employee_name: Optional[str] = None  # for display without extra lookup
     services: List[QueueServiceDetailData] = []
 
     @classmethod
@@ -142,10 +143,13 @@ class QueueDetailData(BaseModel):
         queue: Any,
         services: List[QueueServiceDetailData],
     ) -> "QueueDetailData":
-        """Build from Queue ORM and list of QueueServiceDetailData."""
-        assigned = None
-        if getattr(queue, "employees", None):
-            assigned = queue.employees[0].uuid if queue.employees else None
+        assigned_id = None
+        assigned_name = None
+        employees = getattr(queue, "employees", None) or []
+        if employees:
+            emp = employees[0]
+            assigned_id = emp.uuid
+            assigned_name = getattr(emp, "full_name", None) or ""
         return cls(
             uuid=queue.uuid,
             business_id=queue.merchant_id,
@@ -153,7 +157,8 @@ class QueueDetailData(BaseModel):
             status=queue.status,
             limit=getattr(queue, "limit", None),
             current_length=getattr(queue, "current_length", None),
-            assigned_employee_id=assigned,
+            assigned_employee_id=assigned_id,
+            assigned_employee_name=assigned_name,
             services=services,
         )
 
