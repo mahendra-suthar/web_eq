@@ -55,9 +55,11 @@ export default function BusinessDetailsPage() {
   const handleContinue = () => {
     if (selectedServices.length === 0) return;
     const selectedServicesData = services.filter((s) => selectedServices.includes(s.uuid));
+    // Pass flat list of variant_uuids for booking API (same service with different prices = multiple queue_services)
+    const variantIds = selectedServicesData.flatMap((s) => s.variant_uuids?.length ? s.variant_uuids : [s.uuid]);
     navigate(`/business/${businessId}/book`, {
       state: {
-        selectedServices: selectedServices,
+        selectedServices: variantIds,
         selectedServicesData,
         businessName: business?.name || "",
       },
@@ -68,7 +70,15 @@ export default function BusinessDetailsPage() {
     () => services.filter((s) => selectedServices.includes(s.uuid)),
     [services, selectedServices]
   );
-  const totalPrice = selectedServicesData.reduce((sum, s) => sum + (s.price || 0), 0);
+  const totalPriceMin = selectedServicesData.reduce(
+    (sum, s) => sum + (s.price_min ?? s.price ?? 0),
+    0
+  );
+  const totalPriceMax = selectedServicesData.reduce(
+    (sum, s) => sum + (s.price_max ?? s.price ?? 0),
+    0
+  );
+  const hasPriceRange = totalPriceMin !== totalPriceMax;
 
   const addressLines = useMemo(() => formatFullAddress(business?.address ?? null), [business?.address]);
   const hasCoords =
@@ -129,7 +139,11 @@ export default function BusinessDetailsPage() {
               <p className="bds-hero-category">{business.category_name}</p>
             )}
             <div className="bds-hero-badges">
-              {business.is_open && <span className="bds-badge bds-badge-open">Open now</span>}
+              {business.is_open ? (
+                <span className="bds-badge bds-badge-open">Open now</span>
+              ) : (
+                <span className="bds-badge bds-badge-closed">Closed</span>
+              )}
               {business.is_always_open && (
                 <span className="bds-badge bds-badge-24">24/7</span>
               )}
@@ -171,27 +185,47 @@ export default function BusinessDetailsPage() {
           <div className="bds-empty">No services available at this time.</div>
         ) : (
           <div className="bds-services-grid">
-            {services.map((service) => (
-              <button
-                type="button"
-                key={service.uuid}
-                className={`bds-service-card ${selectedServices.includes(service.uuid) ? "selected" : ""}`}
-                onClick={() => handleServiceToggle(service.uuid)}
-              >
-                <h3 className="bds-service-name">{service.name}</h3>
-                {service.description && (
-                  <p className="bds-service-desc">{service.description}</p>
-                )}
-                <div className="bds-service-meta">
-                  {service.duration != null && (
-                    <span className="bds-service-duration">⏱ {formatDurationMinutes(service.duration)}</span>
+            {services.map((service) => {
+              const hasDurationRange =
+                service.duration_min != null &&
+                service.duration_max != null &&
+                service.duration_min !== service.duration_max;
+              const hasPriceRange =
+                service.price_min != null &&
+                service.price_max != null &&
+                service.price_min !== service.price_max;
+              const priceLabel = hasPriceRange
+                ? `₹${service.price_min} – ₹${service.price_max}`
+                : (service.price ?? service.price_min ?? service.price_max) != null
+                  ? `₹${service.price ?? service.price_min ?? service.price_max}`
+                  : null;
+              const durationLabel = hasDurationRange
+                ? `${formatDurationMinutes(service.duration_min)} – ${formatDurationMinutes(service.duration_max)}`
+                : (service.duration ?? service.duration_min ?? service.duration_max) != null
+                  ? formatDurationMinutes(service.duration ?? service.duration_min ?? service.duration_max)
+                  : null;
+              return (
+                <button
+                  type="button"
+                  key={service.uuid}
+                  className={`bds-service-card ${selectedServices.includes(service.uuid) ? "selected" : ""}`}
+                  onClick={() => handleServiceToggle(service.uuid)}
+                >
+                  <h3 className="bds-service-name">{service.name}</h3>
+                  {service.description && (
+                    <p className="bds-service-desc">{service.description}</p>
                   )}
-                  {service.price != null && (
-                    <span className="bds-service-price">₹{service.price}</span>
-                  )}
-                </div>
-              </button>
-            ))}
+                  <div className="bds-service-meta">
+                    {durationLabel != null && (
+                      <span className="bds-service-duration">⏱ {durationLabel}</span>
+                    )}
+                    {priceLabel != null && (
+                      <span className="bds-service-price">{priceLabel}</span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </section>
@@ -265,7 +299,9 @@ export default function BusinessDetailsPage() {
               <p className="bds-sticky-text">
                 {selectedServices.length} service{selectedServices.length !== 1 ? "s" : ""} selected
               </p>
-              <p className="bds-sticky-total">Total: ₹{totalPrice}</p>
+              <p className="bds-sticky-total">
+                Total: {hasPriceRange ? `₹${totalPriceMin} – ₹${totalPriceMax}` : `₹${totalPriceMin}`}
+              </p>
             </div>
             <Button text="Continue to booking" color="blue" size="lg" onClick={handleContinue} />
           </div>

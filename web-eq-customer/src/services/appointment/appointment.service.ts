@@ -60,14 +60,18 @@ export interface CustomerAppointmentDetailResponse {
   created_at?: string | null;
 }
 
+export interface TodayAppointmentsResponse {
+  items: TodayAppointmentResponse[];
+}
+
 export class AppointmentService extends HttpClient {
-  async getTodayAppointment(): Promise<TodayAppointmentResponse | null> {
+  async getTodayAppointments(): Promise<TodayAppointmentResponse[]> {
     try {
-      const response = await this.get<TodayAppointmentResponse | null>('/customer/appointments/today');
-      return response ?? null;
+      const response = await this.get<TodayAppointmentsResponse>('/customer/appointments/today');
+      return response?.items ?? [];
     } catch (err: any) {
       if (err?.response?.status === 401 || err?.response?.status === 403) {
-        return null;
+        return [];
       }
       throw err;
     }

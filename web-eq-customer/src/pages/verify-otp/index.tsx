@@ -97,9 +97,10 @@ export default function VerifyOTPPage() {
         };
         setUserInfo(userData);
 
-        // Navigate immediately so user is never stuck; do not block on profile fetch
+        // Navigate immediately so user is never stuck; replace so Back from book goes to business details
         if (returnTo) {
           navigate(returnTo, {
+            replace: true,
             state: { selectedServices, selectedServicesData, businessName },
           });
         } else {

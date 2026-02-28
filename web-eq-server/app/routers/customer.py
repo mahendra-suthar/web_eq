@@ -16,7 +16,7 @@ from app.schemas.customer import (
     CustomerAppointmentListResponse,
     CustomerAppointmentDetailResponse,
 )
-from app.schemas.queue import CustomerTodayAppointmentResponse
+from app.schemas.queue import CustomerTodayAppointmentsResponse
 from app.middleware.permissions import get_current_user
 from app.models.user import User
 from app.core.constants import (
@@ -56,15 +56,15 @@ async def update_profile(
 
 @customer_router.get(
     "/appointments/today",
-    response_model=Optional[CustomerTodayAppointmentResponse],
-    summary="Get today's active appointment",
+    response_model=CustomerTodayAppointmentsResponse,
+    summary="Get all of today's active appointments",
 )
-async def get_today_appointment(
+async def get_today_appointments(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     controller = QueueController(db)
-    return controller.get_today_appointment(current_user.uuid)
+    return controller.get_today_appointments(current_user.uuid)
 
 
 @customer_router.get(

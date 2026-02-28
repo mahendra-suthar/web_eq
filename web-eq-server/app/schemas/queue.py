@@ -267,6 +267,15 @@ class QueueUserDetailResponse(BaseModel):
 # Customer Booking Schemas
 # ─────────────────────────────────────────────────────────────────────────────
 
+class QueueServiceInfo(BaseModel):
+    """Service detail specific to a single queue option (resolved price & duration)."""
+    queue_service_uuid: str
+    service_uuid: str
+    service_name: str
+    price: Optional[float] = None
+    duration: Optional[int] = None  # minutes
+
+
 class QueueOptionData(BaseModel):
     """Queue option with calculated metrics for booking"""
     queue_id: str
@@ -280,6 +289,8 @@ class QueueOptionData(BaseModel):
     # Set when the queue is unavailable for a specific reason rather than just being full.
     # e.g. "employee_not_available" — frontend should show this instead of metrics.
     unavailability_reason: Optional[str] = None
+    # Per-queue resolved service prices and durations (populated by booking-preview).
+    services: List[QueueServiceInfo] = []
 
 
 class AvailableSlotData(BaseModel):
@@ -544,3 +555,8 @@ class CustomerTodayAppointmentResponse(BaseModel):
             estimated_appointment_time=appointment_time_12h,
             service_summary=service_summary,
         )
+
+
+class CustomerTodayAppointmentsResponse(BaseModel):
+    """All of today's active appointments for the logged-in customer."""
+    items: List[CustomerTodayAppointmentResponse]

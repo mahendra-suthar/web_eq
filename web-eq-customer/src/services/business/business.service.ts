@@ -71,7 +71,13 @@ export interface BusinessServiceData {
   description: string | null;
   image: string | null;
   price: number | null;
+  price_min: number | null;
+  price_max: number | null;
   duration: number | null;
+  duration_min: number | null;
+  duration_max: number | null;
+  /** All queue_service UUIDs for this logical service (use for booking when same service has multiple variants). */
+  variant_uuids: string[];
 }
 
 export class BusinessService extends HttpClient {

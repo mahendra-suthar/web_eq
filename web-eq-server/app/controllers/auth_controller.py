@@ -5,7 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, Response, Request
 
-from app.core.utils import hash_otp, generate_otp, now_utc
+from app.core.utils import hash_otp, generate_otp, is_full_day, now_utc
 from app.services.otp_service import OTPService
 from app.services.auth_service import AuthService
 from app.services.user_service import UserService
@@ -346,7 +346,8 @@ class AuthController:
         if entity_type == ScheduleEntityType.EMPLOYEE:
             days_covered = {s.day_of_week for s in schedules}
             all_open = all(getattr(s, "is_open", False) for s in schedules)
-            is_always_open = len(days_covered) == 7 and all_open
+            all_full_day = all(is_full_day(s) for s in schedules)
+            is_always_open = len(days_covered) == 7 and all_open and all_full_day
         return ScheduleInfo(
             is_always_open=is_always_open,
             schedules=[ScheduleData.from_schedule(s) for s in schedules],

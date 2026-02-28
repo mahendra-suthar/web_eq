@@ -16,30 +16,30 @@ export default function LandingPage() {
   const [categories, setCategories] = useState<CategoryWithServicesData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [todayAppointment, setTodayAppointment] = useState<TodayAppointmentResponse | null | undefined>(undefined);
+  const [todayAppointments, setTodayAppointments] = useState<TodayAppointmentResponse[]>([]);
   const [todayLoading, setTodayLoading] = useState(false);
 
-  const fetchTodayAppointment = useCallback(async () => {
+  const fetchTodayAppointments = useCallback(async () => {
     if (!isAuthenticated()) {
-      setTodayAppointment(null);
+      setTodayAppointments([]);
       return;
     }
     setTodayLoading(true);
     try {
       const appointmentService = new AppointmentService();
-      const data = await appointmentService.getTodayAppointment();
-      setTodayAppointment(data ?? null);
+      const data = await appointmentService.getTodayAppointments();
+      setTodayAppointments(data ?? []);
     } catch (err) {
-      console.error("Failed to fetch today's appointment:", err);
-      setTodayAppointment(null);
+      console.error("Failed to fetch today's appointments:", err);
+      setTodayAppointments([]);
     } finally {
       setTodayLoading(false);
     }
   }, [isAuthenticated]);
 
   useEffect(() => {
-    fetchTodayAppointment();
-  }, [fetchTodayAppointment]);
+    fetchTodayAppointments();
+  }, [fetchTodayAppointments]);
 
   useEffect(() => {
     fetchCategories();
@@ -94,10 +94,10 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {isAuthenticated() && (todayLoading || todayAppointment) && (
+      {isAuthenticated() && (todayLoading || todayAppointments.length > 0) && (
         <div className="landing-section landing-section-today">
           <div className="landing-section-header">
-            <h2 className="landing-section-title">Today&apos;s appointment</h2>
+            <h2 className="landing-section-title">Today&apos;s appointments</h2>
             <p className="landing-section-subtitle">
               Your current queue status and expected time.
             </p>
@@ -105,47 +105,52 @@ export default function LandingPage() {
           {todayLoading ? (
             <div className="landing-today-loading">
               <div className="landing-spinner" aria-hidden />
-              <p>Loading your appointment…</p>
+              <p>Loading your appointments…</p>
             </div>
-          ) : todayAppointment ? (
-            <div
-              className="landing-today-card"
-              role="button"
-              tabIndex={0}
-              onClick={() => navigate(`/business/${todayAppointment.business_id}`)}
-              onKeyDown={(e) => e.key === "Enter" && navigate(`/business/${todayAppointment.business_id}`)}
-              aria-label={`View ${todayAppointment.business_name} – token ${todayAppointment.token_number}`}
-            >
-              <div className="landing-today-card-header">
-                <span className="landing-today-business">{todayAppointment.business_name}</span>
-                <span className={`landing-today-status status-${todayAppointment.status === 1 ? "waiting" : "in-progress"}`}>
-                  {todayAppointment.status === 1 ? "Waiting" : "In progress"}
-                </span>
-              </div>
-              <p className="landing-today-queue">{todayAppointment.queue_name}</p>
-              {todayAppointment.service_summary && (
-                <p className="landing-today-services">{todayAppointment.service_summary}</p>
-              )}
-              <div className="landing-today-details">
-                <span className="landing-today-token">Token #{todayAppointment.token_number}</span>
-                {todayAppointment.position != null && (
-                  <span className="landing-today-position">Position #{todayAppointment.position}</span>
-                )}
-                {todayAppointment.estimated_wait_minutes != null && todayAppointment.estimated_wait_minutes > 0 && (
-                  <span className="landing-today-wait">
-                    Est. wait {formatDurationMinutes(todayAppointment.estimated_wait_minutes)}
-                    {todayAppointment.estimated_wait_range && ` (${todayAppointment.estimated_wait_range})`}
-                  </span>
-                )}
-                {todayAppointment.estimated_appointment_time && (
-                  <span className="landing-today-time">
-                    Expected at {formatTimeToDisplay(todayAppointment.estimated_appointment_time)}
-                  </span>
-                )}
-              </div>
-              <p className="landing-today-cta">Tap to view business →</p>
+          ) : (
+            <div className="landing-today-cards">
+              {todayAppointments.map((appointment) => (
+                <div
+                  key={appointment.queue_user_id}
+                  className="landing-today-card"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/business/${appointment.business_id}`)}
+                  onKeyDown={(e) => e.key === "Enter" && navigate(`/business/${appointment.business_id}`)}
+                  aria-label={`View ${appointment.business_name} – token ${appointment.token_number}`}
+                >
+                  <div className="landing-today-card-header">
+                    <span className="landing-today-business">{appointment.business_name}</span>
+                    <span className={`landing-today-status status-${appointment.status === 1 ? "waiting" : "in-progress"}`}>
+                      {appointment.status === 1 ? "Waiting" : "In progress"}
+                    </span>
+                  </div>
+                  <p className="landing-today-queue">{appointment.queue_name}</p>
+                  {appointment.service_summary && (
+                    <p className="landing-today-services">{appointment.service_summary}</p>
+                  )}
+                  <div className="landing-today-details">
+                    <span className="landing-today-token">Token #{appointment.token_number}</span>
+                    {appointment.position != null && (
+                      <span className="landing-today-position">Position #{appointment.position}</span>
+                    )}
+                    {appointment.estimated_wait_minutes != null && appointment.estimated_wait_minutes > 0 && (
+                      <span className="landing-today-wait">
+                        Est. wait {formatDurationMinutes(appointment.estimated_wait_minutes)}
+                        {appointment.estimated_wait_range && ` (${appointment.estimated_wait_range})`}
+                      </span>
+                    )}
+                    {appointment.estimated_appointment_time && (
+                      <span className="landing-today-time">
+                        Expected at {formatTimeToDisplay(appointment.estimated_appointment_time)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="landing-today-cta">Tap to view business →</p>
+                </div>
+              ))}
             </div>
-          ) : null}
+          )}
         </div>
       )}
 

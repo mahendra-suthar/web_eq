@@ -106,6 +106,7 @@ class ScheduleController:
             self.schedule_service.replace_schedules_for_entity(
                 payload.entity_id, entity_type_enum, payload.schedules
             )
+            self.db.commit()
             schedules_with_breaks = self.schedule_service.get_schedules_with_breaks(
                 payload.entity_id, entity_type_enum
             )
@@ -114,8 +115,10 @@ class ScheduleController:
         except HTTPException:
             raise
         except SQLAlchemyError:
+            self.db.rollback()
             raise HTTPException(status_code=500, detail="Database error")
         except Exception as e:
+            self.db.rollback()
             raise HTTPException(status_code=500, detail=f"Failed to create schedules: {str(e)}")
 
     async def get_schedules(

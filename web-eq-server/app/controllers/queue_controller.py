@@ -3,8 +3,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
 from uuid import UUID
 from typing import List, Optional, Any, Dict
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 
+import pytz
+
+from app.core.constants import TIMEZONE
 from app.services.queue_service import QueueService
 from app.services.business_service import BusinessService
 from app.services.realtime.queue_manager import queue_manager
@@ -16,6 +19,7 @@ from app.schemas.queue import (
     AvailableSlotData, BookingCreateInput, BookingData, BookingServiceData, BookingPreviewData,
     LiveQueueData,
     CustomerTodayAppointmentResponse,
+    CustomerTodayAppointmentsResponse,
 )
 from app.schemas.user import UserData
 from app.schemas.service import ServiceData
@@ -228,6 +232,57 @@ class QueueController:
     # Customer Booking APIs
     # ─────────────────────────────────────────────────────────────────────────
 
+    def _build_today_metrics(
+        self,
+        queue_ids: List[UUID],
+        raw_rows: List[dict],
+        current_time: datetime,
+    ) -> Dict[UUID, Dict[str, Any]]:
+        """Build per-queue metrics from DB rows (delay-aware for in-progress)."""
+        result: Dict[UUID, Dict[str, Any]] = {
+            qid: {"registered_count": 0, "in_progress_count": 0, "total_wait_minutes": 0}
+            for qid in queue_ids
+        }
+        for row in raw_rows:
+            qid = row["queue_id"]
+            status = row["status"]
+            turn = row.get("turn_time") or 0
+            if status == QUEUE_USER_REGISTERED:
+                result[qid]["registered_count"] += 1
+                result[qid]["total_wait_minutes"] += turn
+            elif status == QUEUE_USER_IN_PROGRESS:
+                result[qid]["in_progress_count"] += 1
+                enqueue_time = row.get("enqueue_time")
+                if current_time and enqueue_time:
+                    try:
+                        enqueue_dt = enqueue_time
+                        if enqueue_dt.tzinfo is None:
+                            enqueue_dt = enqueue_dt.replace(tzinfo=timezone.utc)
+                        elapsed = max(0.0, (current_time - enqueue_dt).total_seconds() / 60)
+                        remaining = max(0, turn - int(elapsed))
+                    except Exception:
+                        remaining = turn
+                else:
+                    remaining = turn
+                result[qid]["total_wait_minutes"] += remaining
+        return result
+
+    def _build_services_by_queue(self, raw_details: List[dict]) -> Dict[UUID, List[dict]]:
+        """Group flat queue service details by queue_id."""
+        result: Dict[UUID, List[dict]] = {}
+        for d in raw_details:
+            qid = d["queue_id"]
+            if qid not in result:
+                result[qid] = []
+            result[qid].append({
+                "queue_service_uuid": d["queue_service_uuid"],
+                "service_uuid": d["service_uuid"],
+                "service_name": d["service_name"],
+                "price": d["price"],
+                "duration": d["duration"],
+            })
+        return result
+
     async def get_booking_preview(
         self,
         business_id: UUID,
@@ -236,15 +291,34 @@ class QueueController:
     ) -> BookingPreviewData:
         try:
             calc_service = BookingCalculationService(self.db)
-
             business = self.business_service.get_business_by_id(business_id)
             if not business:
                 raise HTTPException(status_code=404, detail="Business not found")
 
-            preview = calc_service.calculate_booking_preview(
-                business_id, booking_date, service_ids
-            )
+            queues = self.queue_service.get_queues_offering_service_ids(business_id, service_ids)
+            if not queues:
+                return BookingPreviewData(
+                    business_id=str(business_id),
+                    date=booking_date.isoformat(),
+                    queues=[],
+                    recommended_queue_id=None,
+                )
 
+            queue_ids = [q.uuid for q in queues]
+            today = today_app_date()
+            ist = pytz.timezone(TIMEZONE)
+            current_time = datetime.now(ist)
+
+            raw_users = self.queue_service.get_today_active_queue_user_rows(queue_ids, booking_date)
+            raw_services = self.queue_service.get_queue_service_details_for_ids(service_ids)
+            today_metrics = self._build_today_metrics(queue_ids, raw_users, current_time) if booking_date == today else {}
+            services_by_queue = self._build_services_by_queue(raw_services)
+
+            preview = calc_service.calculate_booking_preview(
+                business_id, booking_date, service_ids,
+                today_metrics=today_metrics,
+                services_by_queue=services_by_queue,
+            )
             return BookingPreviewData(**preview)
 
         except HTTPException:
@@ -290,13 +364,12 @@ class QueueController:
             if not business:
                 raise HTTPException(status_code=404, detail="Business not found")
 
-            queue_services = self.queue_service.get_queue_services_for_booking(
+            all_queue_services = self.queue_service.get_queue_services_for_booking(
                 data.service_ids, data.business_id
             )
-            if not queue_services:
+            if not all_queue_services:
                 raise HTTPException(status_code=400, detail="No valid services selected")
 
-            # Auto-select optimal queue if not provided
             if data.queue_id:
                 queue = self.queue_service.get_queue_by_id_and_business(
                     data.queue_id, data.business_id
@@ -304,18 +377,49 @@ class QueueController:
                 if not queue:
                     raise HTTPException(status_code=404, detail="Queue not found")
                 queue_id = data.queue_id
+                queue_services = [qs for qs in all_queue_services if qs.queue_id == queue_id]
+                if not queue_services:
+                    queue_services = all_queue_services
 
                 if data.queue_date == today_app_date():
+                    ist = pytz.timezone(TIMEZONE)
+                    current_time = datetime.now(ist)
+                    raw_users = self.queue_service.get_today_active_queue_user_rows(
+                        [queue_id], data.queue_date
+                    )
+                    today_metrics_single = self._build_today_metrics(
+                        [queue_id], raw_users, current_time
+                    )
                     metrics = calc_service.calculate_today_queue_metrics(
-                        queue_id, data.queue_date, data.service_ids
+                        queue_id, data.queue_date, data.service_ids,
+                        today_metrics=today_metrics_single,
                     )
                 else:
                     metrics = calc_service.calculate_future_queue_metrics(
                         queue_id, data.queue_date, data.service_ids
                     )
             else:
+                today_metrics = None
+                services_by_queue = None
+                if data.queue_date == today_app_date():
+                    queues_for_optimal = self.queue_service.get_queues_offering_service_ids(
+                        data.business_id, data.service_ids
+                    )
+                    qids = [q.uuid for q in queues_for_optimal] if queues_for_optimal else []
+                    ist = pytz.timezone(TIMEZONE)
+                    current_time = datetime.now(ist)
+                    raw_users = self.queue_service.get_today_active_queue_user_rows(
+                        qids, data.queue_date
+                    ) if qids else []
+                    raw_services = self.queue_service.get_queue_service_details_for_ids(
+                        data.service_ids
+                    )
+                    today_metrics = self._build_today_metrics(qids, raw_users, current_time) if qids else {}
+                    services_by_queue = self._build_services_by_queue(raw_services)
                 optimal_queue = calc_service.find_optimal_queue(
-                    data.business_id, data.queue_date, data.service_ids
+                    data.business_id, data.queue_date, data.service_ids,
+                    today_metrics=today_metrics,
+                    services_by_queue=services_by_queue,
                 )
                 if not optimal_queue:
                     raise HTTPException(status_code=404, detail="No available queues for selected services")
@@ -331,6 +435,10 @@ class QueueController:
                 queue = self.queue_service.get_queue_by_id(queue_id)
                 if not queue:
                     raise HTTPException(status_code=404, detail="Selected queue not found")
+
+                queue_services = [qs for qs in all_queue_services if qs.queue_id == queue_id]
+                if not queue_services:
+                    queue_services = all_queue_services
 
             if data.queue_date == today_app_date():
                 existing_booking = self.get_existing_booking(
@@ -570,41 +678,47 @@ class QueueController:
             metrics, services_data,
         )
 
-    def get_today_appointment(self, user_id: UUID) -> Optional[CustomerTodayAppointmentResponse]:
-        """Return today's active (waiting or in_progress) appointment for the customer, or None."""
+    def get_today_appointments(self, user_id: UUID) -> CustomerTodayAppointmentsResponse:
+        """Return all of today's active (waiting or in_progress) appointments for the customer."""
         today = today_app_date()
-        qu = self.queue_service.get_today_active_appointment_for_user(user_id, today)
-        if not qu:
-            return None
-        queue = qu.queue
-        business = getattr(queue, "business", None)
-        business_name = business.name if business else ""
-        business_id = str(queue.merchant_id) if queue else ""
+        queue_users = self.queue_service.get_today_active_appointments_for_user(user_id, today)
+        if not queue_users:
+            return CustomerTodayAppointmentsResponse(items=[])
 
         calc_service = BookingCalculationService(self.db)
-        metrics = calc_service.get_existing_queue_user_metrics(qu)
+        items = []
+        for qu in queue_users:
+            queue = qu.queue
+            business = getattr(queue, "business", None)
+            business_name = business.name if business else ""
+            business_id = str(queue.merchant_id) if queue else ""
 
-        service_names = []
-        for qus in getattr(qu, "queue_user_services", []) or []:
-            qs = getattr(qus, "queue_service", None)
-            if qs and getattr(qs, "service", None):
-                service_names.append(qs.service.name)
-        service_summary = " · ".join(service_names) if service_names else None
+            metrics = calc_service.get_existing_queue_user_metrics(qu)
 
-        appointment_time_12h = None
-        appointment_time_str = metrics.get("appointment_time")
-        if appointment_time_str:
-            try:
-                parts = appointment_time_str.split(":")
-                if len(parts) >= 2:
-                    h, m = int(parts[0]), int(parts[1])
-                    appointment_time_12h = format_time_12h(
-                        datetime.combine(today_app_date(), time(h, m))
-                    )
-            except Exception:
-                pass
+            service_names = []
+            for qus in getattr(qu, "queue_user_services", []) or []:
+                qs = getattr(qus, "queue_service", None)
+                if qs and getattr(qs, "service", None):
+                    service_names.append(qs.service.name)
+            service_summary = " · ".join(service_names) if service_names else None
 
-        return CustomerTodayAppointmentResponse.from_queue_user_and_metrics(
-            qu, queue, business_id, business_name,
-            metrics, service_summary, appointment_time_12h,
-        )
+            appointment_time_12h = None
+            appointment_time_str = metrics.get("appointment_time")
+            if appointment_time_str:
+                try:
+                    parts = appointment_time_str.split(":")
+                    if len(parts) >= 2:
+                        h, m = int(parts[0]), int(parts[1])
+                        appointment_time_12h = format_time_12h(
+                            datetime.combine(today_app_date(), time(h, m))
+                        )
+                except Exception:
+                    pass
+
+            items.append(
+                CustomerTodayAppointmentResponse.from_queue_user_and_metrics(
+                    qu, queue, business_id, business_name,
+                    metrics, service_summary, appointment_time_12h,
+                )
+            )
+        return CustomerTodayAppointmentsResponse(items=items)

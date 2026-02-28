@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useBookingStore, type QueueOptionData } from "../../store/booking.store";
+import { useBookingStore, type QueueOptionData, type QueueServiceInfo } from "../../store/booking.store";
 import { useAuthStore } from "../../store/auth.store";
 import { useQueueWebSocket } from "../../hooks/useQueueWebSocket";
 import { BookingService } from "../../services/booking/booking.service";
 import { BusinessService, type BusinessServiceData } from "../../services/business/business.service";
-import { getNext7Days } from "../../utils/booking.utils";
+import { getNext7Days, getToday } from "../../utils/booking.utils";
 import { isDateInPast, formatDateDisplay, formatDurationMinutes, formatTimeToDisplay } from "../../utils/util";
 import { HttpStatus } from "../../utils/constants";
 import { saveBookingReturnState, getBookingReturnState, clearBookingReturnState } from "../../utils/bookingReturnState";
@@ -57,7 +57,7 @@ export default function BookingPage() {
         businessName: initialBusinessName,
       };
       saveBookingReturnState(state);
-      navigate("/send-otp", { state });
+      navigate("/send-otp", { state, replace: true });
       return;
     }
   }, [isAuthenticated, businessId, navigate, initialSelectedServices, initialSelectedServicesData, initialBusinessName]);
@@ -95,6 +95,13 @@ export default function BookingPage() {
 
   const selectableDates = useMemo(() => getNext7Days(), []);
 
+  // Default selected date to today when user lands on the booking page
+  useEffect(() => {
+    if (businessId && selectedDate == null) {
+      setSelectedDate(getToday());
+    }
+  }, [businessId, selectedDate, setSelectedDate]);
+
   useEffect(() => {
     const loadServices = async () => {
       if (initialSelectedServicesData.length > 0) return;
@@ -103,7 +110,11 @@ export default function BookingPage() {
         setLoading(true);
         const businessService = new BusinessService();
         const allServices = await businessService.getBusinessServices(businessId);
-        const selected = allServices.filter((s) => initialSelectedServices.includes(s.uuid));
+        const selected = allServices.filter((s) =>
+          s.variant_uuids?.length
+            ? s.variant_uuids.some((uid) => initialSelectedServices.includes(uid))
+            : initialSelectedServices.includes(s.uuid)
+        );
         setSelectedServices(selected);
       } catch (err: any) {
         console.error("Failed to load services:", err);
@@ -115,10 +126,31 @@ export default function BookingPage() {
     loadServices();
   }, [businessId, initialSelectedServices, initialSelectedServicesData, setLoading, setError]);
 
+  // All variant UUIDs for the preview API (shows which queues can serve these services)
   const serviceIds = useMemo(
-    () => selectedServices.map((s) => s.uuid).filter(Boolean),
+    () =>
+      selectedServices.flatMap((s) =>
+        s.variant_uuids?.length ? s.variant_uuids : [s.uuid].filter(Boolean)
+      ),
     [selectedServices]
   );
+
+  // When a queue is selected, use only that queue's service UUIDs for the booking API.
+  // Falls back to all variant UUIDs if the queue has no resolved services.
+  const resolvedServiceIds = useMemo(() => {
+    const queueSvcs = selectedQueueOption?.services;
+    if (queueSvcs && queueSvcs.length > 0) {
+      return queueSvcs.map((s: QueueServiceInfo) => s.queue_service_uuid);
+    }
+    return serviceIds;
+  }, [selectedQueueOption, serviceIds]);
+
+  // Map service_uuid -> resolved QueueServiceInfo for the selected queue.
+  const resolvedByServiceUuid = useMemo<Record<string, QueueServiceInfo>>(() => {
+    const queueSvcs = selectedQueueOption?.services;
+    if (!queueSvcs || queueSvcs.length === 0) return {};
+    return Object.fromEntries(queueSvcs.map((s: QueueServiceInfo) => [s.service_uuid, s]));
+  }, [selectedQueueOption]);
 
   const fetchBookingPreview = useCallback(async () => {
     if (!businessId || !selectedDate || serviceIds.length === 0) return;
@@ -168,8 +200,32 @@ export default function BookingPage() {
     }
   }, [selectedDate, serviceIds.length, fetchBookingPreview]);
 
-  const totalPrice = selectedServices.reduce((sum, s) => sum + (s.price || 0), 0);
-  const totalDuration = selectedServices.reduce((sum, s) => sum + (s.duration || 0), 0);
+  // When a queue is selected, use its exact prices; otherwise show ranges.
+  const hasResolved = Object.keys(resolvedByServiceUuid).length > 0;
+
+  const totalPriceMin = hasResolved
+    ? selectedServices.reduce((sum, s) => {
+        const r = resolvedByServiceUuid[s.service_uuid];
+        return sum + (r?.price ?? s.price_min ?? s.price ?? 0);
+      }, 0)
+    : selectedServices.reduce((sum, s) => sum + (s.price_min ?? s.price ?? 0), 0);
+
+  const totalPriceMax = hasResolved
+    ? totalPriceMin // exact — no range
+    : selectedServices.reduce((sum, s) => sum + (s.price_max ?? s.price ?? 0), 0);
+
+  const totalPrice = totalPriceMin;
+  const totalPriceRange = !hasResolved && totalPriceMin !== totalPriceMax;
+
+  const totalDuration = hasResolved
+    ? selectedServices.reduce((sum, s) => {
+        const r = resolvedByServiceUuid[s.service_uuid];
+        return sum + (r?.duration ?? s.duration_min ?? s.duration ?? 0);
+      }, 0)
+    : selectedServices.reduce(
+        (sum, s) => sum + (s.duration_max ?? s.duration_min ?? s.duration ?? 0),
+        0
+      );
 
   const handleDateSelect = (date: string) => {
     if (isDateInPast(date)) return;
@@ -217,7 +273,12 @@ export default function BookingPage() {
         business_id: businessId,
         queue_id: queueId,
         queue_date: selectedDate,
-        service_ids: serviceIds.length > 0 ? serviceIds : initialSelectedServices,
+        service_ids:
+          resolvedServiceIds.length > 0
+            ? resolvedServiceIds
+            : serviceIds.length > 0
+            ? serviceIds
+            : initialSelectedServices,
       });
       if (result.already_in_queue) {
         setBookingConfirmation(result);
@@ -323,19 +384,46 @@ export default function BookingPage() {
                 </tr>
               </thead>
               <tbody>
-                {selectedServices.map((service) => (
-                  <tr key={service.uuid}>
-                    <td className="bp-td-service">{service.name}</td>
-                    <td className="bp-td-duration">{formatDurationMinutes(service.duration ?? 0)}</td>
-                    <td className="bp-td-price">₹{service.price ?? 0}</td>
-                  </tr>
-                ))}
+                {selectedServices.map((service) => {
+                  const resolved = resolvedByServiceUuid[service.service_uuid];
+                  let durationStr: string;
+                  let priceStr: string;
+                  if (resolved) {
+                    // Exact values for the selected queue
+                    durationStr = formatDurationMinutes(resolved.duration ?? 0);
+                    priceStr = `₹${resolved.price ?? 0}`;
+                  } else {
+                    const hasDurationRange =
+                      service.duration_min != null &&
+                      service.duration_max != null &&
+                      service.duration_min !== service.duration_max;
+                    const hasPriceRange =
+                      service.price_min != null &&
+                      service.price_max != null &&
+                      service.price_min !== service.price_max;
+                    durationStr = hasDurationRange
+                      ? `${formatDurationMinutes(service.duration_min ?? 0)} – ${formatDurationMinutes(service.duration_max ?? 0)}`
+                      : formatDurationMinutes(service.duration ?? service.duration_min ?? service.duration_max ?? 0);
+                    priceStr = hasPriceRange
+                      ? `₹${service.price_min} – ₹${service.price_max}`
+                      : `₹${service.price ?? service.price_min ?? service.price_max ?? 0}`;
+                  }
+                  return (
+                    <tr key={service.uuid}>
+                      <td className="bp-td-service">{service.name}</td>
+                      <td className="bp-td-duration">{durationStr}</td>
+                      <td className="bp-td-price">{priceStr}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             <div className="bp-services-total">
               <span className="bp-services-total-label">Total</span>
               <span className="bp-services-total-duration">{formatDurationMinutes(totalDuration)}</span>
-              <span className="bp-services-total-amount">₹{totalPrice}</span>
+              <span className="bp-services-total-amount">
+                {totalPriceRange ? `₹${totalPriceMin} – ₹${totalPriceMax}` : `₹${totalPrice}`}
+              </span>
             </div>
           </div>
         )}
@@ -429,7 +517,9 @@ export default function BookingPage() {
           <div className="bp-summary-card">
             <div className="bp-summary-row">
               <span className="bp-summary-label">Total amount</span>
-              <span className="bp-summary-amount">₹{totalPrice}</span>
+              <span className="bp-summary-amount">
+                {totalPriceRange ? `₹${totalPriceMin} – ₹${totalPriceMax}` : `₹${totalPrice}`}
+              </span>
             </div>
             <p className="bp-summary-meta">
               {selectedServices.length} {selectedServices.length === 1 ? t("service") : t("services")} · {selectedDate ? formatDateDisplay(selectedDate) : ""}

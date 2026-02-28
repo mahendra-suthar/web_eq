@@ -82,14 +82,15 @@ const BusinessProfile = () => {
 
     const [categories, setCategories] = useState<Category[]>([]);
 
+    // Backend convention: 0 = Monday, 6 = Sunday (ISO-like)
     const dayNames = useMemo(() => [
-        { day_of_week: 0, day_name: t("sunday") },
-        { day_of_week: 1, day_name: t("monday") },
-        { day_of_week: 2, day_name: t("tuesday") },
-        { day_of_week: 3, day_name: t("wednesday") },
-        { day_of_week: 4, day_name: t("thursday") },
-        { day_of_week: 5, day_name: t("friday") },
-        { day_of_week: 6, day_name: t("saturday") },
+        { day_of_week: 0, day_name: t("monday") },
+        { day_of_week: 1, day_name: t("tuesday") },
+        { day_of_week: 2, day_name: t("wednesday") },
+        { day_of_week: 3, day_name: t("thursday") },
+        { day_of_week: 4, day_name: t("friday") },
+        { day_of_week: 5, day_name: t("saturday") },
+        { day_of_week: 6, day_name: t("sunday") },
     ], [t]);
 
     const fetchProfile = useCallback(async () => {
@@ -612,7 +613,11 @@ const BusinessProfile = () => {
 
                                 {!scheduleData.isAlwaysOpen && (
                                     <div className="schedule-list">
-                                        {scheduleData.schedule.map((day, idx) => (
+                                        {[...scheduleData.schedule]
+                                            .sort((a, b) => ((a.day_of_week + 1) % 7) - ((b.day_of_week + 1) % 7))
+                                            .map((day) => {
+                                            const idx = scheduleData.schedule.findIndex(d => d.day_of_week === day.day_of_week);
+                                            return (
                                             <div key={day.day_of_week} className="schedule-item">
                                                 <div className="schedule-day">
                                                     {isEditing ? (
@@ -669,7 +674,8 @@ const BusinessProfile = () => {
                                                     </div>
                                                 )}
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>

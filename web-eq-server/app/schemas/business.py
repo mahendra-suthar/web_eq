@@ -248,7 +248,13 @@ class BusinessDetailData(BaseModel):
     schedule: Optional[BusinessScheduleInfo] = None
 
     @classmethod
-    def from_business(cls, business, address=None, schedule_info: Optional[BusinessScheduleInfo] = None) -> "BusinessDetailData":
+    def from_business(
+        cls,
+        business,
+        address=None,
+        schedule_info: Optional[BusinessScheduleInfo] = None,
+        is_open: bool = False,
+    ) -> "BusinessDetailData":
         category_name = None
         if business.category:
             category_name = str(business.category.name)
@@ -264,30 +270,68 @@ class BusinessDetailData(BaseModel):
             category_id=str(business.category_id) if business.category_id else None,
             category_name=category_name,
             address=AddressData.from_address(address) if address else None,
-            is_open=True,
+            is_open=is_open,
             is_always_open=is_always_open,
             schedule=schedule_info,
         )
 
 
 class BusinessServiceData(BaseModel):
-    uuid: str
+    """One row per logical service; same service with different prices/durations is grouped."""
+    uuid: str  # first variant's queue_service uuid (backward compat / selection key)
     service_uuid: str
     name: str
     description: Optional[str] = None
     image: Optional[str] = None
-    price: Optional[float] = None
-    duration: Optional[int] = None
+    price: Optional[float] = None  # single price when one variant only
+    price_min: Optional[float] = None  # min price across variants
+    price_max: Optional[float] = None  # max price across variants
+    duration: Optional[int] = None  # single duration when one variant only (minutes)
+    duration_min: Optional[int] = None
+    duration_max: Optional[int] = None
+    variant_uuids: List[str] = []  # all queue_service uuids for this logical service (for booking)
 
     @classmethod
     def from_queue_service_and_service(cls, queue_service, service) -> "BusinessServiceData":
         description = queue_service.description if queue_service.description else service.description
+        fee = queue_service.service_fee
+        duration_m = queue_service.avg_service_time
         return cls(
             uuid=str(queue_service.uuid),
             service_uuid=str(service.uuid),
             name=service.name,
             description=description,
             image=service.image,
-            price=queue_service.service_fee,
-            duration=queue_service.avg_service_time,
+            price=fee,
+            price_min=fee,
+            price_max=fee,
+            duration=duration_m,
+            duration_min=duration_m,
+            duration_max=duration_m,
+            variant_uuids=[str(queue_service.uuid)],
+        )
+
+    @classmethod
+    def from_grouped_variants(cls, items: List["BusinessServiceData"]) -> "BusinessServiceData":
+        """Merge multiple variants (same service) into one with price/duration range."""
+        if not items:
+            raise ValueError("from_grouped_variants requires at least one item")
+        if len(items) == 1:
+            return items[0]
+        first = items[0]
+        prices = [p for i in items for p in (i.price_min, i.price_max, i.price) if p is not None]
+        durations = [d for i in items for d in (i.duration_min, i.duration_max, i.duration) if d is not None]
+        return cls(
+            uuid=first.uuid,
+            service_uuid=first.service_uuid,
+            name=first.name,
+            description=first.description,
+            image=first.image,
+            price=None,
+            price_min=min(prices) if prices else None,
+            price_max=max(prices) if prices else None,
+            duration=None,
+            duration_min=min(durations) if durations else None,
+            duration_max=max(durations) if durations else None,
+            variant_uuids=[uid for i in items for uid in i.variant_uuids],
         )

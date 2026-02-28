@@ -52,6 +52,7 @@ export default function SendOTPPage() {
       await authService.sendOTP(DEFAULT_COUNTRY_CODE, phone, ProfileType.CUSTOMER.toLowerCase());
       
       navigate("/verify-otp", {
+        replace: true,
         state: {
           phone: `${DEFAULT_COUNTRY_CODE} ${phone.replace(/\D/g, "")}`,
           phoneNumber: phone.replace(/\D/g, ""),

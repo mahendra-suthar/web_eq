@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import pytz
 
 from app.core.constants import (
+    BIZ_EARLIEST_TIME,
+    BIZ_LATEST_TIME,
     QUEUE_USER_COMPLETED,
     QUEUE_USER_IN_PROGRESS,
     QUEUE_USER_REGISTERED,
@@ -46,6 +48,23 @@ def current_time_app_tz() -> dt_time:
 def day_of_week_app_tz() -> int:
     """Return current day of week in app TZ using JS convention: 0=Sunday, 1=Monday, …, 6=Saturday."""
     return (now_app_tz().weekday() + 1) % 7
+
+
+def is_full_day(schedule: Any) -> bool:
+    """Return True if the schedule represents a full day (00:00–23:59 or no times = 24/7).
+
+    *schedule* must have is_open, opening_time, closing_time (or None). Used for
+    "always open" derivation: only full-day schedules count as always open.
+    """
+    if not getattr(schedule, "is_open", False):
+        return False
+    ot = getattr(schedule, "opening_time", None)
+    ct = getattr(schedule, "closing_time", None)
+    if ot is None and ct is None:
+        return True
+    if ot is not None and ct is not None:
+        return ot <= BIZ_EARLIEST_TIME and ct >= BIZ_LATEST_TIME
+    return False
 
 
 def generate_invitation_code(length: int = 8, expires_in_hours: Optional[int] = 48) -> str:

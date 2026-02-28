@@ -132,9 +132,19 @@
   }
 }
 
-.landing-today-card {
+.landing-today-cards {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
   max-width: 480px;
   margin: 0 auto;
+}
+
+.landing-today-card {
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
   padding: 24px;
   background: #fff;
   border: 1px solid #E0F2F1;

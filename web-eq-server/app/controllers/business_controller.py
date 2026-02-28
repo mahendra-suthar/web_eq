@@ -179,7 +179,25 @@ class BusinessController:
             else:
                 schedule_info = BusinessScheduleInfo(is_always_open=is_always_open, schedules=[])
 
-            return BusinessDetailData.from_business(business, address, schedule_info=schedule_info)
+            # Compute is_open from current time and today's schedule (same logic as get_businesses list)
+            current_time = current_time_app_tz()
+            day_of_week = day_of_week_app_tz()
+            schedule_for_today = next((s for s in schedules if s.day_of_week == day_of_week), None) if schedules else None
+            if is_always_open:
+                is_open = True
+            elif schedule_for_today and schedule_for_today.is_open:
+                opening = schedule_for_today.opening_time
+                closing = schedule_for_today.closing_time
+                if opening and closing:
+                    is_open = opening <= current_time <= closing
+                else:
+                    is_open = True
+            else:
+                is_open = False
+
+            return BusinessDetailData.from_business(
+                business, address, schedule_info=schedule_info, is_open=is_open
+            )
         except HTTPException:
             raise
         except SQLAlchemyError:
@@ -191,9 +209,20 @@ class BusinessController:
     def get_business_services(self, business_id: UUID) -> List[BusinessServiceData]:
         try:
             services_data = self.queue_service.get_business_services(business_id)
-            return [
+            # Build one row per queue_service, then group by service (same name/price variants)
+            flat = [
                 BusinessServiceData.from_queue_service_and_service(queue_svc, service)
                 for queue_svc, service in services_data
+            ]
+            # Group by service_uuid so same service with different price/duration shows as one card with range
+            by_service: Dict[UUID, List[BusinessServiceData]] = {}
+            for item in flat:
+                key = UUID(item.service_uuid)
+                if key not in by_service:
+                    by_service[key] = []
+                by_service[key].append(item)
+            return [
+                BusinessServiceData.from_grouped_variants(group) for group in by_service.values()
             ]
         except HTTPException:
             raise

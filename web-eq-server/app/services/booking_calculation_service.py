@@ -59,8 +59,10 @@ class BookingCalculationService:
                 employee.uuid, ScheduleEntityType.EMPLOYEE, day_of_week
             )
             if schedule:
-                opening = schedule.opening_time or DEFAULT_OPEN_TIME
-                closing = schedule.closing_time or BIZ_LATEST_TIME
+                # NOTE: time(0, 0) is falsy in Python — use explicit None checks so
+                # midnight (always-open) opening is never replaced by DEFAULT_OPEN_TIME.
+                opening = schedule.opening_time if schedule.opening_time is not None else DEFAULT_OPEN_TIME
+                closing = schedule.closing_time if schedule.closing_time is not None else BIZ_LATEST_TIME
 
                 exception = self.schedule.get_exception_for_date(schedule.uuid, booking_date)
                 if exception:
@@ -83,9 +85,10 @@ class BookingCalculationService:
             # Employee exists but has no schedule configured for this day
             return DEFAULT_OPEN_TIME, BIZ_LATEST_TIME, [], False
 
-        # Fall back to queue-level times (no breaks) — assume available
-        if queue.start_time:
-            return queue.start_time, queue.end_time or BIZ_LATEST_TIME, [], True
+        # Fall back to queue-level times (no breaks) — assume available.
+        # NOTE: time(0, 0) is falsy — use explicit None check to preserve midnight start_time.
+        if queue.start_time is not None:
+            return queue.start_time, queue.end_time if queue.end_time is not None else BIZ_LATEST_TIME, [], True
 
         return DEFAULT_OPEN_TIME, BIZ_LATEST_TIME, [], True
 
@@ -147,8 +150,14 @@ class BookingCalculationService:
         business_id: UUID,
         booking_date: date,
         queue_service_ids: List[UUID],
+        today_metrics: Optional[Dict] = None,
+        services_by_queue: Optional[Dict] = None,
     ) -> Dict:
-        queue_options = self.get_queue_options(business_id, booking_date, queue_service_ids)
+        queue_options = self.get_queue_options(
+            business_id, booking_date, queue_service_ids,
+            services_by_queue or {},
+            today_metrics=today_metrics,
+        )
         if not queue_options:
             return {
                 "business_id": str(business_id),
@@ -180,8 +189,14 @@ class BookingCalculationService:
         business_id: UUID,
         booking_date: date,
         queue_service_ids: List[UUID],
+        today_metrics: Optional[Dict] = None,
+        services_by_queue: Optional[Dict] = None,
     ) -> Optional[Dict]:
-        queue_options = self.get_queue_options(business_id, booking_date, queue_service_ids)
+        queue_options = self.get_queue_options(
+            business_id, booking_date, queue_service_ids,
+            services_by_queue or {},
+            today_metrics=today_metrics,
+        )
         available = [o for o in queue_options if o["available"]]
         if not available:
             return None
@@ -193,29 +208,34 @@ class BookingCalculationService:
         business_id: UUID,
         booking_date: date,
         queue_service_ids: List[UUID],
+        services_by_queue: Dict,
+        today_metrics: Optional[Dict] = None,
     ) -> List[Dict]:
-        """Queues that can serve the selected services, with schedule-aware metrics."""
+        """Queues that can serve the selected services, with schedule-aware metrics.
+
+        today_metrics and services_by_queue are built by the controller from DB data.
+        """
         queues = self.queue.get_queues_offering_service_ids(business_id, queue_service_ids)
         if not queues:
             return []
 
         queue_ids = [q.uuid for q in queues]
-        today = date.today()
+        today = today_app_date()
         percentile_map = self.queue.get_historical_percentile_wait_batch(
             queue_ids, booking_date, 0.75, float(DEFAULT_AVG_TIME)
         )
         current_time = self.now_ist()
 
         if booking_date == today:
-            today_metrics = self.queue.get_today_queue_metrics_batch(queue_ids, booking_date)
+            metrics = today_metrics if today_metrics is not None else {}
             return [
-                self.build_today_option(queue, today_metrics, percentile_map, current_time)
+                self.build_today_option(queue, metrics, percentile_map, current_time, services_by_queue)
                 for queue in queues
             ]
 
         future_counts = self.queue.get_future_date_counts_batch(queue_ids, booking_date)
         return [
-            self.build_future_option(queue, future_counts, percentile_map, booking_date)
+            self.build_future_option(queue, future_counts, percentile_map, booking_date, services_by_queue)
             for queue in queues
         ]
 
@@ -226,6 +246,7 @@ class BookingCalculationService:
         today_metrics: Dict[UUID, Dict],
         percentile_map: Dict[UUID, float],
         current_time: datetime,
+        services_by_queue: Dict,
     ) -> Dict:
         t = today_metrics.get(
             queue.uuid,
@@ -239,6 +260,8 @@ class BookingCalculationService:
         today_date = current_time.date()
         open_time, close_time, breaks, employee_available = self.get_employee_window(queue, today_date)
 
+        queue_services = services_by_queue.get(queue.uuid, [])
+
         if not employee_available:
             return {
                 "queue_id": str(queue.uuid),
@@ -250,6 +273,7 @@ class BookingCalculationService:
                 "is_recommended": False,
                 "available": False,
                 "unavailability_reason": "employee_not_available",
+                "services": queue_services,
             }
 
         open_dt = self.ist.localize(datetime.combine(today_date, open_time))
@@ -271,6 +295,7 @@ class BookingCalculationService:
             "is_recommended": False,
             "available": available,
             "unavailability_reason": None,
+            "services": queue_services,
         }
 
     def build_future_option(
@@ -279,6 +304,7 @@ class BookingCalculationService:
         future_counts: Dict[UUID, int],
         percentile_map: Dict[UUID, float],
         booking_date: date,
+        services_by_queue: Dict,
     ) -> Dict:
         scheduled_count = future_counts.get(queue.uuid, 0)
         position, wait_minutes, wait_range = self.compute_future_wait(
@@ -286,6 +312,8 @@ class BookingCalculationService:
         )
 
         open_time, close_time, breaks, employee_available = self.get_employee_window(queue, booking_date)
+
+        queue_services = services_by_queue.get(queue.uuid, [])
 
         if not employee_available:
             return {
@@ -298,6 +326,7 @@ class BookingCalculationService:
                 "is_recommended": False,
                 "available": False,
                 "unavailability_reason": "employee_not_available",
+                "services": queue_services,
             }
 
         base_dt = datetime.combine(booking_date, open_time)
@@ -318,6 +347,7 @@ class BookingCalculationService:
             "is_recommended": False,
             "available": available,
             "unavailability_reason": None,
+            "services": queue_services,
         }
 
 
@@ -326,9 +356,10 @@ class BookingCalculationService:
         queue_id: UUID,
         booking_date: date,
         queue_service_ids: List[UUID],
+        today_metrics: Optional[Dict] = None,
     ) -> Dict:
-        """Real-time metrics for one queue on today's date."""
-        metrics_map = self.queue.get_today_queue_metrics_batch([queue_id], booking_date)
+        """Real-time metrics for one queue on today's date. today_metrics built by controller."""
+        metrics_map = today_metrics if today_metrics is not None else {}
         t = metrics_map.get(
             queue_id,
             {"registered_count": 0, "in_progress_count": 0, "total_wait_minutes": 0},

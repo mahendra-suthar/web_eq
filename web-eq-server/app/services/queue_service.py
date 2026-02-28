@@ -426,6 +426,37 @@ class QueueService:
         except SQLAlchemyError:
             raise
 
+    def get_queue_service_details_for_ids(
+        self, queue_service_ids: List[UUID]
+    ) -> List[dict]:
+        """Return flat list of service detail dicts for the given queue_service UUIDs (DB only).
+
+        Each dict has: queue_id (UUID), queue_service_uuid, service_uuid, service_name, price, duration.
+        Grouping by queue_id is done by the caller (controller).
+        """
+        if not queue_service_ids:
+            return []
+        try:
+            rows = (
+                self.db.query(QueueServiceModel, Service)
+                .join(Service, Service.uuid == QueueServiceModel.service_id)
+                .filter(QueueServiceModel.uuid.in_(queue_service_ids))
+                .all()
+            )
+            return [
+                {
+                    "queue_id": qs.queue_id,
+                    "queue_service_uuid": str(qs.uuid),
+                    "service_uuid": str(svc.uuid),
+                    "service_name": svc.name,
+                    "price": qs.service_fee,
+                    "duration": qs.avg_service_time,
+                }
+                for qs, svc in rows
+            ]
+        except SQLAlchemyError:
+            raise
+
     def get_queue_to_service_ids(self, queue_ids: List[UUID]) -> Dict[UUID, List[UUID]]:
         if not queue_ids:
             return {}
@@ -442,38 +473,40 @@ class QueueService:
         except SQLAlchemyError:
             raise
 
-    def get_today_queue_metrics_batch(
+    def get_today_active_queue_user_rows(
         self, queue_ids: List[UUID], booking_date: date
-    ) -> Dict[UUID, Dict[str, Any]]:
+    ) -> List[dict]:
+        """Return flat list of active (registered + in_progress) queue user rows for the given queues/date (DB only).
+
+        Each dict has: queue_id (UUID), status, turn_time, enqueue_time.
+        Aggregation and delay-aware remaining time are done by the caller (controller).
+        """
         if not queue_ids:
-            return {}
+            return []
         try:
             rows = (
                 self.db.query(
                     QueueUser.queue_id,
-                    func.count(case((QueueUser.status == QUEUE_USER_REGISTERED, 1))).label("registered_count"),
-                    func.count(case((QueueUser.status == QUEUE_USER_IN_PROGRESS, 1))).label("in_progress_count"),
-                    func.coalesce(func.sum(QueueUser.turn_time), 0).label("total_wait_minutes"),
+                    QueueUser.status,
+                    QueueUser.turn_time,
+                    QueueUser.enqueue_time,
                 )
                 .filter(
                     QueueUser.queue_id.in_(queue_ids),
                     QueueUser.queue_date == booking_date,
                     QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
                 )
-                .group_by(QueueUser.queue_id)
                 .all()
             )
-            result: Dict[UUID, Dict[str, Any]] = {
-                qid: {"registered_count": 0, "in_progress_count": 0, "total_wait_minutes": 0}
-                for qid in queue_ids
-            }
-            for row in rows:
-                result[row.queue_id] = {
-                    "registered_count": row.registered_count or 0,
-                    "in_progress_count": row.in_progress_count or 0,
-                    "total_wait_minutes": int(row.total_wait_minutes or 0),
+            return [
+                {
+                    "queue_id": row.queue_id,
+                    "status": row.status,
+                    "turn_time": row.turn_time,
+                    "enqueue_time": row.enqueue_time,
                 }
-            return result
+                for row in rows
+            ]
         except SQLAlchemyError:
             raise
 
@@ -630,6 +663,29 @@ class QueueService:
                 )
                 .order_by(QueueUser.created_at.desc())
                 .first()
+            )
+        except SQLAlchemyError:
+            raise
+
+    def get_today_active_appointments_for_user(
+        self, user_id: UUID, today: date
+    ) -> List[QueueUser]:
+        """Return all active (waiting or in_progress) queue users for this user and date, newest first."""
+        try:
+            return (
+                self.db.query(QueueUser)
+                .options(
+                    joinedload(QueueUser.queue).joinedload(Queue.business),
+                    joinedload(QueueUser.queue).joinedload(Queue.employees),
+                    selectinload(QueueUser.queue_user_services).joinedload(QueueUserService.queue_service).joinedload(QueueServiceModel.service),
+                )
+                .filter(
+                    QueueUser.user_id == user_id,
+                    QueueUser.queue_date == today,
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                )
+                .order_by(QueueUser.created_at.desc())
+                .all()
             )
         except SQLAlchemyError:
             raise
