@@ -22,6 +22,7 @@ from app.core.constants import (
     QUEUE_USER_REGISTERED,
     QUEUE_USER_IN_PROGRESS,
     QUEUE_USER_COMPLETED,
+    QUEUE_USER_CANCELLED,
     QUEUE_USER_EXPIRED,
 )
 
@@ -356,6 +357,94 @@ class QueueService:
             )
         self.db.commit()
         return queue_user
+
+    def get_queue_user_for_update(self, queue_user_id: UUID, user_id: UUID) -> Optional[QueueUser]:
+        try:
+            qu = (
+                self.db.query(QueueUser)
+                .filter(
+                    QueueUser.uuid == queue_user_id,
+                    QueueUser.user_id == user_id,
+                )
+                .with_for_update()
+                .first()
+            )
+            if qu is None:
+                return None
+            self.db.query(QueueUser).options(
+                joinedload(QueueUser.queue).joinedload(Queue.business),
+                selectinload(QueueUser.queue_user_services)
+                .joinedload(QueueUserService.queue_service)
+                .joinedload(QueueServiceModel.service),
+            ).filter(QueueUser.uuid == queue_user_id).first()
+            return qu
+        except SQLAlchemyError:
+            raise
+
+    def update_appointment(
+        self,
+        queue_user: QueueUser,
+        new_queue_id: Optional[UUID],
+        new_queue_services: Optional[list],
+        new_notes: Optional[str],
+        queue_changed: bool,
+        new_date: Optional[date] = None,
+        date_changed: bool = False,
+    ) -> QueueUser:
+        try:
+            if queue_changed and new_queue_id is not None:
+                queue_user.queue_id = new_queue_id
+                queue_user.reschedule_count = (queue_user.reschedule_count or 0) + 1
+
+            if date_changed and new_date is not None:
+                queue_user.queue_date = new_date
+                queue_user.reschedule_count = (queue_user.reschedule_count or 0) + 1
+
+            if new_notes is not None:
+                queue_user.notes = new_notes
+
+            if new_queue_services is not None:
+                self.db.query(QueueUserService).filter(
+                    QueueUserService.queue_user_id == queue_user.uuid
+                ).delete(synchronize_session=False)
+                for qs in new_queue_services:
+                    self.db.add(QueueUserService(
+                        queue_user_id=queue_user.uuid,
+                        queue_service_id=qs.uuid,
+                    ))
+                queue_user.turn_time = sum((qs.avg_service_time or 5) for qs in new_queue_services)
+
+            self.db.commit()
+            self.db.refresh(queue_user)
+            return queue_user
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+
+    def count_active_users_in_queue(self, queue_id: UUID, queue_date: date) -> int:
+        try:
+            return (
+                self.db.query(func.count(QueueUser.uuid))
+                .filter(
+                    QueueUser.queue_id == queue_id,
+                    QueueUser.queue_date == queue_date,
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                )
+                .scalar() or 0
+            )
+        except SQLAlchemyError:
+            raise
+
+    def cancel_appointment(self, queue_user: QueueUser, reason: str = "customer_cancelled") -> QueueUser:
+        try:
+            queue_user.status = QUEUE_USER_CANCELLED
+            queue_user.cancellation_reason = reason
+            self.db.commit()
+            self.db.refresh(queue_user)
+            return queue_user
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
 
     def get_queues_by_business_id(self, business_id: UUID) -> List[Queue]:
         try:

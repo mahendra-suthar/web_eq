@@ -268,7 +268,6 @@ class QueueUserDetailResponse(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class QueueServiceInfo(BaseModel):
-    """Service detail specific to a single queue option (resolved price & duration)."""
     queue_service_uuid: str
     service_uuid: str
     service_name: str
@@ -289,7 +288,6 @@ class QueueOptionData(BaseModel):
     # Set when the queue is unavailable for a specific reason rather than just being full.
     # e.g. "employee_not_available" — frontend should show this instead of metrics.
     unavailability_reason: Optional[str] = None
-    # Per-queue resolved service prices and durations (populated by booking-preview).
     services: List[QueueServiceInfo] = []
 
 
@@ -521,6 +519,7 @@ class CustomerTodayAppointmentResponse(BaseModel):
     queue_name: str
     business_id: str
     business_name: str
+    queue_date: date
     token_number: str
     status: int  # 1=waiting, 2=in_progress
     position: Optional[int] = None
@@ -528,6 +527,7 @@ class CustomerTodayAppointmentResponse(BaseModel):
     estimated_wait_range: Optional[str] = None
     estimated_appointment_time: Optional[str] = None  # 12h e.g. "4:30 PM"
     service_summary: Optional[str] = None
+    queue_service_uuids: List[str] = []
 
     @classmethod
     def from_queue_user_and_metrics(
@@ -539,6 +539,7 @@ class CustomerTodayAppointmentResponse(BaseModel):
         metrics: Dict[str, Any],
         service_summary: Optional[str],
         appointment_time_12h: Optional[str],
+        queue_service_uuids: Optional[List[str]] = None,
     ) -> "CustomerTodayAppointmentResponse":
         """Build from queue user, queue, business ids/names, computed metrics, service summary, and formatted time."""
         return cls(
@@ -547,6 +548,7 @@ class CustomerTodayAppointmentResponse(BaseModel):
             queue_name=queue.name if queue else "",
             business_id=business_id,
             business_name=business_name,
+            queue_date=qu.queue_date,
             token_number=qu.token_number or "",
             status=qu.status,
             position=metrics.get("position"),
@@ -554,9 +556,9 @@ class CustomerTodayAppointmentResponse(BaseModel):
             estimated_wait_range=metrics.get("wait_range"),
             estimated_appointment_time=appointment_time_12h,
             service_summary=service_summary,
+            queue_service_uuids=queue_service_uuids or [],
         )
 
 
 class CustomerTodayAppointmentsResponse(BaseModel):
-    """All of today's active appointments for the logged-in customer."""
     items: List[CustomerTodayAppointmentResponse]

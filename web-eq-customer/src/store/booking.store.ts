@@ -19,7 +19,6 @@ export interface AvailableSlotData {
   status: string;
 }
 
-// Resolved service detail for a specific queue option (exact price & duration, not a range)
 export interface QueueServiceInfo {
   queue_service_uuid: string;
   service_uuid: string;
@@ -39,7 +38,6 @@ export interface QueueOptionData {
   is_recommended: boolean;
   available: boolean;
   unavailability_reason?: string | null;
-  /** Per-queue resolved service prices and durations. Empty for unavailable queues. */
   services: QueueServiceInfo[];
 }
 

@@ -13,6 +13,7 @@ from app.controllers.queue_controller import QueueController
 from app.schemas.profile import CustomerProfileResponse
 from app.schemas.customer import (
     CustomerProfileUpdateInput,
+    AppointmentUpdateInput,
     CustomerAppointmentListResponse,
     CustomerAppointmentDetailResponse,
 )
@@ -94,3 +95,32 @@ async def get_appointment_by_id(
 ):
     controller = CustomerController(db)
     return controller.get_appointment_by_id(current_user.uuid, queue_user_id)
+
+
+@customer_router.patch(
+    "/appointments/{queue_user_id}",
+    response_model=CustomerAppointmentDetailResponse,
+    summary="Update a waiting appointment (services, queue, notes)",
+)
+async def update_appointment(
+    queue_user_id: UUID,
+    data: AppointmentUpdateInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    controller = CustomerController(db)
+    return await controller.update_appointment(current_user.uuid, queue_user_id, data)
+
+
+@customer_router.post(
+    "/appointments/{queue_user_id}/cancel",
+    response_model=CustomerAppointmentDetailResponse,
+    summary="Cancel a waiting/in-progress appointment and remove from queue",
+)
+async def cancel_appointment(
+    queue_user_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    controller = CustomerController(db)
+    return await controller.cancel_appointment(current_user.uuid, queue_user_id)

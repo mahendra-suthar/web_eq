@@ -8,6 +8,7 @@ import type {
 } from "../../services/auth/auth.service";
 import { AppointmentService } from "../../services/appointment/appointment.service";
 import type { CustomerAppointmentListItem } from "../../services/appointment/appointment.service";
+import AppointmentActions from "../../components/appointment-actions";
 import "./profile.scss";
 
 const VALID_TABS = ["profile", "appointments", "settings"] as const;
@@ -207,6 +208,10 @@ function AppointmentsSection() {
     }
   };
 
+  const refreshList = useCallback(() => {
+    loadPage(0, false);
+  }, [loadPage]);
+
   return (
     <section className="profile-section profile-section--appointments">
       <h2 className="profile-section__title">Appointments</h2>
@@ -251,6 +256,7 @@ function AppointmentsSection() {
                       )}
                     </div>
                   )}
+                  <AppointmentActions appointment={item} onUpdated={refreshList} />
                 </article>
               </li>
             ))}

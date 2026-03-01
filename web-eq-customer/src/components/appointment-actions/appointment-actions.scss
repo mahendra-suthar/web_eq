@@ -1,0 +1,116 @@
+@use "../../variables.scss" as *;
+
+// ─── Action buttons row ───
+.appt-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.appt-actions__btn {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.appt-actions__btn--edit {
+  color: $primary;
+  background: rgba(0, 105, 92, 0.08);
+  border-color: $primary;
+
+  &:hover {
+    background: $primary;
+    color: #fff;
+  }
+}
+
+.appt-actions__btn--cancel {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-color: #fecaca;
+
+  &:hover {
+    background: #b91c1c;
+    color: #fff;
+    border-color: #b91c1c;
+  }
+}
+
+// ─── Modal overlay ───
+.appt-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 20px;
+  animation: appt-modal-fade 0.2s ease-out;
+}
+
+@keyframes appt-modal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.appt-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  animation: appt-modal-slide 0.25s ease-out;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+
+@keyframes appt-modal-slide {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.appt-modal__title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: $primary-dark;
+  margin: 0 0 6px;
+}
+
+.appt-modal__subtitle {
+  font-size: 0.9rem;
+  color: $text-secondary;
+  margin: 0 0 20px;
+}
+
+.appt-modal__desc {
+  font-size: 0.9375rem;
+  color: $text-primary;
+  line-height: 1.5;
+  margin: 0 0 20px;
+}
+
+.appt-modal__error {
+  padding: 0.6rem 0.75rem;
+  background: #fef2f2;
+  color: #b91c1c;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  margin-bottom: 16px;
+}
+
+.appt-modal__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 8px;
+}
+

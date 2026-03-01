@@ -696,10 +696,13 @@ class QueueController:
             metrics = calc_service.get_existing_queue_user_metrics(qu)
 
             service_names = []
+            qs_uuids = []
             for qus in getattr(qu, "queue_user_services", []) or []:
                 qs = getattr(qus, "queue_service", None)
-                if qs and getattr(qs, "service", None):
-                    service_names.append(qs.service.name)
+                if qs:
+                    qs_uuids.append(str(qs.uuid))
+                    if getattr(qs, "service", None):
+                        service_names.append(qs.service.name)
             service_summary = " · ".join(service_names) if service_names else None
 
             appointment_time_12h = None
@@ -719,6 +722,7 @@ class QueueController:
                 CustomerTodayAppointmentResponse.from_queue_user_and_metrics(
                     qu, queue, business_id, business_name,
                     metrics, service_summary, appointment_time_12h,
+                    queue_service_uuids=qs_uuids,
                 )
             )
         return CustomerTodayAppointmentsResponse(items=items)

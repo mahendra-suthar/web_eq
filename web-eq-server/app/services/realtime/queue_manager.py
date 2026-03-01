@@ -208,6 +208,60 @@ class QueueManager:
             "token_number": token_number
         }
     
+    async def remove_from_queue(
+        self,
+        db: Session,
+        queue_id: str,
+        user_id: str,
+        date_str: str,
+        business_id: str,
+    ) -> None:
+        """Remove a user from the Redis queue list and delete their hash, then broadcast."""
+        if not self.redis:
+            return
+        key = f"queue:{queue_id}:{date_str}:status:{QueueStatus.REGISTERED.value}"
+        await self.redis.lrem(key, 0, user_id)
+        user_key = f"user:{queue_id}:{date_str}:{user_id}"
+        await self.redis.delete(user_key)
+        await self.notify_queue_update(db, business_id, date_str)
+
+    async def update_queue_user(
+        self,
+        db: Session,
+        old_queue_id: str,
+        new_queue_id: str,
+        user_id: str,
+        date_str: str,
+        new_total_service_time: int,
+        token_number: str,
+        business_id: str,
+        queue_changed: bool,
+    ) -> None:
+        """Move a user between queues or update their service time in Redis, then broadcast."""
+        if not self.redis:
+            return
+
+        if queue_changed:
+            old_key = f"queue:{old_queue_id}:{date_str}:status:{QueueStatus.REGISTERED.value}"
+            await self.redis.lrem(old_key, 0, user_id)
+            old_user_key = f"user:{old_queue_id}:{date_str}:{user_id}"
+            await self.redis.delete(old_user_key)
+
+            new_key = f"queue:{new_queue_id}:{date_str}:status:{QueueStatus.REGISTERED.value}"
+            await self.redis.rpush(new_key, user_id)
+            new_user_key = f"user:{new_queue_id}:{date_str}:{user_id}"
+            await self.redis.hset(new_user_key, mapping={
+                "token_number": token_number,
+                "total_time": str(new_total_service_time * 60),
+                "status": QueueStatus.REGISTERED.value,
+                "created_at": self.get_current_ist_time().isoformat(),
+            })
+        else:
+            user_key = f"user:{new_queue_id}:{date_str}:{user_id}"
+            await self.redis.hset(user_key, "total_time", str(new_total_service_time * 60))
+
+        await self.notify_queue_update(db, business_id, date_str)
+
     async def calculate_wait_time(self, queue_id: str, date_str: str, position: int) -> int:
         """Calculate estimated wait time based on queue position and service times."""
         if not self.redis or position <= 0:

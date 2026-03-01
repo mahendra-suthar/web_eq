@@ -7,6 +7,7 @@ import Button from "../../components/button";
 import { CategoryService, type CategoryWithServicesData } from "../../services/category/category.service";
 import { AppointmentService, type TodayAppointmentResponse } from "../../services/appointment/appointment.service";
 import { useAuthStore } from "../../store/auth.store";
+import AppointmentActions from "../../components/appointment-actions";
 import { formatDurationMinutes, formatTimeToDisplay } from "../../utils/util";
 import "./landing.scss";
 
@@ -146,6 +147,7 @@ export default function LandingPage() {
                       </span>
                     )}
                   </div>
+                  <AppointmentActions appointment={appointment} onUpdated={fetchTodayAppointments} />
                   <p className="landing-today-cta">Tap to view business →</p>
                 </div>
               ))}

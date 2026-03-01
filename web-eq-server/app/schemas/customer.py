@@ -15,6 +15,14 @@ class CustomerProfileUpdateInput(BaseModel):
     gender: Optional[int] = None
 
 
+class AppointmentUpdateInput(BaseModel):
+    """Fields allowed for PATCH /customer/appointments/{id}. At least one field required."""
+    queue_id: Optional[UUID] = None
+    queue_date: Optional[date] = None
+    service_ids: Optional[List[UUID]] = None  # QueueService UUIDs
+    notes: Optional[str] = None
+
+
 class CustomerAppointmentListItem(BaseModel):
     """One row in the customer's appointment list (non-real-time). Includes metrics when status is waiting/in_progress."""
     queue_user_id: str
@@ -26,8 +34,8 @@ class CustomerAppointmentListItem(BaseModel):
     status: int  # 1=waiting, 2=in_progress, 3=completed, 4=failed, 5=cancelled, 7=expired
     token_number: Optional[str] = None
     service_summary: Optional[str] = None
+    queue_service_uuids: List[str] = []
     created_at: Optional[datetime] = None
-    # Populated for status 1 or 2
     position: Optional[int] = None
     estimated_wait_minutes: Optional[int] = None
     estimated_wait_range: Optional[str] = None
@@ -41,6 +49,7 @@ class CustomerAppointmentListItem(BaseModel):
         business,
         service_summary: Optional[str] = None,
         metrics: Optional[dict] = None,
+        queue_service_uuids: Optional[List[str]] = None,
     ) -> "CustomerAppointmentListItem":
         business_name = business.name if business else ""
         business_id = str(queue.merchant_id) if queue else ""
@@ -54,6 +63,7 @@ class CustomerAppointmentListItem(BaseModel):
             status=queue_user.status,
             token_number=queue_user.token_number,
             service_summary=service_summary,
+            queue_service_uuids=queue_service_uuids or [],
             created_at=getattr(queue_user, "created_at", None),
             position=metrics.get("position") if metrics else None,
             estimated_wait_minutes=metrics.get("wait_minutes") if metrics else None,
@@ -73,6 +83,7 @@ class CustomerAppointmentDetailResponse(BaseModel):
     status: int
     token_number: Optional[str] = None
     service_summary: Optional[str] = None
+    queue_service_uuids: List[str] = []
     position: Optional[int] = None
     estimated_wait_minutes: Optional[int] = None
     estimated_wait_range: Optional[str] = None
@@ -89,9 +100,11 @@ class CustomerAppointmentDetailResponse(BaseModel):
         business,
         service_summary: Optional[str],
         metrics: Optional[dict],
+        queue_service_uuids: Optional[List[str]] = None,
     ) -> "CustomerAppointmentDetailResponse":
         business_name = business.name if business else ""
         business_id = str(queue.merchant_id) if queue else ""
+        qs_uuids = queue_service_uuids or []
         return cls(
             queue_user_id=str(queue_user.uuid),
             queue_id=str(queue.uuid),
@@ -102,6 +115,7 @@ class CustomerAppointmentDetailResponse(BaseModel):
             status=queue_user.status,
             token_number=queue_user.token_number,
             service_summary=service_summary,
+            queue_service_uuids=qs_uuids,
             position=metrics.get("position") if metrics else None,
             estimated_wait_minutes=metrics.get("wait_minutes") if metrics else None,
             estimated_wait_range=metrics.get("wait_range") if metrics else None,

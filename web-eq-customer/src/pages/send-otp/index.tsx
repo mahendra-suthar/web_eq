@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AuthService } from "../../services/auth/auth.service";
 import { PHONE_NUMBER_LENGTH, DEFAULT_COUNTRY_CODE, VALID_PHONE_START_DIGITS, OTPErrorCode, ProfileType } from "../../utils/constants";
-import { saveBookingReturnState } from "../../utils/bookingReturnState";
+import { saveBookingReturnState, getBookingReturnState } from "../../utils/bookingReturnState";
 import Button from "../../components/button";
 import "./send-otp.scss";
 
@@ -15,21 +15,49 @@ export default function SendOTPPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
-  const returnTo = (location.state?.returnTo as string) || null;
-  const selectedServices = (location.state?.selectedServices as string[]) || null;
-  const selectedServicesData = location.state?.selectedServicesData ?? null;
-  const businessName = (location.state?.businessName as string) || null;
+  const {
+    returnTo,
+    selectedServices,
+    selectedServicesData,
+    businessName,
+    rescheduleQueueUserId,
+    rescheduleInitialDate,
+  } = useMemo(() => {
+    const fromState = {
+      returnTo: (location.state?.returnTo as string) || null,
+      selectedServices: (location.state?.selectedServices as string[]) || null,
+      selectedServicesData: location.state?.selectedServicesData ?? null,
+      businessName: (location.state?.businessName as string) || null,
+      rescheduleQueueUserId: (location.state?.rescheduleQueueUserId as string) || null,
+      rescheduleInitialDate: (location.state?.rescheduleInitialDate as string) || null,
+    };
+    if (fromState.returnTo) return fromState;
+    const stored = getBookingReturnState();
+    if (stored?.returnTo) {
+      return {
+        returnTo: stored.returnTo,
+        selectedServices: stored.selectedServices || null,
+        selectedServicesData: stored.selectedServicesData ?? null,
+        businessName: stored.businessName || null,
+        rescheduleQueueUserId: stored.rescheduleQueueUserId ?? null,
+        rescheduleInitialDate: stored.rescheduleInitialDate ?? null,
+      };
+    }
+    return fromState;
+  }, [location.state]);
 
   useEffect(() => {
-    if (returnTo && (selectedServices?.length || selectedServicesData?.length)) {
+    if (returnTo && (selectedServices?.length || selectedServicesData?.length || rescheduleQueueUserId)) {
       saveBookingReturnState({
         returnTo,
         selectedServices: selectedServices || [],
         selectedServicesData: selectedServicesData || [],
         businessName: businessName || "",
+        rescheduleQueueUserId,
+        rescheduleInitialDate,
       });
     }
-  }, [returnTo, selectedServices, selectedServicesData, businessName]);
+  }, [returnTo, selectedServices, selectedServicesData, businessName, rescheduleQueueUserId, rescheduleInitialDate]);
 
   const validatePhone = (phoneNumber: string): boolean => {
     const digits = phoneNumber.replace(/\D/g, "");
@@ -61,6 +89,8 @@ export default function SendOTPPage() {
           selectedServices,
           selectedServicesData,
           businessName,
+          rescheduleQueueUserId: rescheduleQueueUserId ?? undefined,
+          rescheduleInitialDate: rescheduleInitialDate ?? undefined,
         },
       });
     } catch (err: any) {

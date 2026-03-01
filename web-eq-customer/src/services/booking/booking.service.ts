@@ -16,6 +16,13 @@ export interface BookingCreateInput {
   notes?: string;
 }
 
+export interface RescheduleInput {
+  queue_id: string;
+  queue_date: string; // YYYY-MM-DD
+  service_ids: string[]; // QueueService UUIDs
+  notes?: string;
+}
+
 export class BookingService extends HttpClient {
   constructor() {
     super();
@@ -79,6 +86,23 @@ export class BookingService extends HttpClient {
       return await this.post<BookingData>('/queue/book', input);
     } catch (error: any) {
       console.error('Failed to create booking:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Reschedule an existing appointment.
+   * Calls PATCH /customer/appointments/{queueUserId} to update queue, date, and services.
+   * Uses the same confirm flow as createBooking but targets an existing QueueUser.
+   */
+  async rescheduleAppointment(
+    queueUserId: string,
+    input: RescheduleInput
+  ): Promise<void> {
+    try {
+      await this.patch<unknown>(`/customer/appointments/${queueUserId}`, input);
+    } catch (error: any) {
+      console.error('Failed to reschedule appointment:', error);
       throw error;
     }
   }

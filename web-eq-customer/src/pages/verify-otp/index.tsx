@@ -17,15 +17,24 @@ export default function VerifyOTPPage() {
   const phone = (location.state?.phone as string) || "";
   const phoneNumber = (location.state?.phoneNumber as string) || "";
   const countryCode = (location.state?.countryCode as string) || DEFAULT_COUNTRY_CODE;
-  // Restore booking return state from location or sessionStorage (survives refresh)
-  const { returnTo, selectedServices, selectedServicesData, businessName } = useMemo(() => {
+  // Restore booking return state from location or sessionStorage (survives refresh and 401 redirect)
+  const {
+    returnTo,
+    selectedServices,
+    selectedServicesData,
+    businessName,
+    rescheduleQueueUserId,
+    rescheduleInitialDate,
+  } = useMemo(() => {
     const fromLocation = {
       returnTo: (location.state?.returnTo as string) || null,
       selectedServices: (location.state?.selectedServices as string[]) || null,
       selectedServicesData: location.state?.selectedServicesData ?? null,
       businessName: (location.state?.businessName as string) || null,
+      rescheduleQueueUserId: (location.state?.rescheduleQueueUserId as string) || null,
+      rescheduleInitialDate: (location.state?.rescheduleInitialDate as string) || null,
     };
-    if (fromLocation.returnTo && (fromLocation.selectedServices?.length || fromLocation.selectedServicesData?.length)) {
+    if (fromLocation.returnTo && (fromLocation.selectedServices?.length || fromLocation.selectedServicesData?.length || fromLocation.rescheduleQueueUserId)) {
       return fromLocation;
     }
     const stored = getBookingReturnState();
@@ -35,6 +44,8 @@ export default function VerifyOTPPage() {
         selectedServices: stored.selectedServices || null,
         selectedServicesData: stored.selectedServicesData?.length ? stored.selectedServicesData : null,
         businessName: stored.businessName || null,
+        rescheduleQueueUserId: stored.rescheduleQueueUserId || null,
+        rescheduleInitialDate: stored.rescheduleInitialDate || null,
       };
     }
     return fromLocation;
@@ -97,11 +108,16 @@ export default function VerifyOTPPage() {
         };
         setUserInfo(userData);
 
-        // Navigate immediately so user is never stuck; replace so Back from book goes to business details
         if (returnTo) {
           navigate(returnTo, {
             replace: true,
-            state: { selectedServices, selectedServicesData, businessName },
+            state: {
+              selectedServices,
+              selectedServicesData,
+              businessName,
+              rescheduleQueueUserId: rescheduleQueueUserId ?? undefined,
+              rescheduleInitialDate: rescheduleInitialDate ?? undefined,
+            },
           });
         } else {
           navigate("/");
@@ -200,7 +216,7 @@ export default function VerifyOTPPage() {
   return (
     <div className="verify-otp-page">
       <div className="verify-otp-header">
-        <button className="back-button" onClick={() => navigate("/send-otp", { state: { returnTo, selectedServices, selectedServicesData, businessName } })}>
+        <button className="back-button" onClick={() => navigate("/send-otp", { state: { returnTo, selectedServices, selectedServicesData, businessName, rescheduleQueueUserId, rescheduleInitialDate } })}>
           ←
         </button>
         <div className="header-content">

@@ -277,7 +277,6 @@ class BusinessDetailData(BaseModel):
 
 
 class BusinessServiceData(BaseModel):
-    """One row per logical service; same service with different prices/durations is grouped."""
     uuid: str  # first variant's queue_service uuid (backward compat / selection key)
     service_uuid: str
     name: str

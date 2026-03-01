@@ -20,47 +20,81 @@ export default function BookingPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
 
-  // Restore from location.state or sessionStorage (survives OTP redirect/refresh)
-  const { initialSelectedServices, initialSelectedServicesData, initialBusinessName } = useMemo(() => {
+  const {
+    initialSelectedServices,
+    initialSelectedServicesData,
+    initialBusinessName,
+    rescheduleQueueUserId,
+    rescheduleInitialDate,
+  } = useMemo(() => {
     const fromLocation = {
-      initialSelectedServices: (location.state?.selectedServices as string[]) || [],
+      initialSelectedServices:     (location.state?.selectedServices     as string[])              || [],
       initialSelectedServicesData: (location.state?.selectedServicesData as BusinessServiceData[]) || [],
-      initialBusinessName: (location.state?.businessName as string) || "",
+      initialBusinessName:         (location.state?.businessName         as string)                || "",
+      rescheduleQueueUserId:       (location.state?.rescheduleQueueUserId as string | undefined)   || undefined,
+      rescheduleInitialDate:       (location.state?.rescheduleInitialDate  as string | undefined)  || undefined,
     };
-    if (fromLocation.initialSelectedServices.length > 0 || fromLocation.initialSelectedServicesData.length > 0) {
+    if (
+      fromLocation.initialSelectedServices.length > 0 ||
+      fromLocation.initialSelectedServicesData.length > 0
+    ) {
       return fromLocation;
     }
     const stored = getBookingReturnState();
     if (stored?.returnTo && (stored.selectedServices?.length > 0 || stored.selectedServicesData?.length > 0)) {
       return {
-        initialSelectedServices: stored.selectedServices || [],
-        initialSelectedServicesData: (stored.selectedServicesData || []) as BusinessServiceData[],
-        initialBusinessName: stored.businessName || "",
+        initialSelectedServices:     stored.selectedServices                         || [],
+        initialSelectedServicesData: (stored.selectedServicesData || [])             as BusinessServiceData[],
+        initialBusinessName:         stored.businessName                             || "",
+        rescheduleQueueUserId:       stored.rescheduleQueueUserId,
+        rescheduleInitialDate:       stored.rescheduleInitialDate,
       };
     }
     return fromLocation;
   }, [location.state]);
 
+  /** True when the page is being used to reschedule an existing appointment. */
+  const isReschedule = !!rescheduleQueueUserId;
+
+  // Persist reschedule context so that if a 401 redirects to send-otp, after login we can restore
   useEffect(() => {
-    if (initialSelectedServices.length > 0 || initialSelectedServicesData.length > 0) {
+    if (!businessId || !isReschedule || !rescheduleQueueUserId) return;
+    saveBookingReturnState({
+      returnTo:             `/business/${businessId}/book`,
+      selectedServices:     initialSelectedServices,
+      selectedServicesData: initialSelectedServicesData,
+      businessName:         initialBusinessName,
+      rescheduleQueueUserId,
+      rescheduleInitialDate,
+    });
+  }, [businessId, isReschedule, rescheduleQueueUserId, initialBusinessName, rescheduleInitialDate, initialSelectedServices, initialSelectedServicesData]);
+
+  // Clear stored booking state after restore, but keep it when in reschedule so 401 redirect can restore
+  useEffect(() => {
+    if (
+      (initialSelectedServices.length > 0 || initialSelectedServicesData.length > 0) &&
+      !isReschedule
+    ) {
       clearBookingReturnState();
     }
-  }, [initialSelectedServices.length, initialSelectedServicesData.length]);
+  }, [initialSelectedServices.length, initialSelectedServicesData.length, isReschedule]);
 
   useEffect(() => {
     if (!isAuthenticated()) {
       const returnTo = `/business/${businessId}/book`;
       const state = {
         returnTo,
-        selectedServices: initialSelectedServices,
+        selectedServices:     initialSelectedServices,
         selectedServicesData: initialSelectedServicesData,
-        businessName: initialBusinessName,
+        businessName:         initialBusinessName,
+        rescheduleQueueUserId,
+        rescheduleInitialDate,
       };
       saveBookingReturnState(state);
       navigate("/send-otp", { state, replace: true });
       return;
     }
-  }, [isAuthenticated, businessId, navigate, initialSelectedServices, initialSelectedServicesData, initialBusinessName]);
+  }, [isAuthenticated, businessId, navigate, initialSelectedServices, initialSelectedServicesData, initialBusinessName, rescheduleQueueUserId, rescheduleInitialDate]);
 
   if (!isAuthenticated()) {
     return null;
@@ -84,6 +118,8 @@ export default function BookingPage() {
   const [bookingInProgress, setBookingInProgress] = useState(false);
   const [queueOptions, setQueueOptions] = useState<QueueOptionData[]>([]);
   const [selectedQueueOption, setSelectedQueueOption] = useState<QueueOptionData | null>(null);
+  /** When a queue is selected, these are the queue_service_uuids the user has chosen for booking (editable). */
+  const [selectedQueueServiceIds, setSelectedQueueServiceIds] = useState<string[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
@@ -95,12 +131,16 @@ export default function BookingPage() {
 
   const selectableDates = useMemo(() => getNext7Days(), []);
 
-  // Default selected date to today when user lands on the booking page
   useEffect(() => {
-    if (businessId && selectedDate == null) {
+    if (!businessId) return;
+    if (selectedDate != null) return;
+    // In reschedule mode pre-select the original appointment date (if still future/today)
+    if (rescheduleInitialDate && !isDateInPast(rescheduleInitialDate)) {
+      setSelectedDate(rescheduleInitialDate);
+    } else {
       setSelectedDate(getToday());
     }
-  }, [businessId, selectedDate, setSelectedDate]);
+  }, [businessId, selectedDate, rescheduleInitialDate, setSelectedDate]);
 
   useEffect(() => {
     const loadServices = async () => {
@@ -126,7 +166,6 @@ export default function BookingPage() {
     loadServices();
   }, [businessId, initialSelectedServices, initialSelectedServicesData, setLoading, setError]);
 
-  // All variant UUIDs for the preview API (shows which queues can serve these services)
   const serviceIds = useMemo(
     () =>
       selectedServices.flatMap((s) =>
@@ -135,15 +174,17 @@ export default function BookingPage() {
     [selectedServices]
   );
 
-  // When a queue is selected, use only that queue's service UUIDs for the booking API.
-  // Falls back to all variant UUIDs if the queue has no resolved services.
+  // When a queue is selected, use the user's chosen queue_service_uuids (editable); else fall back to serviceIds.
   const resolvedServiceIds = useMemo(() => {
+    if (selectedQueueOption && selectedQueueServiceIds.length > 0) {
+      return selectedQueueServiceIds;
+    }
     const queueSvcs = selectedQueueOption?.services;
     if (queueSvcs && queueSvcs.length > 0) {
       return queueSvcs.map((s: QueueServiceInfo) => s.queue_service_uuid);
     }
     return serviceIds;
-  }, [selectedQueueOption, serviceIds]);
+  }, [selectedQueueOption, selectedQueueServiceIds, serviceIds]);
 
   // Map service_uuid -> resolved QueueServiceInfo for the selected queue.
   const resolvedByServiceUuid = useMemo<Record<string, QueueServiceInfo>>(() => {
@@ -151,6 +192,22 @@ export default function BookingPage() {
     if (!queueSvcs || queueSvcs.length === 0) return {};
     return Object.fromEntries(queueSvcs.map((s: QueueServiceInfo) => [s.service_uuid, s]));
   }, [selectedQueueOption]);
+
+  /** Services from the selected queue that are currently selected for booking (for display and totals). */
+  const displayQueueServices = useMemo(() => {
+    const option = selectedQueueOption;
+    if (!option?.services?.length || selectedQueueServiceIds.length === 0) return [];
+    const byId = new Set(selectedQueueServiceIds);
+    return option.services.filter((s) => byId.has(s.queue_service_uuid));
+  }, [selectedQueueOption, selectedQueueServiceIds]);
+
+  /** Queue services not yet selected (for "Add service" list). */
+  const availableToAddQueueServices = useMemo(() => {
+    const option = selectedQueueOption;
+    if (!option?.services?.length) return [];
+    const selectedSet = new Set(selectedQueueServiceIds);
+    return option.services.filter((s) => !selectedSet.has(s.queue_service_uuid));
+  }, [selectedQueueOption, selectedQueueServiceIds]);
 
   const fetchBookingPreview = useCallback(async () => {
     if (!businessId || !selectedDate || serviceIds.length === 0) return;
@@ -200,24 +257,30 @@ export default function BookingPage() {
     }
   }, [selectedDate, serviceIds.length, fetchBookingPreview]);
 
-  // When a queue is selected, use its exact prices; otherwise show ranges.
   const hasResolved = Object.keys(resolvedByServiceUuid).length > 0;
+  const useQueueServicesForTotals = selectedQueueOption != null && displayQueueServices.length > 0;
 
-  const totalPriceMin = hasResolved
+  const totalPriceMin = useQueueServicesForTotals
+    ? displayQueueServices.reduce((sum, s) => sum + (s.price ?? 0), 0)
+    : hasResolved
     ? selectedServices.reduce((sum, s) => {
         const r = resolvedByServiceUuid[s.service_uuid];
         return sum + (r?.price ?? s.price_min ?? s.price ?? 0);
       }, 0)
     : selectedServices.reduce((sum, s) => sum + (s.price_min ?? s.price ?? 0), 0);
 
-  const totalPriceMax = hasResolved
-    ? totalPriceMin // exact — no range
+  const totalPriceMax = useQueueServicesForTotals
+    ? totalPriceMin
+    : hasResolved
+    ? totalPriceMin
     : selectedServices.reduce((sum, s) => sum + (s.price_max ?? s.price ?? 0), 0);
 
   const totalPrice = totalPriceMin;
-  const totalPriceRange = !hasResolved && totalPriceMin !== totalPriceMax;
+  const totalPriceRange = !useQueueServicesForTotals && !hasResolved && totalPriceMin !== totalPriceMax;
 
-  const totalDuration = hasResolved
+  const totalDuration = useQueueServicesForTotals
+    ? displayQueueServices.reduce((sum, s) => sum + (s.duration ?? 0), 0)
+    : hasResolved
     ? selectedServices.reduce((sum, s) => {
         const r = resolvedByServiceUuid[s.service_uuid];
         return sum + (r?.duration ?? s.duration_min ?? s.duration ?? 0);
@@ -239,6 +302,7 @@ export default function BookingPage() {
   const handleQueueOptionSelect = (option: QueueOptionData) => {
     if (!option.available) return;
     setSelectedQueueOption(option);
+    setSelectedQueueServiceIds(option.services?.map((s) => s.queue_service_uuid) ?? []);
     setSelectedQueue({
       queue_id: option.queue_id,
       queue_name: option.queue_name,
@@ -253,6 +317,18 @@ export default function BookingPage() {
     });
   };
 
+  const removeQueueService = (queueServiceUuid: string) => {
+    setSelectedQueueServiceIds((prev) => {
+      const next = prev.filter((id) => id !== queueServiceUuid);
+      return next.length >= 1 ? next : prev;
+    });
+  };
+
+  const addQueueService = (queueServiceUuid: string) => {
+    if (selectedQueueServiceIds.includes(queueServiceUuid)) return;
+    setSelectedQueueServiceIds((prev) => [...prev, queueServiceUuid]);
+  };
+
   const handleConfirm = async () => {
     if (!businessId || !selectedDate) return;
     const queueId = selectedQueueOption?.queue_id ?? selectedQueue?.queue_id;
@@ -260,25 +336,47 @@ export default function BookingPage() {
       setError("Please select a queue.");
       return;
     }
+    if (selectedQueueOption && selectedQueueServiceIds.length === 0) {
+      setError("Please select at least one service for this queue.");
+      return;
+    }
     if (isDateInPast(selectedDate)) {
       setError("Please select today or a future date.");
       return;
     }
+
+    const finalServiceIds =
+      resolvedServiceIds.length > 0
+        ? resolvedServiceIds
+        : serviceIds.length > 0
+        ? serviceIds
+        : initialSelectedServices;
+
     setBookingInProgress(true);
     setError(null);
     setBookingConfirmation(null);
+
     try {
       const bookingService = new BookingService();
+
+      // ── Reschedule mode: update existing appointment ──────────────────────
+      if (isReschedule && rescheduleQueueUserId) {
+        await bookingService.rescheduleAppointment(rescheduleQueueUserId, {
+          queue_id:    queueId,
+          queue_date:  selectedDate,
+          service_ids: finalServiceIds,
+        });
+        alert(t("appointmentRescheduled", { defaultValue: "Appointment rescheduled!" }));
+        navigate("/profile?tab=appointments");
+        return;
+      }
+
+      // ── New booking mode ──────────────────────────────────────────────────
       const result = await bookingService.createBooking({
         business_id: businessId,
-        queue_id: queueId,
-        queue_date: selectedDate,
-        service_ids:
-          resolvedServiceIds.length > 0
-            ? resolvedServiceIds
-            : serviceIds.length > 0
-            ? serviceIds
-            : initialSelectedServices,
+        queue_id:    queueId,
+        queue_date:  selectedDate,
+        service_ids: finalServiceIds,
       });
       if (result.already_in_queue) {
         setBookingConfirmation(result);
@@ -287,18 +385,21 @@ export default function BookingPage() {
       alert(t("bookingConfirmed"));
       navigate("/");
     } catch (err: any) {
-      console.error("Booking failed:", err);
+      console.error(isReschedule ? "Reschedule failed:" : "Booking failed:", err);
       const errorMsg =
-        err.response?.data?.detail || "Booking failed. Please try again.";
+        err.response?.data?.detail ||
+        (isReschedule ? "Reschedule failed. Please try again." : "Booking failed. Please try again.");
       setError(errorMsg);
       if (err.response?.status === HttpStatus.UNAUTHORIZED) {
         alert(t("pleaseLogin"));
         navigate("/send-otp", {
           state: {
-            returnTo: `/business/${businessId}/book`,
-            selectedServices: initialSelectedServices,
+            returnTo:             `/business/${businessId}/book`,
+            selectedServices:     initialSelectedServices,
             selectedServicesData: initialSelectedServicesData,
-            businessName: initialBusinessName,
+            businessName:         initialBusinessName,
+            rescheduleQueueUserId,
+            rescheduleInitialDate,
           },
         });
         return;
@@ -321,8 +422,15 @@ export default function BookingPage() {
   return (
     <div className="booking-page">
       <header className="bp-header">
-        <h1 className="bp-title">Book Appointment</h1>
+        <h1 className="bp-title">
+          {isReschedule ? "Reschedule Appointment" : "Book Appointment"}
+        </h1>
         {initialBusinessName && <p className="bp-business-name">{initialBusinessName}</p>}
+        {isReschedule && (
+          <p className="bp-reschedule-hint">
+            Choose a new date, queue, or both — your appointment will be updated.
+          </p>
+        )}
         {selectedDate && (
           <div className={`bp-ws-badge ${wsConnectedState ? "connected" : "disconnected"}`}>
             <span className="bp-ws-dot" aria-hidden />
@@ -356,7 +464,7 @@ export default function BookingPage() {
         </div>
       </section>
 
-      {/* 2. Selected services — table + total */}
+      {/* 2. Selected services — table (or queue-filtered editable list when queue chosen) + total */}
       <section className="bp-section" aria-labelledby="bp-services-title">
         <h2 id="bp-services-title" className="bp-section-title">{t("selectedServices")}</h2>
         {loading && selectedServices.length === 0 ? (
@@ -364,7 +472,7 @@ export default function BookingPage() {
             <div className="bp-spinner" aria-hidden />
             <p>{t("loading")}</p>
           </div>
-        ) : selectedServices.length === 0 ? (
+        ) : selectedServices.length === 0 && !selectedQueueOption ? (
           <div className="bp-empty">
             <p>{t("noServicesSelected")}</p>
             <Button
@@ -372,6 +480,65 @@ export default function BookingPage() {
               color="outline-blue"
               onClick={() => navigate(`/business/${businessId}`)}
             />
+          </div>
+        ) : selectedQueueOption ? (
+          <div className="bp-services-wrap">
+            <p className="bp-services-queue-hint">
+              Services for <strong>{selectedQueueOption.queue_name}</strong> · You can remove or add services below.
+            </p>
+            <table className="bp-services-table">
+              <thead>
+                <tr>
+                  <th scope="col">Service</th>
+                  <th scope="col">Duration</th>
+                  <th scope="col" className="bp-th-price">Price</th>
+                  <th scope="col" className="bp-th-action" aria-label="Remove" />
+                </tr>
+              </thead>
+              <tbody>
+                {displayQueueServices.map((s) => (
+                  <tr key={s.queue_service_uuid}>
+                    <td className="bp-td-service">{s.service_name}</td>
+                    <td className="bp-td-duration">{formatDurationMinutes(s.duration ?? 0)}</td>
+                    <td className="bp-td-price">₹{s.price ?? 0}</td>
+                    <td className="bp-td-action">
+                      <button
+                        type="button"
+                        className="bp-service-remove"
+                        onClick={() => removeQueueService(s.queue_service_uuid)}
+                        disabled={displayQueueServices.length <= 1}
+                        title={displayQueueServices.length <= 1 ? "At least one service required" : "Remove service"}
+                        aria-label={`Remove ${s.service_name}`}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {availableToAddQueueServices.length > 0 && (
+              <div className="bp-services-add">
+                <span className="bp-services-add-label">Add service:</span>
+                <div className="bp-services-add-btns">
+                  {availableToAddQueueServices.map((s) => (
+                    <button
+                      key={s.queue_service_uuid}
+                      type="button"
+                      className="bp-service-add-btn"
+                      onClick={() => addQueueService(s.queue_service_uuid)}
+                    >
+                      + {s.service_name} (₹{s.price ?? 0})
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="bp-services-total">
+              <span className="bp-services-total-label">Total</span>
+              <span className="bp-services-total-duration">{formatDurationMinutes(totalDuration)}</span>
+              <span className="bp-services-total-amount">₹{totalPrice}</span>
+            </div>
           </div>
         ) : (
           <div className="bp-services-wrap">
@@ -389,7 +556,6 @@ export default function BookingPage() {
                   let durationStr: string;
                   let priceStr: string;
                   if (resolved) {
-                    // Exact values for the selected queue
                     durationStr = formatDurationMinutes(resolved.duration ?? 0);
                     priceStr = `₹${resolved.price ?? 0}`;
                   } else {
@@ -535,7 +701,13 @@ export default function BookingPage() {
             </p>
           </div>
           <Button
-            text={bookingInProgress ? t("confirming") : t("fixAppointment")}
+            text={
+              bookingInProgress
+                ? t("confirming")
+                : isReschedule
+                ? t("confirmReschedule", { defaultValue: "Confirm Reschedule" })
+                : t("fixAppointment")
+            }
             color="blue"
             size="lg"
             onClick={handleConfirm}

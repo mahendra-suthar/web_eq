@@ -35,6 +35,16 @@
     color: $text-secondary;
     margin: 8px 0 0 0;
   }
+
+  .bp-reschedule-hint {
+    font-size: 0.875rem;
+    color: #0369a1;   // info blue
+    background: #e0f2fe;
+    border-left: 3px solid #0ea5e9;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 10px 0 0 0;
+  }
 }
 
 .bp-ws-badge {
@@ -173,6 +183,18 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
+.bp-services-queue-hint {
+  font-size: 0.875rem;
+  color: $text-secondary;
+  padding: 12px 16px;
+  margin: 0;
+  border-bottom: 1px solid #e8ecef;
+
+  strong {
+    color: $primary-dark;
+  }
+}
+
 .bp-services-table {
   width: 100%;
   border-collapse: collapse;
@@ -193,6 +215,13 @@
 
     &.bp-th-price {
       text-align: right;
+    }
+
+    &.bp-th-action {
+      width: 100px;
+      text-align: right;
+      font-weight: 500;
+      text-transform: none;
     }
   }
 
@@ -224,6 +253,67 @@
       font-weight: 600;
       color: $primary;
     }
+
+    &.bp-td-action {
+      text-align: right;
+    }
+  }
+}
+
+.bp-service-remove {
+  font-size: 0.8125rem;
+  color: #b91c1c;
+  background: transparent;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover:not(:disabled) {
+    background: #fef2f2;
+    color: #991b1b;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.bp-services-add {
+  padding: 12px 16px;
+  border-top: 1px solid #e8ecef;
+  background: #fafafa;
+
+  .bp-services-add-label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: $text-secondary;
+    margin-bottom: 8px;
+  }
+
+  .bp-services-add-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+.bp-service-add-btn {
+  font-size: 0.875rem;
+  color: $primary;
+  background: rgba(0, 105, 92, 0.08);
+  border: 1px solid $primary-light;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover {
+    background: rgba(0, 105, 92, 0.12);
+    border-color: $primary;
   }
 }
 

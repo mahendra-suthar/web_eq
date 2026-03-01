@@ -55,7 +55,6 @@ export default function BusinessDetailsPage() {
   const handleContinue = () => {
     if (selectedServices.length === 0) return;
     const selectedServicesData = services.filter((s) => selectedServices.includes(s.uuid));
-    // Pass flat list of variant_uuids for booking API (same service with different prices = multiple queue_services)
     const variantIds = selectedServicesData.flatMap((s) => s.variant_uuids?.length ? s.variant_uuids : [s.uuid]);
     navigate(`/business/${businessId}/book`, {
       state: {

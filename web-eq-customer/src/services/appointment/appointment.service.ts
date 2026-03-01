@@ -9,6 +9,7 @@ export interface TodayAppointmentResponse {
   queue_name: string;
   business_id: string;
   business_name: string;
+  queue_date?: string;
   token_number: string;
   status: number;
   position: number | null;
@@ -16,6 +17,7 @@ export interface TodayAppointmentResponse {
   estimated_wait_range: string | null;
   estimated_appointment_time: string | null;
   service_summary: string | null;
+  queue_service_uuids?: string[];
 }
 
 export interface CustomerAppointmentListItem {
@@ -28,6 +30,7 @@ export interface CustomerAppointmentListItem {
   status: number;
   token_number?: string | null;
   service_summary?: string | null;
+  queue_service_uuids?: string[];
   created_at?: string | null;
   position?: number | null;
   estimated_wait_minutes?: number | null;
@@ -51,6 +54,7 @@ export interface CustomerAppointmentDetailResponse {
   status: number;
   token_number?: string | null;
   service_summary?: string | null;
+  queue_service_uuids?: string[];
   position?: number | null;
   estimated_wait_minutes?: number | null;
   estimated_wait_range?: string | null;
@@ -64,6 +68,13 @@ export interface TodayAppointmentsResponse {
   items: TodayAppointmentResponse[];
 }
 
+export interface AppointmentUpdatePayload {
+  queue_id?: string;
+  queue_date?: string;
+  service_ids?: string[];
+  notes?: string;
+}
+
 export class AppointmentService extends HttpClient {
   async getTodayAppointments(): Promise<TodayAppointmentResponse[]> {
     try {
@@ -75,6 +86,29 @@ export class AppointmentService extends HttpClient {
       }
       throw err;
     }
+  }
+
+  async updateAppointment(
+    queueUserId: string,
+    payload: AppointmentUpdatePayload
+  ): Promise<CustomerAppointmentDetailResponse> {
+    return this.patch<CustomerAppointmentDetailResponse>(
+      `/customer/appointments/${queueUserId}`,
+      payload
+    );
+  }
+
+  async cancelAppointment(
+    queueUserId: string
+  ): Promise<CustomerAppointmentDetailResponse> {
+    return this.post<CustomerAppointmentDetailResponse>(
+      `/customer/appointments/${queueUserId}/cancel`,
+      {}
+    );
+  }
+
+  async getAppointmentById(queueUserId: string): Promise<CustomerAppointmentDetailResponse> {
+    return this.get<CustomerAppointmentDetailResponse>(`/customer/appointments/${queueUserId}`);
   }
 
   async getAppointments(limit: number = 5, offset: number = 0): Promise<CustomerAppointmentListResponse> {

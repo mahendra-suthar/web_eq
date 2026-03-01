@@ -358,7 +358,6 @@ class BookingCalculationService:
         queue_service_ids: List[UUID],
         today_metrics: Optional[Dict] = None,
     ) -> Dict:
-        """Real-time metrics for one queue on today's date. today_metrics built by controller."""
         metrics_map = today_metrics if today_metrics is not None else {}
         t = metrics_map.get(
             queue_id,
