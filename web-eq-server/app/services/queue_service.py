@@ -4,9 +4,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Tuple, Dict, cast, Optional, Any
 from collections import defaultdict
 from uuid import UUID
-from datetime import datetime, date, timedelta, timezone
+from datetime import datetime, date, time, timedelta, timezone
 
-from app.models.queue import Queue, QueueService as QueueServiceModel, QueueUser, QueueUserService
+from app.models.queue import Queue, QueueService as QueueServiceModel, QueueUser, QueueUserService, AppointmentSlot
 from app.models.service import Service
 from app.models.employee import Employee
 from app.models.user import User
@@ -24,6 +24,13 @@ from app.core.constants import (
     QUEUE_USER_COMPLETED,
     QUEUE_USER_CANCELLED,
     QUEUE_USER_EXPIRED,
+    DEFAULT_SLOT_MINUTES,
+    DEFAULT_AVG_TIME,
+    SLOT_DURATION_FLOOR,
+    SLOT_DURATION_CEILING,
+    APPOINTMENT_TYPE_QUEUE,
+    APPOINTMENT_TYPE_FIXED,
+    APPOINTMENT_TYPE_APPROXIMATE,
 )
 
 
@@ -38,8 +45,18 @@ class QueueService:
         employee_id: Optional[UUID],
         services: List[Service],
         service_configs: Dict[UUID, Any],
+        booking_mode: Optional[str] = None,
+        slot_interval_minutes: Optional[int] = None,
+        max_per_slot: Optional[int] = None,
     ) -> Queue:
-        new_queue = Queue(merchant_id=business_id, name=name, status=1)
+        new_queue = Queue(
+            merchant_id=business_id,
+            name=name,
+            status=1,
+            booking_mode=(booking_mode or "QUEUE").upper(),
+            slot_interval_minutes=slot_interval_minutes,
+            max_per_slot=max_per_slot if max_per_slot is not None else 1,
+        )
         self.db.add(new_queue)
         self.db.flush()
 
@@ -73,6 +90,9 @@ class QueueService:
             employee_id=data.employee_id,
             services=services,
             service_configs=service_configs,
+            booking_mode=getattr(data, "booking_mode", None),
+            slot_interval_minutes=getattr(data, "slot_interval_minutes", None),
+            max_per_slot=getattr(data, "max_per_slot", None),
         )
         try:
             self.db.commit()
@@ -103,6 +123,9 @@ class QueueService:
                     employee_id=item.employee_id,
                     services=services,
                     service_configs=service_configs,
+                    booking_mode=getattr(item, "booking_mode", None),
+                    slot_interval_minutes=getattr(item, "slot_interval_minutes", None),
+                    max_per_slot=getattr(item, "max_per_slot", None),
                 )
                 created.append(queue)
             self.db.commit()
@@ -332,8 +355,13 @@ class QueueService:
         estimated_enqueue_time: Optional[datetime],
         estimated_dequeue_time: Optional[datetime],
         queue_services: List[QueueServiceModel],
+        appointment_type: Optional[str] = None,
+        slot_id: Optional[UUID] = None,
+        scheduled_start: Optional[time] = None,
+        scheduled_end: Optional[time] = None,
     ) -> QueueUser:
         """Create a QueueUser and its QueueUserService links. Commits the transaction. Returns the created QueueUser."""
+        appt_type = appointment_type or APPOINTMENT_TYPE_QUEUE
         queue_user = QueueUser(
             user_id=user_id,
             queue_id=queue_id,
@@ -345,6 +373,10 @@ class QueueService:
             is_scheduled=is_scheduled,
             estimated_enqueue_time=estimated_enqueue_time,
             estimated_dequeue_time=estimated_dequeue_time,
+            appointment_type=appt_type,
+            slot_id=slot_id,
+            scheduled_start=scheduled_start,
+            scheduled_end=scheduled_end,
         )
         self.db.add(queue_user)
         self.db.flush()
@@ -446,6 +478,27 @@ class QueueService:
             self.db.rollback()
             raise
 
+    def get_registered_queue_users_for_serving(
+        self, queue_id: UUID, queue_date: date
+    ) -> List[QueueUser]:
+        try:
+            return (
+                self.db.query(QueueUser)
+                .options(
+                    joinedload(QueueUser.user),
+                    joinedload(QueueUser.slot),
+                    selectinload(QueueUser.queue_user_services).joinedload(QueueUserService.queue_service).joinedload(QueueServiceModel.service),
+                )
+                .filter(
+                    QueueUser.queue_id == queue_id,
+                    QueueUser.queue_date == queue_date,
+                    QueueUser.status == QUEUE_USER_REGISTERED,
+                )
+                .all()
+            )
+        except SQLAlchemyError:
+            raise
+
     def get_queues_by_business_id(self, business_id: UUID) -> List[Queue]:
         try:
             return (
@@ -496,6 +549,77 @@ class QueueService:
         except SQLAlchemyError:
             raise
 
+    def get_queue_min_slot_duration_minutes(self, queue_id: UUID) -> int:
+        try:
+            rows = (
+                self.db.query(QueueServiceModel.avg_service_time)
+                .filter(
+                    QueueServiceModel.queue_id == queue_id,
+                    QueueServiceModel.avg_service_time.isnot(None),
+                )
+                .all()
+            )
+            values = [r[0] for r in rows if r[0] is not None and r[0] > 0]
+            if not values:
+                return DEFAULT_SLOT_MINUTES
+            minutes = int(min(values))
+            return max(SLOT_DURATION_FLOOR, min(SLOT_DURATION_CEILING, minutes))
+        except SQLAlchemyError:
+            return DEFAULT_SLOT_MINUTES
+
+    def reserve_slot_atomic(self, slot_id: UUID) -> Optional[AppointmentSlot]:
+        try:
+            slot = (
+                self.db.query(AppointmentSlot)
+                .filter(AppointmentSlot.uuid == slot_id)
+                .with_for_update()
+                .first()
+            )
+            if not slot or slot.is_blocked or slot.booked_count >= slot.capacity:
+                return None
+            slot.booked_count += 1
+            self.db.flush()
+            return slot
+        except SQLAlchemyError:
+            raise
+
+    def release_slot(self, slot_id: UUID) -> None:
+        try:
+            slot = self.db.query(AppointmentSlot).filter(AppointmentSlot.uuid == slot_id).first()
+            if slot and slot.booked_count > 0:
+                slot.booked_count -= 1
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise
+
+    def get_slot_by_id(self, slot_id: UUID) -> Optional[AppointmentSlot]:
+        try:
+            return self.db.query(AppointmentSlot).filter(AppointmentSlot.uuid == slot_id).first()
+        except SQLAlchemyError:
+            raise
+
+    def get_active_scheduled_bookings_for_date(
+        self, queue_id: UUID, queue_date: date
+    ) -> List[QueueUser]:
+        try:
+            return (
+                self.db.query(QueueUser)
+                .options(
+                    selectinload(QueueUser.queue_user_services).joinedload(QueueUserService.queue_service),
+                )
+                .filter(
+                    QueueUser.queue_id == queue_id,
+                    QueueUser.queue_date == queue_date,
+                    QueueUser.appointment_type.in_([APPOINTMENT_TYPE_FIXED, APPOINTMENT_TYPE_APPROXIMATE]),
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                    QueueUser.scheduled_start.isnot(None),
+                )
+                .all()
+            )
+        except SQLAlchemyError:
+            raise
+
     def get_queues_offering_service_ids(
         self, business_id: UUID, queue_service_ids: List[UUID]
     ) -> List[Queue]:
@@ -518,11 +642,6 @@ class QueueService:
     def get_queue_service_details_for_ids(
         self, queue_service_ids: List[UUID]
     ) -> List[dict]:
-        """Return flat list of service detail dicts for the given queue_service UUIDs (DB only).
-
-        Each dict has: queue_id (UUID), queue_service_uuid, service_uuid, service_name, price, duration.
-        Grouping by queue_id is done by the caller (controller).
-        """
         if not queue_service_ids:
             return []
         try:
@@ -565,11 +684,6 @@ class QueueService:
     def get_today_active_queue_user_rows(
         self, queue_ids: List[UUID], booking_date: date
     ) -> List[dict]:
-        """Return flat list of active (registered + in_progress) queue user rows for the given queues/date (DB only).
-
-        Each dict has: queue_id (UUID), status, turn_time, enqueue_time.
-        Aggregation and delay-aware remaining time are done by the caller (controller).
-        """
         if not queue_ids:
             return []
         try:
@@ -832,10 +946,6 @@ class QueueService:
     def get_active_queue_users_with_lock(
         self, queue_id: UUID, queue_date: date
     ) -> List[QueueUser]:
-        """
-        Load IN_PROGRESS + REGISTERED queue users with FOR UPDATE lock.
-        Used by advance_queue; prefer calling advance_queue from controller.
-        """
         return (
             self.db.query(QueueUser)
             .filter(
@@ -851,33 +961,60 @@ class QueueService:
             .all()
         )
 
-    def advance_queue(self, queue_id: UUID, queue_date: date) -> None:
-        try:
-            active_users = self.get_active_queue_users_with_lock(queue_id, queue_date)
-            in_progress = next(
-                (u for u in active_users if u.status == QUEUE_USER_IN_PROGRESS), None
-            )
-            waiting = sorted(
-                [u for u in active_users if u.status == QUEUE_USER_REGISTERED],
-                key=lambda u: (u.enqueue_time or u.created_at or datetime.min),
-            )
-            if not in_progress and not waiting:
-                self.db.rollback()
-                raise ValueError("No users to serve")
+    def mark_queue_user_completed(
+        self, queue_user_id: UUID, dequeue_time: datetime
+    ) -> None:
+        self.db.query(QueueUser).filter(QueueUser.uuid == queue_user_id).update(
+            {
+                QueueUser.status: QUEUE_USER_COMPLETED,
+                QueueUser.dequeue_time: dequeue_time,
+            },
+            synchronize_session=False,
+        )
+        self.db.flush()
 
-            now = datetime.now(timezone.utc)
-            if in_progress:
-                in_progress.status = QUEUE_USER_COMPLETED
-                in_progress.dequeue_time = now
-            if waiting:
-                first_waiting = waiting[0]
-                first_waiting.status = QUEUE_USER_IN_PROGRESS
-                first_waiting.enqueue_time = now
+    def mark_queue_user_in_progress(
+        self, queue_user_id: UUID, enqueue_time: datetime
+    ) -> None:
+        self.db.query(QueueUser).filter(QueueUser.uuid == queue_user_id).update(
+            {
+                QueueUser.status: QUEUE_USER_IN_PROGRESS,
+                QueueUser.enqueue_time: enqueue_time,
+            },
+            synchronize_session=False,
+        )
+        self.db.flush()
 
-            self.db.commit()
-        except SQLAlchemyError:
-            self.db.rollback()
-            raise
+    def add_delay_to_later_approx_bookings(
+        self,
+        queue_id: UUID,
+        queue_date: date,
+        after_enqueue_time: Optional[datetime],
+        after_created_at: Optional[datetime],
+        exclude_queue_user_id: UUID,
+        delay_minutes: int,
+    ) -> None:
+        if delay_minutes <= 0:
+            return
+        order_after = None
+        if after_enqueue_time is not None:
+            order_after = QueueUser.enqueue_time > after_enqueue_time
+        elif after_created_at is not None:
+            order_after = QueueUser.created_at > after_created_at
+        filters = [
+            QueueUser.queue_id == queue_id,
+            QueueUser.queue_date == queue_date,
+            QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+            QueueUser.appointment_type == APPOINTMENT_TYPE_APPROXIMATE,
+            QueueUser.uuid != exclude_queue_user_id,
+        ]
+        if order_after is not None:
+            filters.append(order_after)
+        self.db.query(QueueUser).filter(*filters).update(
+            {QueueUser.delay_minutes: QueueUser.delay_minutes + delay_minutes},
+            synchronize_session=False,
+        )
+        self.db.flush()
 
     def set_queue_status(self, queue_id: UUID, status: int) -> Optional[Queue]:
         try:
@@ -892,8 +1029,6 @@ class QueueService:
             raise
 
     def get_queues(self, business_id: UUID):  # type: ignore
-        # Use correlated subqueries to avoid json_agg(distinct(...)), which PostgreSQL
-        # does not support (no equality operator for type json).
         try:
             emp_subq = (
                 select(

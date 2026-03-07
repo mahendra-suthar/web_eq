@@ -33,9 +33,9 @@
     background: #e2e4e8;
   }
 
-  @media screen and (max-width: 480px) {
-    padding: 6px 10px;
-    gap: 8px;
+  @media screen and (max-width: $breakpoint-sm) {
+    padding: $space-sm 10px;
+    gap: $space-sm;
   }
 }
 
@@ -59,9 +59,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 
-  @media screen and (max-width: 480px) {
+  @media screen and (max-width: $breakpoint-sm) {
     max-width: 80px;
-    font-size: 13px;
+    font-size: $text-sm;
   }
 }
 

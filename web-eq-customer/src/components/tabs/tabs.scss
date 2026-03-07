@@ -1,3 +1,5 @@
+@use "../../variables.scss" as *;
+
 .tabs {
   display: flex;
   flex-direction: column;
@@ -52,9 +54,9 @@
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: $breakpoint-md) {
   .tabs__tab {
-    padding: 0.6rem 1rem;
-    font-size: 0.875rem;
+    padding: $space-sm $space-lg;
+    font-size: $text-base;
   }
 }

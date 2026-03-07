@@ -48,38 +48,91 @@ textarea:focus {
   border-radius: 8px;
   background: rgba(145, 158, 171, 0.08);
   height: 53px;
-  padding: 0px 12px 0px 10px;
+  padding: 0 $space-md 0 10px;
   border: none;
   width: 100%;
   color: $primary-dark;
   font-family: "Noto Sans Hebrew", serif;
-  font-size: 15px;
+  font-size: $text-md;
   line-height: 22px;
 
-  @media screen and (max-width: 600px) {
-    font-size: 14px;
+  @media screen and (max-width: $breakpoint-md) {
+    font-size: $text-base;
     line-height: 20px;
-    padding: 0px 8px 0px 8px;
+    padding: 0 $space-sm;
     height: 46px;
   }
 }
 
 .form-field input::placeholder {
-  color: #919EAB;
+  color: $text-disabled;
 }
 
-// Error message CSS
+// Error message CSS (uses semantic tokens)
 .error-message {
-  color: #d32f2f;
+  color: $color-error;
   font-family: "Noto Sans Hebrew", serif;
-  font-size: 14px;
+  font-size: $text-base;
   font-weight: 400;
   line-height: 20px;
-  margin-top: 16px;
-  padding: 12px;
-  background-color: #ffebee;
+  margin-top: $space-lg;
+  padding: $space-md;
+  background-color: $color-error-bg;
   border-radius: 8px;
-  border: 1px solid #ffcdd2;
+  border: 1px solid $color-error-border;
+}
+
+// ─── Shared utility classes (replace inline styles) ───────────────────────
+.util-center {
+  text-align: center;
+}
+
+.util-padding-block {
+  padding: $space-xl;
+}
+
+.util-padding-block-sm {
+  padding: $space-lg;
+}
+
+.util-muted {
+  color: $color-muted;
+  font-size: $text-base;
+  margin: 0;
+}
+
+.util-flex-spacer {
+  flex: 1;
+}
+
+// ─── Base card (use .card-base for consistent cards) ─────────────────────
+.card-base {
+  background: #fff;
+  border: 1px solid #e8ecef;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.card-base:hover {
+  border-color: $primary-light;
+  box-shadow: 0 4px 12px rgba(0, 105, 92, 0.08);
+}
+
+// ─── Loading state wrapper (spinner + message) ───────────────────────────
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $space-md;
+  padding: $space-2xl $space-xl;
+  text-align: center;
+}
+
+.loading-state__message {
+  margin: 0;
+  font-size: $text-md;
+  color: $text-secondary;
 }
 
 body {

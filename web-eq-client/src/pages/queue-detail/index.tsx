@@ -31,6 +31,8 @@ const QueueDetail = () => {
     const [editStatus, setEditStatus] = useState<number | "">("");
     const [editLimit, setEditLimit] = useState<number | "">("");
     const [editEmployeeId, setEditEmployeeId] = useState<string | null>(null);
+    const [editBookingMode, setEditBookingMode] = useState<"QUEUE" | "FIXED" | "APPROXIMATE" | "HYBRID">("QUEUE");
+    const [editMaxPerSlot, setEditMaxPerSlot] = useState<number | "">(1);
     const [savingQueue, setSavingQueue] = useState(false);
     const [queueSaveError, setQueueSaveError] = useState("");
 
@@ -55,6 +57,8 @@ const QueueDetail = () => {
                 setEditStatus(d.status ?? "");
                 setEditLimit(d.limit ?? "");
                 setEditEmployeeId(d.assigned_employee_id ?? null);
+                setEditBookingMode(((d.booking_mode || "QUEUE") as any).toUpperCase());
+                setEditMaxPerSlot(d.max_per_slot ?? 1);
             })
             .catch((err: unknown) => {
                 const e = err as { response?: { data?: { detail?: string } }; message?: string };
@@ -83,11 +87,21 @@ const QueueDetail = () => {
         setQueueSaveError("");
         setSavingQueue(true);
         try {
+            if (editBookingMode !== "QUEUE") {
+                const cap = editMaxPerSlot === "" ? NaN : Number(editMaxPerSlot);
+                if (isNaN(cap) || cap < 1) {
+                    setQueueSaveError("Max per slot must be at least 1");
+                    return;
+                }
+            }
             await queueService.updateQueue(queueId, data.business_id, {
                 name: editName.trim(),
                 status: editStatus === "" ? undefined : Number(editStatus),
                 limit: editLimit === "" ? undefined : Number(editLimit),
                 employee_id: editEmployeeId || null,
+                booking_mode: editBookingMode,
+                slot_interval_minutes: null, // backend uses min service avg time when null
+                max_per_slot: editBookingMode === "QUEUE" ? null : (editMaxPerSlot === "" ? 1 : Number(editMaxPerSlot)),
             });
             loadDetail();
             setEditingQueue(false);
@@ -294,6 +308,47 @@ const QueueDetail = () => {
                                         ))}
                                     </select>
                                 </div>
+
+                                <div className="form-row">
+                                    <label className="form-label">Booking mode</label>
+                                    <select
+                                        className="form-input form-select"
+                                        value={editBookingMode}
+                                        onChange={(e) => {
+                                            const v = (e.target.value || "QUEUE") as any;
+                                            setEditBookingMode(v);
+                                            if (v === "QUEUE") {
+                                                setEditSlotIntervalMinutes("");
+                                                setEditMaxPerSlot(1);
+                                            }
+                                        }}
+                                        disabled={savingQueue}
+                                    >
+                                        <option value="QUEUE">Walk-in (Queue)</option>
+                                        <option value="FIXED">Fixed time</option>
+                                        <option value="APPROXIMATE">Approximate time</option>
+                                        <option value="HYBRID">Hybrid (Walk-in + Scheduled)</option>
+                                    </select>
+                                </div>
+
+                                {editBookingMode !== "QUEUE" && (
+                                    <>
+                                        <div className="form-row">
+                                            <label className="form-label">Max per slot</label>
+                                            <input
+                                                type="number"
+                                                className="form-input"
+                                                value={editMaxPerSlot}
+                                                min={1}
+                                                onChange={(e) => setEditMaxPerSlot(e.target.value === "" ? "" : Number(e.target.value))}
+                                                disabled={savingQueue}
+                                            />
+                                        </div>
+                                        <p className="form-hint">
+                                            Slot duration is derived from the queue’s minimum service average time.
+                                        </p>
+                                    </>
+                                )}
                             </div>
                         ) : (
                             <div className="info-grid">
@@ -318,6 +373,21 @@ const QueueDetail = () => {
                                     <label className="info-label">{t("queueLimit")}</label>
                                     <div className="info-value">{data.limit != null ? String(data.limit) : "—"}</div>
                                 </div>
+                                <div className="info-field">
+                                    <label className="info-label">Booking mode</label>
+                                    <div className="info-value">{(data.booking_mode || "QUEUE").toUpperCase()}</div>
+                                </div>
+                                {(data.booking_mode || "QUEUE").toUpperCase() !== "QUEUE" && (
+                                    <>
+                                        <div className="info-field">
+                                            <label className="info-label">Max per slot</label>
+                                            <div className="info-value">{data.max_per_slot != null ? String(data.max_per_slot) : "1"}</div>
+                                        </div>
+                                        <p className="form-hint" style={{ gridColumn: "1 / -1" }}>
+                                            Slot duration: from queue’s minimum service average time.
+                                        </p>
+                                    </>
+                                )}
                                 {data.current_length != null && (
                                     <div className="info-field">
                                         <label className="info-label">{t("currentLength")}</label>

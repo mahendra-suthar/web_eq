@@ -107,6 +107,27 @@ export function formatDurationMinutes(minutes: number): string {
   return rem === 0 ? `${h}h` : `${h}h ${rem}m`;
 }
 
+// ============================================================================
+// Schedule day-of-week mapping (UI <-> backend)
+// ============================================================================
+/**
+ * Backend schedules use JS convention: 0=Sunday, 1=Monday, …, 6=Saturday.
+ * Many admin UIs prefer ISO-like ordering: 0=Monday, …, 6=Sunday.
+ *
+ * These helpers keep UI ordering stable while sending/reading correct values.
+ */
+export function uiDowToBackendDow(uiIsoDow: number): number {
+  // ui: 0=Mon..6=Sun  -> backend: 0=Sun..6=Sat
+  // mapping: backend = (ui + 1) % 7
+  return (uiIsoDow + 1) % 7;
+}
+
+export function backendDowToUiDow(backendJsDow: number): number {
+  // backend: 0=Sun..6=Sat -> ui: 0=Mon..6=Sun
+  // mapping: ui = (backend + 6) % 7
+  return (backendJsDow + 6) % 7;
+}
+
 /**
  * Format a time for display as 12-hour with AM/PM (e.g. "4:30 PM").
  * Accepts ISO datetime string, "HH:MM" string, or Date.

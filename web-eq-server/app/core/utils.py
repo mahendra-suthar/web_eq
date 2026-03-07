@@ -216,6 +216,8 @@ def build_live_queue_users_raw(
         else:
             pos = None
         names = svc_by_user.get(qu.uuid, [])
+        st = getattr(qu, "scheduled_start", None)
+        se = getattr(qu, "scheduled_end", None)
         result.append({
             "uuid": str(qu.uuid),
             "full_name": user.full_name,
@@ -228,6 +230,10 @@ def build_live_queue_users_raw(
             "position": pos,
             "estimated_enqueue_time": getattr(qu, "estimated_enqueue_time", None),
             "estimated_dequeue_time": getattr(qu, "estimated_dequeue_time", None),
+            "appointment_type": getattr(qu, "appointment_type", None) or "QUEUE",
+            "scheduled_start": st.strftime("%H:%M") if st else None,
+            "scheduled_end": se.strftime("%H:%M") if se else None,
+            "delay_minutes": getattr(qu, "delay_minutes", None),
         })
     return result
 

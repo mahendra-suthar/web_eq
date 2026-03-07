@@ -25,7 +25,7 @@
       display: flex;
       align-items: center;
       width: 100%;
-      padding: 0 24px;
+      padding: 0 $space-xl;
     }
 
     .customer-brand {
@@ -48,13 +48,19 @@
   .customer-footer {
     background-color: white;
     border-top: 1px solid #e0e0e0;
-    padding: 24px 0;
+    padding: $space-xl 0;
 
     .customer-footer-inner {
       max-width: 1200px;
       margin: 0 auto;
       text-align: center;
-      padding: 0 24px;
+      padding: 0 $space-xl;
+    }
+
+    .customer-footer__text {
+      color: $text-secondary;
+      font-size: $text-base;
+      margin: 0;
     }
   }
 }

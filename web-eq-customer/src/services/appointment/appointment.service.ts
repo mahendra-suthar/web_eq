@@ -18,6 +18,10 @@ export interface TodayAppointmentResponse {
   estimated_appointment_time: string | null;
   service_summary: string | null;
   queue_service_uuids?: string[];
+  appointment_type?: string;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
+  delay_minutes?: number | null;
 }
 
 export interface CustomerAppointmentListItem {
@@ -36,6 +40,10 @@ export interface CustomerAppointmentListItem {
   estimated_wait_minutes?: number | null;
   estimated_wait_range?: string | null;
   estimated_appointment_time?: string | null;
+  appointment_type?: string;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
+  delay_minutes?: number | null;
 }
 
 export interface CustomerAppointmentListResponse {
@@ -62,6 +70,10 @@ export interface CustomerAppointmentDetailResponse {
   enqueue_time?: string | null;
   dequeue_time?: string | null;
   created_at?: string | null;
+  appointment_type?: string;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
+  delay_minutes?: number | null;
 }
 
 export interface TodayAppointmentsResponse {

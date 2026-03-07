@@ -234,6 +234,13 @@ class CustomerController:
 
         self.queue_service.cancel_appointment(qu)
 
+        slot_id = getattr(qu, "slot_id", None)
+        if slot_id:
+            try:
+                self.queue_service.release_slot(slot_id)
+            except Exception:
+                pass
+
         if qu.queue_date == today_app_date():
             try:
                 await queue_manager.connect_to_redis()

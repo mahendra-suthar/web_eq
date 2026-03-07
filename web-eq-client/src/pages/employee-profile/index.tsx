@@ -6,7 +6,7 @@ import { BusinessService } from '../../services/business/business.service';
 import { EmployeeService } from '../../services/employee/employee.service';
 import { OTPService } from '../../services/otp/otp.service';
 import { QueueService, QueueDetailData } from '../../services/queue/queue.service';
-import { emailRegex, formatDurationMinutes, getQueueStatusLabel } from '../../utils/utils';
+import { backendDowToUiDow, emailRegex, formatDurationMinutes, getQueueStatusLabel, uiDowToBackendDow } from '../../utils/utils';
 import { Tabs } from '../../components/tabs/Tabs';
 import './employee-profile.scss';
 
@@ -86,7 +86,7 @@ const EmployeeProfile = () => {
         schedule: [] as DaySchedule[],
     });
 
-    // Backend convention: 0 = Monday, 6 = Sunday (ISO-like)
+    // UI convention: 0 = Monday, 6 = Sunday. Backend stores schedules as 0=Sunday..6=Saturday.
     const dayNames = useMemo(() => [
         { day_of_week: 0, day_name: t("monday") },
         { day_of_week: 1, day_name: t("tuesday") },
@@ -149,7 +149,9 @@ const EmployeeProfile = () => {
                 city: "", district: "", state: "", postal_code: "", country: "INDIA",
             });
             const mappedSchedule: DaySchedule[] = dayNames.map(day => {
-                const scheduleItem = profile.schedule?.schedules.find((s: { day_of_week: number }) => s.day_of_week === day.day_of_week);
+                const scheduleItem = profile.schedule?.schedules.find(
+                    (s: { day_of_week: number }) => backendDowToUiDow(s.day_of_week) === day.day_of_week
+                );
                 return {
                     day_of_week: day.day_of_week,
                     day_name: day.day_name,
@@ -269,10 +271,10 @@ const EmployeeProfile = () => {
         setSaveError("");
         try {
             const schedules = scheduleData.schedule.map(d => ({
-                day_of_week: d.day_of_week,
+                day_of_week: uiDowToBackendDow(d.day_of_week),
                 is_open: d.is_open,
-                opening_time: d.is_open && d.opening_time ? d.opening_time : undefined,
-                closing_time: d.is_open && d.closing_time ? d.closing_time : undefined,
+                opening_time: d.is_open && d.opening_time ? d.opening_time : null,
+                closing_time: d.is_open && d.closing_time ? d.closing_time : null,
             }));
             await businessService.upsertSchedules(employeeId, "EMPLOYEE", schedules, scheduleData.isAlwaysOpen);
             await fetchProfile();

@@ -6,6 +6,7 @@ import type {
   AvailableSlotData,
   BookingData,
   BookingPreviewData,
+  SlotsListResponse,
 } from '../../store/booking.store';
 
 export interface BookingCreateInput {
@@ -14,6 +15,10 @@ export interface BookingCreateInput {
   queue_date: string; // YYYY-MM-DD
   service_ids: string[]; // QueueService UUIDs
   notes?: string;
+  /** QUEUE (walk-in) | FIXED | APPROXIMATE */
+  appointment_type?: string;
+  /** Required for FIXED/APPROXIMATE — slot UUID from GET /queue/slots */
+  slot_id?: string;
 }
 
 export interface RescheduleInput {
@@ -46,6 +51,23 @@ export class BookingService extends HttpClient {
       return await this.post<BookingPreviewData>(url, {});
     } catch (error: any) {
       console.error('Failed to fetch booking preview:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get bookable time slots for a queue on a date (FIXED/APPROXIMATE/HYBRID).
+   * Slot duration is derived from queue's min service avg time.
+   */
+  async getQueueSlots(queueId: string, date: string): Promise<SlotsListResponse> {
+    try {
+      const params = new URLSearchParams();
+      params.append('queue_id', queueId);
+      params.append('date', date);
+      const url = `/queue/slots?${params.toString()}`;
+      return await this.get<SlotsListResponse>(url);
+    } catch (error: any) {
+      console.error('Failed to fetch queue slots:', error);
       throw error;
     }
   }

@@ -4,6 +4,9 @@ export interface QueueCreatePayload {
     business_id: string;
     name: string;
     employee_id?: string | null;
+    booking_mode?: string; // QUEUE | FIXED | APPROXIMATE | HYBRID
+    slot_interval_minutes?: number | null;
+    max_per_slot?: number | null;
     services?: {
         service_id: string;
         avg_service_time?: number;
@@ -14,6 +17,9 @@ export interface QueueCreatePayload {
 export interface QueueCreateItemPayload {
     name: string;
     employee_id?: string | null;
+    booking_mode?: string;
+    slot_interval_minutes?: number | null;
+    max_per_slot?: number | null;
     services: {
         service_id: string;
         avg_service_time?: number;
@@ -31,6 +37,9 @@ export interface QueueUpdatePayload {
     status?: number;
     limit?: number;
     employee_id?: string | null;
+    booking_mode?: string;
+    slot_interval_minutes?: number | null;
+    max_per_slot?: number | null;
 }
 
 export interface QueueServiceAddItem {
@@ -110,6 +119,9 @@ export interface QueueData {
     status?: number | null;
     is_counter?: boolean | null;
     limit?: number | null;
+    booking_mode?: string | null;
+    slot_interval_minutes?: number | null;
+    max_per_slot?: number | null;
     created_at?: string | null;
 }
 
@@ -129,10 +141,23 @@ export interface QueueDetailData {
     status?: number | null;
     limit?: number | null;
     current_length?: number | null;
+    booking_mode?: string | null;
+    slot_interval_minutes?: number | null;
+    max_per_slot?: number | null;
     assigned_employee_id?: string | null;
     assigned_employee_name?: string | null;
     services: QueueServiceDetailData[];
 }
+export interface NextCustomerResponse {
+    queue_user_id: string;
+    token_number: string;
+    customer_name?: string | null;
+    appointment_type: string;  // QUEUE, FIXED, APPROXIMATE
+    scheduled_start?: string | null;
+    scheduled_end?: string | null;
+    service_summary?: string | null;
+}
+
 export interface LiveQueueUserItem {
     uuid: string;
     full_name?: string | null;
@@ -145,6 +170,10 @@ export interface LiveQueueUserItem {
     position?: number | null; // 1-indexed, only for waiting users
     estimated_wait_minutes?: number | null;   // for waiting users
     estimated_appointment_time?: string | null; // e.g. "4:30 PM"
+    appointment_type?: string | null;  // QUEUE, FIXED, APPROXIMATE
+    scheduled_start?: string | null;
+    scheduled_end?: string | null;
+    delay_minutes?: number | null;  // for APPROXIMATE: cascaded delay
 }
 
 export interface LiveQueueData {
@@ -202,6 +231,16 @@ export class QueueService extends HttpClient {
                 queues: payload.queues.map((q) => ({
                     name: q.name,
                     employee_id: q.employee_id || null,
+                    booking_mode: q.booking_mode ?? "QUEUE",
+                    slot_interval_minutes: null, // backend uses min service avg time when null
+                    max_per_slot:
+                        q.booking_mode === "QUEUE"
+                            ? undefined
+                            : (typeof q.max_per_slot === "number"
+                                ? q.max_per_slot
+                                : (q.max_per_slot != null && String(q.max_per_slot).trim() !== ""
+                                    ? parseInt(String(q.max_per_slot), 10)
+                                    : 1)),
                     services: q.services ?? [],
                 })),
             });
@@ -306,6 +345,18 @@ export class QueueService extends HttpClient {
             return await this.get<LiveQueueData>(`/queue/${queueId}/live`);
         } catch (error: any) {
             console.error("Failed to get live queue:", error);
+            throw error;
+        }
+    }
+
+    async getNextCustomer(queueId: string, date: string): Promise<NextCustomerResponse | null> {
+        try {
+            const params = new URLSearchParams({ date });
+            return await this.get<NextCustomerResponse | null>(
+                `/queue/${queueId}/next?${params.toString()}`
+            );
+        } catch (error: any) {
+            console.error("Failed to get next customer:", error);
             throw error;
         }
     }

@@ -5,7 +5,7 @@ import { AddressData, DaySchedule } from '../../utils/businessRegistrationStore'
 import { ProfileService, UnifiedProfileResponse } from '../../services/profile/profile.service';
 import { BusinessService, Category } from '../../services/business/business.service';
 import { OTPService } from '../../services/otp/otp.service';
-import { emailRegex } from '../../utils/utils';
+import { backendDowToUiDow, emailRegex, uiDowToBackendDow } from '../../utils/utils';
 import { Tabs } from '../../components/tabs/Tabs';
 import { RouterConstant } from '../../routers/index';
 import './business-profile.scss';
@@ -82,7 +82,7 @@ const BusinessProfile = () => {
 
     const [categories, setCategories] = useState<Category[]>([]);
 
-    // Backend convention: 0 = Monday, 6 = Sunday (ISO-like)
+    // UI convention: 0 = Monday, 6 = Sunday. Backend stores schedules as 0=Sunday..6=Saturday.
     const dayNames = useMemo(() => [
         { day_of_week: 0, day_name: t("monday") },
         { day_of_week: 1, day_name: t("tuesday") },
@@ -143,7 +143,7 @@ const BusinessProfile = () => {
             });
             const mappedSchedule: DaySchedule[] = dayNames.map(day => {
                 const scheduleItem = profile.schedule?.schedules.find(
-                    (s: { day_of_week: number }) => s.day_of_week === day.day_of_week
+                    (s: { day_of_week: number }) => backendDowToUiDow(s.day_of_week) === day.day_of_week
                 );
                 return {
                     day_of_week: day.day_of_week,
@@ -254,10 +254,10 @@ const BusinessProfile = () => {
             const schedules = scheduleData.isAlwaysOpen
                 ? []
                 : scheduleData.schedule.map(d => ({
-                    day_of_week: d.day_of_week,
+                    day_of_week: uiDowToBackendDow(d.day_of_week),
                     is_open: d.is_open,
-                    opening_time: d.is_open && d.opening_time ? d.opening_time : undefined,
-                    closing_time: d.is_open && d.closing_time ? d.closing_time : undefined,
+                    opening_time: d.is_open && d.opening_time ? d.opening_time : null,
+                    closing_time: d.is_open && d.closing_time ? d.closing_time : null,
                 }));
             await businessService.upsertSchedules(businessId, "BUSINESS", schedules, scheduleData.isAlwaysOpen);
             await fetchProfile();

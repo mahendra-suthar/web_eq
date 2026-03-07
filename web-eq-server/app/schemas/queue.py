@@ -2,7 +2,7 @@ import re
 from pydantic import BaseModel, validator
 from typing import Optional, List, Any, Dict
 from uuid import UUID
-from datetime import datetime, date
+from datetime import datetime, date, time
 
 from app.schemas.user import UserData
 from app.core.utils import format_time_12h, wait_minutes_from_now
@@ -19,6 +19,9 @@ class QueueCreate(BaseModel):
     business_id: UUID
     name: str
     employee_id: Optional[UUID] = None
+    booking_mode: Optional[str] = "QUEUE"
+    slot_interval_minutes: Optional[int] = None
+    max_per_slot: Optional[int] = 1
     services: List[QueueServiceCreate] = []
     avg_service_time: Optional[int] = None
     fee: Optional[float] = None
@@ -27,6 +30,9 @@ class QueueCreate(BaseModel):
 class QueueCreateItem(BaseModel):
     name: str
     employee_id: Optional[UUID] = None
+    booking_mode: Optional[str] = "QUEUE"
+    slot_interval_minutes: Optional[int] = None
+    max_per_slot: Optional[int] = 1
     services: List[QueueServiceCreate] = []
 
 
@@ -36,11 +42,14 @@ class QueueCreateBatch(BaseModel):
 
 
 class QueueUpdate(BaseModel):
-    """Partial update for queue (name, status, limit, assigned employee)."""
+    """Partial update for queue (name, status, limit, assigned employee, multi-mode settings)."""
     name: Optional[str] = None
     status: Optional[int] = None
     limit: Optional[int] = None
     employee_id: Optional[UUID] = None  # assign employee to queue; null to unassign
+    booking_mode: Optional[str] = None
+    slot_interval_minutes: Optional[int] = None
+    max_per_slot: Optional[int] = None
 
 
 class QueueServiceAddItem(BaseModel):
@@ -69,6 +78,9 @@ class QueueData(BaseModel):
     status: Optional[int] = None
     is_counter: Optional[bool] = None
     limit: Optional[int] = None
+    booking_mode: Optional[str] = None
+    slot_interval_minutes: Optional[int] = None
+    max_per_slot: Optional[int] = None
     created_at: Optional[datetime] = None
 
     @classmethod
@@ -80,6 +92,9 @@ class QueueData(BaseModel):
             status=queue.status,
             is_counter=getattr(queue, "is_counter", None),
             limit=getattr(queue, "limit", None),
+            booking_mode=getattr(queue, "booking_mode", None),
+            slot_interval_minutes=getattr(queue, "slot_interval_minutes", None),
+            max_per_slot=getattr(queue, "max_per_slot", None),
             created_at=getattr(queue, "created_at", None),
         )
 
@@ -133,6 +148,9 @@ class QueueDetailData(BaseModel):
     status: Optional[int] = None
     limit: Optional[int] = None
     current_length: Optional[int] = None
+    booking_mode: Optional[str] = None
+    slot_interval_minutes: Optional[int] = None
+    max_per_slot: Optional[int] = None
     assigned_employee_id: Optional[UUID] = None  # employee currently assigned to this queue
     assigned_employee_name: Optional[str] = None  # for display without extra lookup
     services: List[QueueServiceDetailData] = []
@@ -157,6 +175,9 @@ class QueueDetailData(BaseModel):
             status=queue.status,
             limit=getattr(queue, "limit", None),
             current_length=getattr(queue, "current_length", None),
+            booking_mode=getattr(queue, "booking_mode", None),
+            slot_interval_minutes=getattr(queue, "slot_interval_minutes", None),
+            max_per_slot=getattr(queue, "max_per_slot", None),
             assigned_employee_id=assigned_id,
             assigned_employee_name=assigned_name,
             services=services,
@@ -289,6 +310,8 @@ class QueueOptionData(BaseModel):
     # e.g. "employee_not_available" — frontend should show this instead of metrics.
     unavailability_reason: Optional[str] = None
     services: List[QueueServiceInfo] = []
+    # Multi-mode: QUEUE (walk-in), FIXED, APPROXIMATE, HYBRID (supports walk-in + scheduled)
+    booking_mode: Optional[str] = "QUEUE"
 
 
 class AvailableSlotData(BaseModel):
@@ -316,6 +339,74 @@ class BookingCreateInput(BaseModel):
     queue_date: date
     service_ids: List[UUID]  # QueueService UUIDs
     notes: Optional[str] = None
+    # Multi-mode: QUEUE (default walk-in), FIXED, APPROXIMATE
+    appointment_type: Optional[str] = "QUEUE"
+    slot_id: Optional[UUID] = None  # Required for FIXED/APPROXIMATE
+
+
+class SlotData(BaseModel):
+    """One bookable slot for FIXED/APPROXIMATE mode."""
+    uuid: str
+    slot_start: str  # HH:MM or HH:MM:SS
+    slot_end: str
+    capacity: int
+    booked_count: int
+    available: bool
+    remaining: int  # capacity - booked_count
+
+
+class SlotsListResponse(BaseModel):
+    """Available slots for a queue on a date."""
+    queue_id: str
+    queue_name: str
+    date: date
+    booking_mode: str
+    slots: List[SlotData]
+
+    @classmethod
+    def from_queue_and_slots(
+        cls, queue: Any, slot_date: date, slots: List["SlotData"]
+    ) -> "SlotsListResponse":
+        """Build from queue, date, and pre-built slot list."""
+        return cls(
+            queue_id=str(queue.uuid),
+            queue_name=queue.name,
+            date=slot_date,
+            booking_mode=getattr(queue, "booking_mode", None) or "FIXED",
+            slots=slots,
+        )
+
+
+class NextCustomerResponse(BaseModel):
+    """Next customer to serve (for employee 'Next' action)."""
+    queue_user_id: str
+    token_number: str
+    customer_name: Optional[str] = None
+    appointment_type: str  # QUEUE, FIXED, APPROXIMATE
+    scheduled_start: Optional[str] = None  # time string
+    scheduled_end: Optional[str] = None
+    service_summary: Optional[str] = None
+
+    @classmethod
+    def from_queue_user(cls, queue_user: Any) -> "NextCustomerResponse":
+        """Build from a QueueUser with user and queue_user_services loaded."""
+        user = getattr(queue_user, "user", None)
+        service_names: List[str] = []
+        for qus in getattr(queue_user, "queue_user_services", []) or []:
+            qs = getattr(qus, "queue_service", None)
+            if qs and getattr(qs, "service", None):
+                service_names.append(qs.service.name)
+        st = getattr(queue_user, "scheduled_start", None)
+        se = getattr(queue_user, "scheduled_end", None)
+        return cls(
+            queue_user_id=str(queue_user.uuid),
+            token_number=getattr(queue_user, "token_number", None) or "",
+            customer_name=user.full_name if user else None,
+            appointment_type=getattr(queue_user, "appointment_type", None) or "QUEUE",
+            scheduled_start=st.strftime("%H:%M") if st else None,
+            scheduled_end=se.strftime("%H:%M") if se else None,
+            service_summary=" · ".join(service_names) if service_names else None,
+        )
 
 
 class BookingServiceData(BaseModel):
@@ -343,6 +434,9 @@ class BookingData(BaseModel):
     status: str
     created_at: datetime
     already_in_queue: Optional[bool] = False
+    appointment_type: Optional[str] = "QUEUE"
+    scheduled_start: Optional[str] = None  # time for FIXED/APPROXIMATE
+    scheduled_end: Optional[str] = None
 
     @classmethod
     def from_booking_created(
@@ -358,6 +452,9 @@ class BookingData(BaseModel):
         token_number: str,
     ) -> "BookingData":
         """Build for a newly created booking."""
+        appt_type = getattr(queue_user, "appointment_type", None) or "QUEUE"
+        st = getattr(queue_user, "scheduled_start", None)
+        se = getattr(queue_user, "scheduled_end", None)
         return cls(
             uuid=str(queue_user.uuid),
             token_number=token_number,
@@ -373,6 +470,9 @@ class BookingData(BaseModel):
             services=services_data,
             status="confirmed",
             created_at=datetime.now(),
+            appointment_type=appt_type,
+            scheduled_start=st.strftime("%H:%M") if st else None,
+            scheduled_end=se.strftime("%H:%M") if se else None,
         )
 
     @classmethod
@@ -388,6 +488,9 @@ class BookingData(BaseModel):
         services_data: List["BookingServiceData"],
     ) -> "BookingData":
         """Build for an existing queue user (already in queue)."""
+        appt_type = getattr(existing_full, "appointment_type", None) or "QUEUE"
+        st = getattr(existing_full, "scheduled_start", None)
+        se = getattr(existing_full, "scheduled_end", None)
         return cls(
             uuid=str(existing_full.uuid),
             token_number=existing_full.token_number or "",
@@ -404,6 +507,9 @@ class BookingData(BaseModel):
             status="confirmed",
             created_at=existing_full.created_at or datetime.now(),
             already_in_queue=True,
+            appointment_type=appt_type,
+            scheduled_start=st.strftime("%H:%M") if st else None,
+            scheduled_end=se.strftime("%H:%M") if se else None,
         )
 
     class Config:
@@ -437,6 +543,10 @@ class LiveQueueUserItem(BaseModel):
     position: Optional[int] = None  # 1-indexed, only for waiting users
     estimated_wait_minutes: Optional[int] = None   # for waiting: est. wait; for in_progress: 0
     estimated_appointment_time: Optional[str] = None  # 12h e.g. "4:30 PM" (when expected to be served/done)
+    appointment_type: Optional[str] = "QUEUE"     # QUEUE, FIXED, APPROXIMATE
+    scheduled_start: Optional[str] = None        # time e.g. "10:30"
+    scheduled_end: Optional[str] = None
+    delay_minutes: Optional[int] = None          # for APPROXIMATE: cascaded delay
 
     @classmethod
     def from_user_dict(cls, u: Dict[str, Any]) -> "LiveQueueUserItem":
@@ -466,6 +576,10 @@ class LiveQueueUserItem(BaseModel):
             position=u.get("position"),
             estimated_wait_minutes=est_wait,
             estimated_appointment_time=appt_time,
+            appointment_type=u.get("appointment_type") or "QUEUE",
+            scheduled_start=u.get("scheduled_start"),
+            scheduled_end=u.get("scheduled_end"),
+            delay_minutes=u.get("delay_minutes"),
         )
 
 
@@ -528,6 +642,10 @@ class CustomerTodayAppointmentResponse(BaseModel):
     estimated_appointment_time: Optional[str] = None  # 12h e.g. "4:30 PM"
     service_summary: Optional[str] = None
     queue_service_uuids: List[str] = []
+    appointment_type: Optional[str] = "QUEUE"
+    scheduled_start: Optional[str] = None  # time e.g. "10:30"
+    scheduled_end: Optional[str] = None
+    delay_minutes: Optional[int] = None
 
     @classmethod
     def from_queue_user_and_metrics(
@@ -542,6 +660,8 @@ class CustomerTodayAppointmentResponse(BaseModel):
         queue_service_uuids: Optional[List[str]] = None,
     ) -> "CustomerTodayAppointmentResponse":
         """Build from queue user, queue, business ids/names, computed metrics, service summary, and formatted time."""
+        st = getattr(qu, "scheduled_start", None)
+        se = getattr(qu, "scheduled_end", None)
         return cls(
             queue_user_id=str(qu.uuid),
             queue_id=str(qu.queue_id),
@@ -557,6 +677,10 @@ class CustomerTodayAppointmentResponse(BaseModel):
             estimated_appointment_time=appointment_time_12h,
             service_summary=service_summary,
             queue_service_uuids=queue_service_uuids or [],
+            appointment_type=getattr(qu, "appointment_type", None) or "QUEUE",
+            scheduled_start=st.strftime("%H:%M") if st else None,
+            scheduled_end=se.strftime("%H:%M") if se else None,
+            delay_minutes=getattr(qu, "delay_minutes", None),
         )
 
 

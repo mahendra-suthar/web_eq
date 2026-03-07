@@ -16,6 +16,9 @@ interface QueueBlockState {
   id: string;
   name: string;
   employee_id: string;
+  booking_mode: "QUEUE" | "FIXED" | "APPROXIMATE" | "HYBRID";
+  slot_interval_minutes: string; // "" = unset
+  max_per_slot: string; // default "1"
   selectedServices: string[];
   serviceSettings: Record<string, { avg_service_time: string; fee: string }>;
 }
@@ -34,6 +37,9 @@ function createEmptyQueueBlock(id: string): QueueBlockState {
     id,
     name: "",
     employee_id: "",
+    booking_mode: "QUEUE",
+    slot_interval_minutes: "",
+    max_per_slot: "1",
     selectedServices: [],
     serviceSettings: {},
   };
@@ -44,6 +50,10 @@ function queueBlockFromData(id: string, data: QueueData): QueueBlockState {
     id,
     name: data.name || "",
     employee_id: data.employee_id || "",
+    booking_mode: ((data as any).booking_mode || "QUEUE").toUpperCase(),
+    slot_interval_minutes:
+      (data as any).slot_interval_minutes != null ? String((data as any).slot_interval_minutes) : "",
+    max_per_slot: (data as any).max_per_slot != null ? String((data as any).max_per_slot) : "1",
     selectedServices: data.services?.map((s) => s.service_id) || [],
     serviceSettings:
       data.services?.reduce(
@@ -213,6 +223,12 @@ export default function BusinessQueueSetup({
         queues: queues.map((q) => ({
           name: q.name.trim(),
           employee_id: q.employee_id || null,
+          booking_mode: q.booking_mode,
+          slot_interval_minutes: null, // backend uses min service avg time when null
+          max_per_slot:
+            q.booking_mode === "QUEUE" || !q.max_per_slot.trim()
+              ? null
+              : parseInt(q.max_per_slot, 10),
           services: q.selectedServices.map((service_id) => {
             const s = q.serviceSettings[service_id];
             const avgTime = s?.avg_service_time?.trim();
@@ -229,6 +245,9 @@ export default function BusinessQueueSetup({
       const queuesForStore: QueueData[] = queues.map((q) => ({
         name: q.name.trim(),
         employee_id: q.employee_id,
+        booking_mode: q.booking_mode as any,
+        slot_interval_minutes: q.slot_interval_minutes as any,
+        max_per_slot: q.max_per_slot as any,
         services: q.selectedServices.map((sid) => {
           const s = q.serviceSettings[sid];
           return {
@@ -353,6 +372,44 @@ export default function BusinessQueueSetup({
                     )}
                   </div>
                 </div>
+
+                <div className="form-field-wrapper">
+                  <label className="form-label">Booking mode</label>
+                  <div className="form-field">
+                    <select
+                      value={block.booking_mode}
+                      onChange={(e) => {
+                        const v = (e.target.value || "QUEUE") as any;
+                        updateQueue(block.id, {
+                          booking_mode: v,
+                          ...(v === "QUEUE" ? { slot_interval_minutes: "", max_per_slot: "1" } : {}),
+                        });
+                      }}
+                    >
+                      <option value="QUEUE">Walk-in (Queue)</option>
+                      <option value="FIXED">Fixed time</option>
+                      <option value="APPROXIMATE">Approximate time</option>
+                      <option value="HYBRID">Hybrid (Walk-in + Scheduled)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {block.booking_mode !== "QUEUE" && (
+                  <div className="form-field-wrapper">
+                    <label className="form-label">Max per slot</label>
+                    <div className="form-field">
+                      <input
+                        type="number"
+                        min={1}
+                        value={block.max_per_slot}
+                        onChange={(e) => updateQueue(block.id, { max_per_slot: e.target.value })}
+                      />
+                      <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: 13 }}>
+                        Slot duration is derived from the queue’s minimum service average time.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="form-field-wrapper">
                   <label className="form-label">{t("selectServices")} *</label>

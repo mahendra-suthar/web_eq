@@ -2,7 +2,7 @@
 
 .verify-otp-page {
   background: #fff;
-  padding: 40px 32px;
+  padding: $space-3xl $space-2xl;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -13,7 +13,7 @@
 }
 
 .verify-otp-header {
-  margin-bottom: 32px;
+  margin-bottom: $space-2xl;
   position: relative;
 
   .back-button {
@@ -22,7 +22,7 @@
     top: 0;
     background: none;
     border: none;
-    font-size: 24px;
+    font-size: $text-3xl;
     cursor: pointer;
     color: $primary-dark;
     padding: 0;
@@ -31,9 +31,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: 4px;
 
     &:hover {
-      opacity: 0.7;
+      opacity: 0.8;
+    }
+
+    &:focus {
+      outline: 2px solid $primary;
+      outline-offset: 2px;
     }
   }
 
@@ -44,16 +50,16 @@
   .verify-otp-title {
     color: $primary;
     font-family: "Noto Sans Hebrew", serif;
-    font-size: 32px;
-    font-weight: 700;
+    font-size: $text-4xl;
+    font-weight: $font-weight-bold;
     line-height: 40px;
-    margin: 0 0 8px 0;
+    margin: 0 0 $space-sm 0;
   }
 
   .verify-otp-subtitle {
-    color: #637381;
+    color: $text-secondary;
     font-family: "Noto Sans Hebrew", serif;
-    font-size: 14px;
+    font-size: $text-base;
     font-weight: 400;
     line-height: 20px;
     margin: 0;
@@ -68,19 +74,19 @@
 .verify-otp-form-fields {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: $space-xl;
 }
 
 .phone-info-container {
   display: flex;
   justify-content: center;
-  margin-bottom: 8px;
+  margin-bottom: $space-sm;
 
   .phone-display {
     color: $primary-dark;
     font-family: "Noto Sans Hebrew", serif;
-    font-size: 16px;
-    font-weight: 600;
+    font-size: $text-lg;
+    font-weight: $font-weight-semibold;
     line-height: 24px;
     margin: 0;
   }
@@ -89,37 +95,53 @@
 .otp-input-section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: $space-lg;
 }
 
 .otp-info-text {
   color: $primary-dark;
   font-family: "Noto Sans Hebrew", serif;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: $text-base;
+  font-weight: $font-weight-semibold;
   line-height: 20px;
   margin: 0;
   text-align: center;
 }
 
 .otp-container {
+  position: relative;
   display: flex;
   justify-content: center;
   width: 100%;
   direction: ltr;
+}
 
-  &.invalid {
-    .otp-box .otp-slot {
-      background-color: rgba(255, 86, 48, 0.1);
-      border-color: #FF5630;
+.otp-input-hidden {
+  position: absolute;
+  opacity: 0;
+  pointer-events: auto;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  border: none;
+  background: transparent;
+  font-size: 1px;
+  color: transparent;
+  z-index: 10;
+}
 
-      .otp-char.filled {
-        color: #FF5630;
-      }
+.otp-container.invalid {
+  .otp-box .otp-slot {
+    background-color: $color-error-bg;
+    border-color: $color-error-border;
 
-      .otp-char.placeholder {
-        color: rgba(255, 86, 48, 0.5);
-      }
+    .otp-char.filled {
+      color: $color-error;
+    }
+
+    .otp-char.placeholder {
+      color: rgba($color-error, 0.5);
     }
   }
 }
@@ -127,7 +149,7 @@
 .otp-box {
   display: flex;
   justify-content: center;
-  gap: 12px;
+  gap: $space-md;
   width: 100%;
 }
 
@@ -135,8 +157,8 @@
   height: 53px;
   width: 53px;
   border-radius: 8px;
-  font-size: 24px;
-  font-weight: bold;
+  font-size: $text-3xl;
+  font-weight: $font-weight-bold;
   background-color: rgba(145, 158, 171, 0.08);
   display: flex;
   align-items: center;
@@ -151,13 +173,13 @@
 }
 
 .otp-char {
-  font-weight: bold;
-  font-size: 24px;
+  font-weight: $font-weight-bold;
+  font-size: $text-3xl;
   text-align: center;
 
   &.placeholder {
-    color: #B0B0B0;
-    font-size: 32px;
+    color: $text-disabled;
+    font-size: $text-4xl;
   }
 
   &.filled {
@@ -169,13 +191,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding-top: 16px;
+  gap: $space-lg;
+  padding-top: $space-lg;
 
   .error-text {
-    color: #FF5630;
-    font-size: 14px;
-    font-weight: 600;
+    color: $color-error;
+    font-size: $text-base;
+    font-weight: $font-weight-semibold;
     margin: 0;
   }
 }
@@ -183,7 +205,7 @@
 .resend-container {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: $space-md;
 }
 
 .resend-button {
@@ -191,15 +213,20 @@
   color: $primary;
   border: 1px solid $primary;
   border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 700;
+  padding: $space-sm $space-lg;
+  font-size: $text-sm;
+  font-weight: $font-weight-bold;
   font-family: "Noto Sans Hebrew", serif;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover:not(.disabled) {
     background-color: rgba($primary, 0.1);
+  }
+
+  &:focus:not(.disabled) {
+    outline: 2px solid $primary;
+    outline-offset: 2px;
   }
 
   &.disabled {
@@ -212,8 +239,8 @@
 }
 
 .countdown-text {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: $text-lg;
+  font-weight: $font-weight-semibold;
   color: $primary-dark;
   font-family: "Noto Sans Hebrew", serif;
   margin: 0;
@@ -222,14 +249,14 @@
 .verify-otp-form-action {
   display: flex;
   justify-content: center;
-  padding-top: 32px;
-  margin-top: 8px;
-  
+  padding-top: $space-2xl;
+  margin-top: $space-sm;
+
   .button {
     width: 100%;
-    padding: 14px 24px;
-    font-size: 16px;
-    font-weight: 600;
+    padding: 14px $space-xl;
+    font-size: $text-lg;
+    font-weight: $font-weight-semibold;
     background-color: $primary;
     border-radius: 8px;
     text-transform: none;

@@ -3,12 +3,12 @@
 .booking-page {
   max-width: 720px;
   margin: 0 auto;
-  padding: 24px 20px 48px;
+  padding: $space-xl $space-xl $space-3xl;
   min-height: 60vh;
 
   &.booking-page-confirm {
     max-width: 520px;
-    padding-bottom: 48px;
+    padding-bottom: $space-3xl;
   }
 }
 
@@ -532,6 +532,87 @@
   }
 }
 
+// ——— Appointment mode (Walk-in / Fixed / Approximate) ———
+.bp-mode-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.bp-mode-btn {
+  padding: 12px 20px;
+  border: 2px solid #e8ecef;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: $primary-dark;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+
+  &:hover {
+    border-color: $primary-light;
+    background: rgba(0, 105, 92, 0.04);
+  }
+
+  &.selected {
+    border-color: $primary;
+    background: rgba(0, 105, 92, 0.1);
+    color: $primary;
+  }
+}
+
+// ——— Time slot picker (FIXED/APPROXIMATE) ———
+.bp-time-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.bp-time-slot-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 12px;
+  border: 2px solid #e8ecef;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: $primary-dark;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+
+  .bp-time-slot-time {
+    display: block;
+  }
+
+  .bp-time-slot-end {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: $text-secondary;
+    margin-top: 2px;
+  }
+
+  .bp-time-slot-remaining {
+    font-size: 0.7rem;
+    color: #e65100;
+    margin-top: 4px;
+  }
+
+  &:hover {
+    border-color: $primary-light;
+    background: rgba(0, 105, 92, 0.04);
+  }
+
+  &.selected {
+    border-color: $primary;
+    background: rgba(0, 105, 92, 0.1);
+  }
+}
+
 // ——— Summary & CTA ———
 .bp-section-summary {
   padding-top: 8px;
@@ -680,7 +761,7 @@
 }
 
 // ——— Responsive ———
-@media (max-width: 480px) {
+@media (max-width: $breakpoint-sm) {
   .bp-services-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -688,38 +769,38 @@
 
   .bp-services-table {
     min-width: 280px;
-    font-size: 0.9rem;
+    font-size: $text-md;
 
     th, td {
-      padding: 12px 14px;
+      padding: $space-md 14px;
     }
   }
 
   .bp-services-total {
     grid-template-columns: 1fr;
-    gap: 6px;
-    padding: 14px 16px;
+    gap: $space-sm;
+    padding: 14px $space-lg;
 
     .bp-services-total-duration {
       order: -1;
-      font-size: 0.85rem;
+      font-size: $text-base;
     }
 
     .bp-services-total-amount {
       text-align: left;
-      font-size: 1.25rem;
+      font-size: $text-2xl;
     }
   }
 }
 
-@media (min-width: 600px) {
+@media (min-width: $breakpoint-md) {
   .booking-page {
-    padding-left: 28px;
-    padding-right: 28px;
+    padding-left: $space-2xl;
+    padding-right: $space-2xl;
   }
 
   .bp-title {
-    font-size: 2rem;
+    font-size: $text-4xl;
   }
 
   .bp-dates-grid {
@@ -825,4 +906,238 @@
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+}
+
+// ——— Appointment mode icon ———
+.bp-mode-icon {
+  margin-right: 4px;
+  font-style: normal;
+}
+
+// ——— Slot trigger row (under mode buttons) ———
+.bp-slot-trigger-row {
+  margin-top: 16px;
+}
+
+.bp-choose-slot-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  background: $primary;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+
+  &:hover {
+    background: $primary-dark;
+    box-shadow: 0 4px 12px rgba(0, 105, 92, 0.2);
+  }
+}
+
+.bp-selected-slot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: rgba(0, 105, 92, 0.1);
+  border: 1.5px solid $primary;
+  border-radius: 20px;
+
+  &__label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: $primary-dark;
+  }
+
+  &__change {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: $primary;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+
+    &:hover {
+      color: $primary-dark;
+    }
+  }
+}
+
+// ——— Slot picker modal ———
+.bp-slot-picker-modal {
+  background: #fff;
+  border-radius: 20px;
+  max-width: 520px;
+  width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+  animation: bp-modal-slide-in 0.25s ease-out;
+  overflow: hidden;
+}
+
+.bp-slot-picker-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid #e8ecef;
+  flex-shrink: 0;
+}
+
+.bp-slot-picker-duration-hint {
+  font-size: 0.875rem;
+  color: $text-secondary;
+  margin: 6px 0 0 0;
+}
+
+.bp-slot-picker-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: $background-neutral;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  color: $text-secondary;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: 8px;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover {
+    background: #e8ecef;
+    color: $text-primary;
+  }
+}
+
+.bp-slot-picker-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.bp-slot-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.bp-slot-picker-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 14px 10px;
+  border: 2px solid #e8ecef;
+  border-radius: 12px;
+  background: #fff;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+  position: relative;
+
+  &:hover {
+    border-color: $primary-light;
+    background: rgba(0, 105, 92, 0.04);
+    box-shadow: 0 2px 8px rgba(0, 105, 92, 0.08);
+  }
+
+  &.selected {
+    border-color: $primary;
+    background: rgba(0, 105, 92, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 105, 92, 0.12);
+  }
+
+  &__start {
+    font-size: 1rem;
+    font-weight: 700;
+    color: $primary-dark;
+  }
+
+  &__dash {
+    font-size: 0.75rem;
+    color: $text-disabled;
+  }
+
+  &__end {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: $text-secondary;
+  }
+
+  &__scarcity {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #e65100;
+    background: rgba(230, 81, 0, 0.1);
+    border-radius: 6px;
+    padding: 2px 6px;
+    margin-top: 4px;
+  }
+}
+
+.bp-slot-picker-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 32px 16px;
+  gap: 8px;
+
+  &__icon {
+    font-size: 2.5rem;
+  }
+
+  &__title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: $primary-dark;
+    margin: 0;
+  }
+
+  &__hint {
+    font-size: 0.875rem;
+    color: $text-secondary;
+    margin: 0;
+    max-width: 280px;
+  }
+}
+
+.bp-slot-retry-btn {
+  padding: 8px 16px;
+  background: $primary;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 4px;
+
+  &:hover {
+    background: $primary-dark;
+  }
+}
+
+@media (max-width: $breakpoint-md) {
+  .bp-slot-picker-modal {
+    max-height: 92vh;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .bp-slot-picker-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }

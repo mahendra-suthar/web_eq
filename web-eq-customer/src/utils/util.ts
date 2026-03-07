@@ -110,3 +110,62 @@ export function formatTimeToDisplay(
     return "";
   }
 }
+
+// ============================================================================
+// Appointment display (shared across landing, profile, booking)
+// ============================================================================
+
+export type AppointmentType = "QUEUE" | "FIXED" | "APPROXIMATE" | string | null | undefined;
+
+/** Human-readable label for appointment type. */
+export function formatAppointmentTypeLabel(type: AppointmentType): string {
+  if (!type) return "Queue";
+  const upper = String(type).toUpperCase();
+  if (upper === "FIXED") return "Fixed";
+  if (upper === "APPROXIMATE") return "Approximate";
+  return "Queue";
+}
+
+/** Single-line time/slot summary: Fixed 10:30 / Approx 10:30–11:00 / Expected at 4:30 PM. */
+export function formatAppointmentTimeSummary(
+  appointmentType: AppointmentType,
+  scheduledStart: string | null | undefined,
+  scheduledEnd: string | null | undefined,
+  estimatedAppointmentTime: string | null | undefined
+): string {
+  const type = appointmentType ? String(appointmentType).toUpperCase() : "QUEUE";
+  if (type === "FIXED" && scheduledStart) {
+    return `Fixed ${formatTimeToDisplay(scheduledStart)}`;
+  }
+  if (type === "APPROXIMATE" && scheduledStart && scheduledEnd) {
+    return `Approx ${formatTimeToDisplay(scheduledStart)}–${formatTimeToDisplay(scheduledEnd)}`;
+  }
+  if (estimatedAppointmentTime) {
+    return `Expected at ${formatTimeToDisplay(estimatedAppointmentTime)}`;
+  }
+  return "";
+}
+
+/** Delay message for APPROXIMATE when delay_minutes > 0. */
+export function formatDelayMessage(delayMinutes: number | null | undefined): string {
+  if (delayMinutes == null || delayMinutes <= 0 || !Number.isFinite(delayMinutes)) return "";
+  return `Running ~${delayMinutes} min late`;
+}
+
+// ============================================================================
+// API error handling
+// ============================================================================
+
+/** Extract user-facing message from API error (axios or similar). */
+export function getApiErrorMessage(
+  err: unknown,
+  fallback: string = "Something went wrong. Please try again."
+): string {
+  if (err == null) return fallback;
+  const anyErr = err as { response?: { data?: { detail?: string | string[] } }; message?: string };
+  const detail = anyErr?.response?.data?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail.trim();
+  if (Array.isArray(detail) && detail.length > 0 && typeof detail[0] === "string") return detail[0];
+  if (typeof anyErr?.message === "string" && anyErr.message.trim()) return anyErr.message.trim();
+  return fallback;
+}

@@ -2,13 +2,22 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import CategoryCard from "../../components/category-card";
 import BusinessCard from "../../components/business-card";
-import { mockBusinesses } from "../../mock/businesses";
+import type { Business } from "../../mock/businesses";
 import Button from "../../components/button";
 import { CategoryService, type CategoryWithServicesData } from "../../services/category/category.service";
+import { BusinessService } from "../../services/business/business.service";
 import { AppointmentService, type TodayAppointmentResponse } from "../../services/appointment/appointment.service";
 import { useAuthStore } from "../../store/auth.store";
 import AppointmentActions from "../../components/appointment-actions";
-import { formatDurationMinutes, formatTimeToDisplay } from "../../utils/util";
+import LoadingSpinner from "../../components/loading-spinner";
+import EmptyState from "../../components/empty-state";
+import ErrorMessage from "../../components/error-message";
+import {
+  formatDurationMinutes,
+  formatAppointmentTimeSummary,
+  formatDelayMessage,
+  getApiErrorMessage,
+} from "../../utils/util";
 import "./landing.scss";
 
 export default function LandingPage() {
@@ -19,6 +28,11 @@ export default function LandingPage() {
   const [error, setError] = useState<string | null>(null);
   const [todayAppointments, setTodayAppointments] = useState<TodayAppointmentResponse[]>([]);
   const [todayLoading, setTodayLoading] = useState(false);
+  const [featuredBusinesses, setFeaturedBusinesses] = useState<Business[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
+  const [featuredError, setFeaturedError] = useState<string | null>(null);
+
+  const FEATURED_LIMIT = 6;
 
   const fetchTodayAppointments = useCallback(async () => {
     if (!isAuthenticated()) {
@@ -46,6 +60,46 @@ export default function LandingPage() {
     fetchCategories();
   }, []);
 
+  const fetchFeaturedBusinesses = useCallback(async () => {
+    setFeaturedLoading(true);
+    setFeaturedError(null);
+    try {
+      const businessService = new BusinessService();
+      const list = await businessService.getBusinesses();
+      const mapped: Business[] = list.map((b) => ({
+        id: b.uuid,
+        name: b.name,
+        categoryId: b.category_id || "",
+        rating: b.rating || 0,
+        reviewCount: b.review_count || 0,
+        location: b.address || "",
+        distance: undefined,
+        image: b.profile_picture || undefined,
+        description: b.about_business || "",
+        isOpen: b.is_open,
+        isAlwaysOpen: b.is_always_open,
+        opensAt: b.opens_at,
+        closesAt: b.closes_at,
+        serviceNames: b.service_names || [],
+        minPrice: b.min_price ?? null,
+        maxPrice: b.max_price ?? null,
+        latitude: b.latitude,
+        longitude: b.longitude,
+      }));
+      setFeaturedBusinesses(mapped.slice(0, FEATURED_LIMIT));
+    } catch (err) {
+      console.error("Failed to fetch featured businesses:", err);
+      setFeaturedError(getApiErrorMessage(err, "Failed to load businesses."));
+      setFeaturedBusinesses([]);
+    } finally {
+      setFeaturedLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFeaturedBusinesses();
+  }, [fetchFeaturedBusinesses]);
+
   const fetchCategories = async () => {
     try {
       setLoading(true);
@@ -53,9 +107,9 @@ export default function LandingPage() {
       const categoryService = new CategoryService();
       const data = await categoryService.getCategoriesWithServices();
       setCategories(data);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to fetch categories:", err);
-      setError("Failed to load categories. Please try again later.");
+      setError(getApiErrorMessage(err, "Failed to load categories. Please try again later."));
     } finally {
       setLoading(false);
     }
@@ -104,9 +158,9 @@ export default function LandingPage() {
             </p>
           </div>
           {todayLoading ? (
-            <div className="landing-today-loading">
-              <div className="landing-spinner" aria-hidden />
-              <p>Loading your appointments…</p>
+            <div className="landing-today-loading loading-state">
+              <LoadingSpinner aria-label="Loading appointments" size="md" />
+              <p className="loading-state__message">Loading your appointments…</p>
             </div>
           ) : (
             <div className="landing-today-cards">
@@ -141,9 +195,24 @@ export default function LandingPage() {
                         {appointment.estimated_wait_range && ` (${appointment.estimated_wait_range})`}
                       </span>
                     )}
-                    {appointment.estimated_appointment_time && (
+                    {formatAppointmentTimeSummary(
+                      appointment.appointment_type,
+                      appointment.scheduled_start ?? null,
+                      appointment.scheduled_end ?? null,
+                      appointment.estimated_appointment_time ?? null
+                    ) && (
                       <span className="landing-today-time">
-                        Expected at {formatTimeToDisplay(appointment.estimated_appointment_time)}
+                        {formatAppointmentTimeSummary(
+                          appointment.appointment_type,
+                          appointment.scheduled_start ?? null,
+                          appointment.scheduled_end ?? null,
+                          appointment.estimated_appointment_time ?? null
+                        )}
+                      </span>
+                    )}
+                    {formatDelayMessage(appointment.delay_minutes ?? null) && (
+                      <span className="landing-today-delay">
+                        {formatDelayMessage(appointment.delay_minutes ?? null)}
                       </span>
                     )}
                   </div>
@@ -163,14 +232,15 @@ export default function LandingPage() {
         </div>
 
         {loading && (
-          <div style={{ textAlign: "center", padding: "2rem" }}>
-            <p>Loading categories...</p>
+          <div className="landing-categories-loading loading-state">
+            <LoadingSpinner aria-label="Loading categories" size="md" />
+            <p className="loading-state__message">Loading categories...</p>
           </div>
         )}
 
         {error && (
-          <div style={{ textAlign: "center", padding: "2rem", color: "#d32f2f" }}>
-            <p>{error}</p>
+          <div className="landing-categories-error">
+            <ErrorMessage>{error}</ErrorMessage>
           </div>
         )}
 
@@ -181,27 +251,51 @@ export default function LandingPage() {
                 <CategoryCard key={category.uuid} category={category} />
               ))
             ) : (
-              <div style={{ textAlign: "center", padding: "2rem" }}>
-                <p>No categories available.</p>
-              </div>
+              <EmptyState
+                title="No categories available."
+                className="landing-categories-empty"
+              />
             )}
           </div>
         )}
       </div>
 
-      <div className="landing-section">
+      <div className="landing-section landing-section-featured">
         <div className="landing-section-header">
-          <h2 className="landing-section-title">Popular right now</h2>
+          <h2 className="landing-section-title">Explore businesses</h2>
           <p className="landing-section-subtitle">
-            A few featured places to show how listings will look.
+            Start with these or browse by category above.
           </p>
         </div>
 
-        <div className="landing-grid">
-          {mockBusinesses.slice(0, 3).map((business) => (
-            <BusinessCard key={business.id} business={business} />
-          ))}
-        </div>
+        {featuredLoading && (
+          <div className="landing-featured-loading loading-state">
+            <LoadingSpinner aria-label="Loading businesses" size="md" />
+            <p className="loading-state__message">Loading businesses…</p>
+          </div>
+        )}
+
+        {featuredError && !featuredLoading && (
+          <div className="landing-featured-error">
+            <ErrorMessage>{featuredError}</ErrorMessage>
+          </div>
+        )}
+
+        {!featuredLoading && !featuredError && featuredBusinesses.length > 0 && (
+          <div className="landing-grid">
+            {featuredBusinesses.map((business) => (
+              <BusinessCard key={business.id} business={business} />
+            ))}
+          </div>
+        )}
+
+        {!featuredLoading && !featuredError && featuredBusinesses.length === 0 && (
+          <EmptyState
+            title="No businesses yet"
+            hint="Browse by category above to discover and book with businesses as they join."
+            className="landing-featured-empty"
+          />
+        )}
       </div>
     </div>
   );

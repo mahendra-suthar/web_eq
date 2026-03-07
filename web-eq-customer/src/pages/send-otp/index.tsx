@@ -53,8 +53,8 @@ export default function SendOTPPage() {
         selectedServices: selectedServices || [],
         selectedServicesData: selectedServicesData || [],
         businessName: businessName || "",
-        rescheduleQueueUserId,
-        rescheduleInitialDate,
+        rescheduleQueueUserId: rescheduleQueueUserId ?? undefined,
+        rescheduleInitialDate: rescheduleInitialDate ?? undefined,
       });
     }
   }, [returnTo, selectedServices, selectedServicesData, businessName, rescheduleQueueUserId, rescheduleInitialDate]);
@@ -154,7 +154,7 @@ export default function SendOTPPage() {
             </div>
             {error && <div className="error-message">{error}</div>}
             {!error && (
-              <p style={{ color: "#637381", fontSize: "14px", margin: "8px 0 0 0" }}>
+              <p className="send-otp-hint">
                 {t("weWillSendCode")}
               </p>
             )}
@@ -173,19 +173,11 @@ export default function SendOTPPage() {
           />
         </div>
 
-        <div style={{ textAlign: "center", marginTop: "16px" }}>
+        <div className="send-otp-back-wrap">
           <button
             type="button"
+            className="send-otp-back-btn"
             onClick={() => navigate(returnTo || "/")}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#00695C",
-              cursor: "pointer",
-              fontSize: "14px",
-              textDecoration: "underline",
-              fontFamily: '"Noto Sans Hebrew", serif',
-            }}
           >
             {t("back")} {returnTo ? t("backToPreviousPage") : t("backToHome")}
           </button>

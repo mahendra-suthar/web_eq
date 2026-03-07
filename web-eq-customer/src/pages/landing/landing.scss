@@ -32,23 +32,23 @@
     line-height: 1.2;
     margin: 0 0 24px 0;
 
-    @media screen and (max-width: 768px) {
-      font-size: 32px;
+    @media screen and (max-width: $breakpoint-lg) {
+      font-size: $text-4xl;
     }
   }
 
   .landing-subtitle {
     color: $text-secondary;
     font-family: "Noto Sans Hebrew", serif;
-    font-size: 18px;
+    font-size: $text-xl;
     line-height: 1.6;
-    margin: 0 0 32px 0;
+    margin: 0 0 $space-2xl 0;
     max-width: 600px;
     margin-left: auto;
     margin-right: auto;
 
-    @media screen and (max-width: 768px) {
-      font-size: 16px;
+    @media screen and (max-width: $breakpoint-lg) {
+      font-size: $text-lg;
     }
   }
 
@@ -63,28 +63,28 @@
 .landing-section {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 64px 24px;
+  padding: $space-4xl $space-xl;
 
   .landing-section-header {
-    margin-bottom: 32px;
+    margin-bottom: $space-2xl;
     text-align: center;
 
     .landing-section-title {
       color: $primary-dark;
       font-family: "Noto Sans Hebrew", serif;
-      font-size: 32px;
-      font-weight: 700;
-      margin: 0 0 8px 0;
+      font-size: $text-4xl;
+      font-weight: $font-weight-bold;
+      margin: 0 0 $space-sm 0;
 
-      @media screen and (max-width: 768px) {
-        font-size: 24px;
+      @media screen and (max-width: $breakpoint-lg) {
+        font-size: $text-3xl;
       }
     }
 
     .landing-section-subtitle {
       color: $text-secondary;
       font-family: "Noto Sans Hebrew", serif;
-      font-size: 16px;
+      font-size: $text-lg;
       margin: 0;
     }
   }
@@ -92,12 +92,41 @@
   .landing-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 24px;
+    gap: $space-xl;
 
-    @media screen and (max-width: 768px) {
+    @media screen and (max-width: $breakpoint-lg) {
       grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 16px;
+      gap: $space-lg;
     }
+  }
+
+  .landing-categories-loading {
+    margin: 0 auto;
+  }
+
+  .landing-categories-error {
+    max-width: 480px;
+    margin: 0 auto $space-xl;
+  }
+
+  .landing-categories-empty {
+    grid-column: 1 / -1;
+  }
+}
+
+// Featured / Explore businesses section
+.landing-section-featured {
+  .landing-featured-loading {
+    margin: 0 auto;
+  }
+
+  .landing-featured-error {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  .landing-featured-empty {
+    grid-column: 1 / -1;
   }
 }
 
@@ -109,12 +138,12 @@
 .landing-today-loading,
 .landing-today-empty {
   text-align: center;
-  padding: 2rem;
+  padding: $space-2xl;
   color: $text-secondary;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  gap: $space-lg;
 
   .landing-spinner {
     width: 32px;
@@ -136,7 +165,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  gap: $space-lg;
   max-width: 480px;
   margin: 0 auto;
 }
@@ -145,9 +174,9 @@
   max-width: 100%;
   width: 100%;
   margin: 0;
-  padding: 24px;
+  padding: $space-xl;
   background: #fff;
-  border: 1px solid #E0F2F1;
+  border: 1px solid $primary-light;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 105, 92, 0.08);
   cursor: pointer;
@@ -167,21 +196,21 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 8px;
+    gap: $space-md;
+    margin-bottom: $space-sm;
   }
 
   .landing-today-business {
     font-family: "Noto Sans Hebrew", serif;
-    font-size: 18px;
-    font-weight: 700;
+    font-size: $text-xl;
+    font-weight: $font-weight-bold;
     color: $primary-dark;
   }
 
   .landing-today-status {
-    font-size: 12px;
-    font-weight: 600;
-    padding: 4px 10px;
+    font-size: $text-xs;
+    font-weight: $font-weight-semibold;
+    padding: $space-xs 10px;
     border-radius: 20px;
     flex-shrink: 0;
 
@@ -197,22 +226,22 @@
   }
 
   .landing-today-queue {
-    font-size: 15px;
+    font-size: $text-md;
     color: $text-secondary;
-    margin: 0 0 4px 0;
+    margin: 0 0 $space-xs 0;
   }
 
   .landing-today-services {
-    font-size: 14px;
+    font-size: $text-base;
     color: $primary;
-    margin: 0 0 12px 0;
+    margin: 0 0 $space-md 0;
   }
 
   .landing-today-details {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px 20px;
-    font-size: 14px;
+    gap: $space-md 20px;
+    font-size: $text-base;
     color: $text-secondary;
 
     .landing-today-token,
@@ -225,9 +254,9 @@
   }
 
   .landing-today-cta {
-    margin: 16px 0 0 0;
-    font-size: 14px;
+    margin: $space-lg 0 0 0;
+    font-size: $text-base;
     color: $primary;
-    font-weight: 600;
+    font-weight: $font-weight-semibold;
   }
 }

@@ -8,6 +8,8 @@ import {
 import { formatFullAddress, getMapEmbedUrl, getGoogleMapsLink, formatDurationMinutes } from "../../utils/util";
 import { DAY_NAMES } from "../../utils/constants";
 import Button from "../../components/button";
+import LoadingSpinner from "../../components/loading-spinner";
+import ErrorMessage from "../../components/error-message";
 import "./business-details.scss";
 
 export default function BusinessDetailsPage() {
@@ -89,9 +91,9 @@ export default function BusinessDetailsPage() {
   if (loading) {
     return (
       <div className="business-details-page">
-        <div className="bds-loading">
-          <div className="bds-loading-spinner" aria-hidden />
-          <p>Loading business details...</p>
+        <div className="bds-loading loading-state">
+          <LoadingSpinner aria-label="Loading business details" size="md" />
+          <p className="loading-state__message">Loading business details...</p>
         </div>
       </div>
     );
@@ -101,7 +103,7 @@ export default function BusinessDetailsPage() {
     return (
       <div className="business-details-page">
         <div className="bds-error">
-          <p>{error}</p>
+          <ErrorMessage>{error}</ErrorMessage>
         </div>
       </div>
     );
@@ -111,7 +113,7 @@ export default function BusinessDetailsPage() {
     return (
       <div className="business-details-page">
         <div className="bds-error">
-          <p>Business not found</p>
+          <ErrorMessage>Business not found</ErrorMessage>
         </div>
       </div>
     );
@@ -198,10 +200,11 @@ export default function BusinessDetailsPage() {
                 : (service.price ?? service.price_min ?? service.price_max) != null
                   ? `₹${service.price ?? service.price_min ?? service.price_max}`
                   : null;
-              const durationLabel = hasDurationRange
+              const durationVal = service.duration ?? service.duration_min ?? service.duration_max;
+              const durationLabel = hasDurationRange && service.duration_min != null && service.duration_max != null
                 ? `${formatDurationMinutes(service.duration_min)} – ${formatDurationMinutes(service.duration_max)}`
-                : (service.duration ?? service.duration_min ?? service.duration_max) != null
-                  ? formatDurationMinutes(service.duration ?? service.duration_min ?? service.duration_max)
+                : durationVal != null
+                  ? formatDurationMinutes(durationVal)
                   : null;
               return (
                 <button

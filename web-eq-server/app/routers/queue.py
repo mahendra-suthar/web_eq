@@ -12,6 +12,8 @@ from app.schemas.queue import (
     QueueUserData, QueueUserDetailResponse,
     AvailableSlotData, BookingCreateInput, BookingData, BookingPreviewData,
     LiveQueueData,
+    SlotsListResponse,
+    NextCustomerResponse,
 )
 from app.schemas.service import ServiceData
 from app.middleware.permissions import get_current_user, require_roles
@@ -142,6 +144,30 @@ async def get_available_slots(
         booking_date=booking_date,
         service_ids=service_ids
     )
+
+
+@queue_router.get("/slots", response_model=SlotsListResponse)
+async def get_queue_slots(
+    queue_id: UUID = Query(..., description="Queue UUID"),
+    date: date = Query(..., description="Slot date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get or generate bookable time slots for a queue on a date (FIXED/APPROXIMATE/HYBRID)."""
+    controller = QueueController(db)
+    return controller.get_queue_slots(queue_id, date)
+
+
+@queue_router.get("/{queue_id}/next", response_model=Optional[NextCustomerResponse])
+async def get_next_customer(
+    queue_id: UUID,
+    date: date = Query(..., description="Queue date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Next customer to serve (FIXED overdue > QUEUE FIFO > APPROXIMATE in window)."""
+    controller = QueueController(db)
+    return controller.get_next_customer(queue_id, date)
 
 
 @queue_router.get("/{queue_id}/live", response_model=LiveQueueData)

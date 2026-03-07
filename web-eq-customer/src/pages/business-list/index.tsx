@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import BusinessCard from "../../components/business-card";
+import LoadingSpinner from "../../components/loading-spinner";
+import EmptyState from "../../components/empty-state";
+import ErrorMessage from "../../components/error-message";
 import { BusinessService } from "../../services/business/business.service";
 import { CategoryService, type CategoryWithServicesData, type ServiceData } from "../../services/category/category.service";
 import { getCategoryEmoji } from "../../utils/category-emoji";
@@ -98,9 +101,7 @@ export default function BusinessListPage() {
   if (!category && !loading && !error) {
     return (
       <div className="business-list-page">
-        <div style={{ textAlign: "center", padding: "2rem" }}>
-          <p>Category not found</p>
-        </div>
+        <EmptyState title="Category not found" className="business-list-empty-state" />
       </div>
     );
   }
@@ -150,14 +151,15 @@ export default function BusinessListPage() {
       {/* Error */}
       {error && (
         <div className="business-list-error">
-          <p>{error}</p>
+          <ErrorMessage>{error}</ErrorMessage>
         </div>
       )}
 
       {/* Loading */}
       {loading && (
-        <div style={{ textAlign: "center", padding: "2rem" }}>
-          <p>Loading businesses...</p>
+        <div className="business-list-loading loading-state">
+          <LoadingSpinner aria-label="Loading businesses" size="md" />
+          <p className="loading-state__message">Loading businesses...</p>
         </div>
       )}
 
@@ -165,14 +167,16 @@ export default function BusinessListPage() {
       {!loading && !error && businesses.length === 0 && (
         <div className="business-list-empty">
           {selectedServiceIds.length > 0 ? (
-            <>
-              <p>No businesses found for the selected services.</p>
-              <button className="service-filters-clear" onClick={handleClearFilters}>
-                Clear filters
-              </button>
-            </>
+            <EmptyState
+              title="No businesses found for the selected services."
+              action={
+                <button className="service-filters-clear" onClick={handleClearFilters}>
+                  Clear filters
+                </button>
+              }
+            />
           ) : (
-            <p>No businesses found in this category.</p>
+            <EmptyState title="No businesses found in this category." />
           )}
         </div>
       )}

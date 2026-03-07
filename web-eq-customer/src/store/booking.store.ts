@@ -39,6 +39,27 @@ export interface QueueOptionData {
   available: boolean;
   unavailability_reason?: string | null;
   services: QueueServiceInfo[];
+  /** QUEUE | FIXED | APPROXIMATE | HYBRID — whether queue supports scheduled slots */
+  booking_mode?: string;
+}
+
+// Time-slot for FIXED/APPROXIMATE booking (from GET /queue/slots)
+export interface SlotData {
+  uuid: string;
+  slot_start: string;
+  slot_end: string;
+  capacity: number;
+  booked_count: number;
+  available: boolean;
+  remaining: number;
+}
+
+export interface SlotsListResponse {
+  queue_id: string;
+  queue_name: string;
+  date: string;
+  booking_mode: string;
+  slots: SlotData[];
 }
 
 export interface BookingPreviewData {
@@ -72,6 +93,9 @@ export interface BookingData {
   status: string;
   created_at: string;
   already_in_queue?: boolean;
+  appointment_type?: string;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
 }
 
 // WebSocket message types

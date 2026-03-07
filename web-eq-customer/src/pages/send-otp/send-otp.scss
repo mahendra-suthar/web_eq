@@ -2,7 +2,7 @@
 
 .send-otp-page {
   background: #fff;
-  padding: 40px 32px;
+  padding: $space-3xl $space-2xl;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -14,21 +14,21 @@
 
 .welcome-header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: $space-2xl;
 
   .welcome-title {
     color: $primary;
     font-family: "Noto Sans Hebrew", serif;
-    font-size: 32px;
-    font-weight: 700;
+    font-size: $text-4xl;
+    font-weight: $font-weight-bold;
     line-height: 40px;
-    margin: 0 0 8px 0;
+    margin: 0 0 $space-sm 0;
   }
 
   .welcome-subtitle {
-    color: #637381;
+    color: $text-secondary;
     font-family: "Noto Sans Hebrew", serif;
-    font-size: 14px;
+    font-size: $text-base;
     font-weight: 400;
     line-height: 20px;
     margin: 0;
@@ -43,40 +43,72 @@
 .send-otp-form-fields {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: $space-xl;
 }
 
 .phone-input-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: $space-sm;
+  margin-bottom: $space-sm;
 
   .phone-input-label {
     color: $primary-dark;
     font-family: "Noto Sans Hebrew", serif;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: $text-base;
+    font-weight: $font-weight-semibold;
     line-height: 20px;
-    margin: 0 0 8px 0;
+    margin: 0 0 $space-sm 0;
   }
 }
 
 .send-otp-form-action {
   display: flex;
   justify-content: center;
-  padding-top: 32px;
-  margin-top: 8px;
-  
+  padding-top: $space-2xl;
+  margin-top: $space-sm;
+
   .button {
     width: 100%;
-    padding: 14px 24px;
-    font-size: 16px;
-    font-weight: 600;
+    padding: 14px $space-xl;
+    font-size: $text-lg;
+    font-weight: $font-weight-semibold;
     background-color: $primary;
     border-radius: 8px;
     text-transform: none;
     color: white;
     border: none;
+  }
+}
+
+.send-otp-hint {
+  color: $text-secondary;
+  font-size: $text-base;
+  margin: $space-sm 0 0 0;
+  font-family: "Noto Sans Hebrew", serif;
+}
+
+.send-otp-back-wrap {
+  text-align: center;
+  margin-top: $space-lg;
+}
+
+.send-otp-back-btn {
+  background: none;
+  border: none;
+  color: $primary;
+  cursor: pointer;
+  font-size: $text-base;
+  text-decoration: underline;
+  font-family: "Noto Sans Hebrew", serif;
+  padding: $space-sm $space-md;
+
+  &:hover {
+    color: $primary-dark;
+  }
+
+  &:focus {
+    outline: 2px solid $primary;
+    outline-offset: 2px;
   }
 }

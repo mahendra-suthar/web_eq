@@ -72,3 +72,17 @@ BIZ_LATEST_TIME = _time(23, 59)
 # Booking / queue calculation defaults
 DEFAULT_AVG_TIME = 15          # minutes per slot when no historical data exists
 DEFAULT_OPEN_TIME = _time(9, 0)  # fallback opening time when no schedule is configured
+DEFAULT_SLOT_MINUTES = 15      # fallback slot duration when queue has no services (min floor)
+SLOT_DURATION_FLOOR = 10       # minimum slot length in minutes
+SLOT_DURATION_CEILING = 60     # maximum slot length in minutes
+
+# Queue booking modes
+BOOKING_MODE_QUEUE = "QUEUE"
+BOOKING_MODE_FIXED = "FIXED"
+BOOKING_MODE_APPROXIMATE = "APPROXIMATE"
+BOOKING_MODE_HYBRID = "HYBRID"
+
+# Appointment types (queue_user)
+APPOINTMENT_TYPE_QUEUE = "QUEUE"
+APPOINTMENT_TYPE_FIXED = "FIXED"
+APPOINTMENT_TYPE_APPROXIMATE = "APPROXIMATE"

@@ -31,6 +31,8 @@ const QueueAdd = () => {
 
     const [name, setName] = useState("");
     const [employeeId, setEmployeeId] = useState<string | null>(null);
+    const [bookingMode, setBookingMode] = useState<"QUEUE" | "FIXED" | "APPROXIMATE" | "HYBRID">("QUEUE");
+    const [maxPerSlot, setMaxPerSlot] = useState<number | "">(1);
     const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
     const [allServices, setAllServices] = useState<ServiceData[]>([]);
     const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
@@ -109,12 +111,22 @@ const QueueAdd = () => {
             setError(t("businessIdRequired") || "Business ID is required");
             return;
         }
+        if (bookingMode !== "QUEUE") {
+            const cap = maxPerSlot === "" ? NaN : Number(maxPerSlot);
+            if (isNaN(cap) || cap < 1) {
+                setError("Max per slot must be at least 1");
+                return;
+            }
+        }
         setSaving(true);
         try {
             const created = await queueService.createQueue({
                 business_id: businessId,
                 name: name.trim(),
                 employee_id: employeeId || undefined,
+                booking_mode: bookingMode,
+                slot_interval_minutes: null, // backend uses min service avg time when null
+                max_per_slot: bookingMode === "QUEUE" ? null : (maxPerSlot === "" ? 1 : Number(maxPerSlot)),
                 services: selectedServices.map((s) => ({
                     service_id: s.service_id,
                     service_fee: s.service_fee,
@@ -190,6 +202,45 @@ const QueueAdd = () => {
                             ))}
                         </select>
                     </div>
+
+                    <div className="form-block">
+                        <label className="form-label">Booking mode</label>
+                        <select
+                            className="form-select"
+                            value={bookingMode}
+                            onChange={(e) => {
+                                const v = (e.target.value || "QUEUE") as any;
+                                setBookingMode(v);
+                                if (v === "QUEUE") setMaxPerSlot(1);
+                            }}
+                            disabled={saving}
+                        >
+                            <option value="QUEUE">Walk-in (Queue)</option>
+                            <option value="FIXED">Fixed time</option>
+                            <option value="APPROXIMATE">Approximate time</option>
+                            <option value="HYBRID">Hybrid (Walk-in + Scheduled)</option>
+                        </select>
+                        <p className="form-hint">
+                            Fixed/Approx/Hybrid will generate time slots based on the queue’s minimum service average time.
+                        </p>
+                    </div>
+
+                    {bookingMode !== "QUEUE" && (
+                        <div className="form-block">
+                            <label className="form-label">Max per slot</label>
+                            <input
+                                type="number"
+                                className="form-input"
+                                value={maxPerSlot}
+                                min={1}
+                                onChange={(e) => setMaxPerSlot(e.target.value === "" ? "" : Number(e.target.value))}
+                                disabled={saving}
+                            />
+                            <p className="form-hint">
+                                Slot duration is derived from the queue’s minimum service average time.
+                            </p>
+                        </div>
+                    )}
 
                     <div className="form-block">
                         <h3 className="form-block-title">{t("queueServices") || "Queue services"}</h3>

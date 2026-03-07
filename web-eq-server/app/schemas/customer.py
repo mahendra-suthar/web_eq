@@ -40,6 +40,10 @@ class CustomerAppointmentListItem(BaseModel):
     estimated_wait_minutes: Optional[int] = None
     estimated_wait_range: Optional[str] = None
     estimated_appointment_time: Optional[str] = None
+    appointment_type: Optional[str] = "QUEUE"
+    scheduled_start: Optional[str] = None
+    scheduled_end: Optional[str] = None
+    delay_minutes: Optional[int] = None
 
     @classmethod
     def from_orm_row(
@@ -53,6 +57,8 @@ class CustomerAppointmentListItem(BaseModel):
     ) -> "CustomerAppointmentListItem":
         business_name = business.name if business else ""
         business_id = str(queue.merchant_id) if queue else ""
+        st = getattr(queue_user, "scheduled_start", None)
+        se = getattr(queue_user, "scheduled_end", None)
         return cls(
             queue_user_id=str(queue_user.uuid),
             queue_id=str(queue.uuid),
@@ -69,6 +75,10 @@ class CustomerAppointmentListItem(BaseModel):
             estimated_wait_minutes=metrics.get("wait_minutes") if metrics else None,
             estimated_wait_range=metrics.get("wait_range") if metrics else None,
             estimated_appointment_time=metrics.get("appointment_time") if metrics else None,
+            appointment_type=getattr(queue_user, "appointment_type", None) or "QUEUE",
+            scheduled_start=st.strftime("%H:%M") if st else None,
+            scheduled_end=se.strftime("%H:%M") if se else None,
+            delay_minutes=getattr(queue_user, "delay_minutes", None),
         )
 
 
@@ -88,9 +98,13 @@ class CustomerAppointmentDetailResponse(BaseModel):
     estimated_wait_minutes: Optional[int] = None
     estimated_wait_range: Optional[str] = None
     estimated_appointment_time: Optional[str] = None
+    appointment_type: Optional[str] = "QUEUE"
+    scheduled_start: Optional[str] = None
+    scheduled_end: Optional[str] = None
     enqueue_time: Optional[datetime] = None
     dequeue_time: Optional[datetime] = None
     created_at: Optional[datetime] = None
+    delay_minutes: Optional[int] = None
 
     @classmethod
     def from_queue_user_and_metrics(
@@ -105,6 +119,8 @@ class CustomerAppointmentDetailResponse(BaseModel):
         business_name = business.name if business else ""
         business_id = str(queue.merchant_id) if queue else ""
         qs_uuids = queue_service_uuids or []
+        st = getattr(queue_user, "scheduled_start", None)
+        se = getattr(queue_user, "scheduled_end", None)
         return cls(
             queue_user_id=str(queue_user.uuid),
             queue_id=str(queue.uuid),
@@ -120,9 +136,13 @@ class CustomerAppointmentDetailResponse(BaseModel):
             estimated_wait_minutes=metrics.get("wait_minutes") if metrics else None,
             estimated_wait_range=metrics.get("wait_range") if metrics else None,
             estimated_appointment_time=metrics.get("appointment_time") if metrics else None,
+            appointment_type=getattr(queue_user, "appointment_type", None) or "QUEUE",
+            scheduled_start=st.strftime("%H:%M") if st else None,
+            scheduled_end=se.strftime("%H:%M") if se else None,
             enqueue_time=queue_user.enqueue_time,
             dequeue_time=queue_user.dequeue_time,
             created_at=getattr(queue_user, "created_at", None),
+            delay_minutes=getattr(queue_user, "delay_minutes", None),
         )
 
 

@@ -60,6 +60,9 @@ export interface QueueData {
     services: QueueServiceData[];
     avg_service_time?: number;
     fee?: number;
+    booking_mode?: string; // QUEUE | FIXED | APPROXIMATE | HYBRID
+    slot_interval_minutes?: string | number;
+    max_per_slot?: string | number;
 }
 
 export interface RegistrationData {

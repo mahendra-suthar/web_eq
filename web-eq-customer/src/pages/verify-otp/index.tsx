@@ -233,27 +233,15 @@ export default function VerifyOTPPage() {
 
           <div className="otp-input-section">
             <p className="otp-info-text">{t("enterReceivedCode")}</p>
-            <div className={`otp-container ${error ? "invalid" : ""}`} style={{ position: "relative" }}>
+            <div className={`otp-container ${error ? "invalid" : ""}`}>
               <input
                 type="text"
+                className="otp-input-hidden"
                 value={otp}
                 onChange={handleOtpChange}
                 maxLength={OTP_LENGTH}
-                style={{
-                  position: "absolute",
-                  opacity: 0,
-                  pointerEvents: "auto",
-                  width: "100%",
-                  height: "100%",
-                  top: 0,
-                  left: 0,
-                  border: "none",
-                  background: "transparent",
-                  fontSize: "1px",
-                  color: "transparent",
-                  zIndex: 10,
-                }}
                 autoFocus
+                aria-label={t("enterReceivedCode")}
               />
               <div className="otp-box">
                 {[0, 1, 2, 3, 4].map((idx) => (

@@ -11,6 +11,34 @@ import "./live-queue.scss";
 
 const queueService = new QueueService();
 
+/** Human-readable appointment type for display. */
+function appointmentTypeLabel(type: string | null | undefined): string {
+  if (!type) return "Queue";
+  const upper = type.toUpperCase();
+  if (upper === "FIXED") return "Fixed";
+  if (upper === "APPROXIMATE") return "Approximate";
+  return "Queue";
+}
+
+/** Scheduled time for FIXED/APPROXIMATE: { labelKey, value } or null. */
+function formatScheduledLabel(user: {
+  appointment_type?: string | null;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
+}): { labelKey: "scheduledAt" | "scheduledWindow"; value: string } | null {
+  const start = user.scheduled_start?.trim();
+  if (!start) return null;
+  const type = (user.appointment_type || "").toUpperCase();
+  const startDisplay = formatTimeToDisplay(start);
+  if (type === "APPROXIMATE" && user.scheduled_end?.trim()) {
+    return {
+      labelKey: "scheduledWindow",
+      value: `${startDisplay} – ${formatTimeToDisplay(user.scheduled_end)}`,
+    };
+  }
+  return { labelKey: "scheduledAt", value: startDisplay };
+}
+
 type UIUser = {
   id: string;
   full_name: string;
@@ -20,7 +48,11 @@ type UIUser = {
   time_label: string;
   estimated_wait_label: string;
   expected_at_label: string;
-  position?: number | null;  // for waiting users
+  position?: number | null;
+  appointment_type?: string | null;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
+  delay_minutes?: number | null;
 };
 
 type CurrentUser = UIUser & { position: number; estimated_token: string };
@@ -50,6 +82,10 @@ function mapLiveData(data: LiveQueueData): {
       estimated_wait_label: estWaitLabel,
       expected_at_label: expectedAtLabel,
       position: u.position ?? null,
+      appointment_type: u.appointment_type ?? null,
+      scheduled_start: u.scheduled_start ?? null,
+      scheduled_end: u.scheduled_end ?? null,
+      delay_minutes: u.delay_minutes ?? null,
     };
 
     if (u.status === QueueUserStatus.COMPLETED) {
@@ -95,6 +131,7 @@ const LiveQueue: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [nextLoading, setNextLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const todayLabel = useMemo(() => {
     try {
@@ -194,16 +231,17 @@ const LiveQueue: React.FC = () => {
 
   const handleNext = useCallback(async () => {
     if (!selectedQueueId || nextLoading) return;
+    setActionError(null);
     setNextLoading(true);
     try {
       const updated = await queueService.advanceQueue(selectedQueueId);
       setLiveData(updated);
     } catch (e: any) {
-      alert(e?.response?.data?.detail || "Failed to advance queue");
+      setActionError(e?.response?.data?.detail || "Failed to advance queue");
     } finally {
       setNextLoading(false);
     }
-  }, [selectedQueueId, current, nextLoading]);
+  }, [selectedQueueId, nextLoading]);
 
   const handleRefresh = useCallback(() => {
     if (selectedQueueId) fetchLiveQueue(selectedQueueId);
@@ -211,12 +249,13 @@ const LiveQueue: React.FC = () => {
 
   const handleStart = useCallback(async () => {
     if (!selectedQueueId || !businessId || actionLoading) return;
+    setActionError(null);
     setActionLoading(true);
     try {
       await queueService.startQueue(selectedQueueId, businessId);
       setLiveData((prev) => (prev ? { ...prev, queue_status: 2 } : prev));
     } catch (e: any) {
-      alert(e?.response?.data?.detail || "Failed to start queue");
+      setActionError(e?.response?.data?.detail || "Failed to start queue");
     } finally {
       setActionLoading(false);
     }
@@ -224,12 +263,13 @@ const LiveQueue: React.FC = () => {
 
   const handleStop = useCallback(async () => {
     if (!selectedQueueId || !businessId || actionLoading) return;
+    setActionError(null);
     setActionLoading(true);
     try {
       await queueService.stopQueue(selectedQueueId, businessId);
       setLiveData((prev) => (prev ? { ...prev, queue_status: 3 } : prev));
     } catch (e: any) {
-      alert(e?.response?.data?.detail || "Failed to stop queue");
+      setActionError(e?.response?.data?.detail || "Failed to stop queue");
     } finally {
       setActionLoading(false);
     }
@@ -361,6 +401,19 @@ const LiveQueue: React.FC = () => {
         {error && !liveData && (
           <div className="lq-state-msg lq-state-msg--error">{error}</div>
         )}
+        {actionError && (
+          <div className="lq-state-msg lq-state-msg--error lq-action-error" role="alert">
+            {actionError}
+            <button
+              type="button"
+              className="lq-action-error-dismiss"
+              onClick={() => setActionError(null)}
+              aria-label={t("dismiss") || "Dismiss"}
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {/* Current user card – always shown once data is loaded */}
         {!loading && liveData && (
@@ -401,10 +454,31 @@ const LiveQueue: React.FC = () => {
                   <div className="lq-currentCard__info">
                     <div className="lq-currentCard__topRow">
                       <div className="lq-currentCard__name">{current.full_name}</div>
+                      <span className="lq-badge lq-badge--apptType" data-type={current.appointment_type || "QUEUE"}>
+                        {appointmentTypeLabel(current.appointment_type)}
+                      </span>
                       <span className="lq-badge lq-badge--progress">
                         {t("inProgress") || "In Progress"}
                       </span>
                     </div>
+                    {current.appointment_type === "APPROXIMATE" &&
+                      current.delay_minutes != null &&
+                      current.delay_minutes > 0 && (
+                        <div className="lq-currentCard__delay">
+                          {t("runningLate") || "Running"} ~{current.delay_minutes} {t("minLate") || "min late"}
+                        </div>
+                      )}
+                    {(() => {
+                      const scheduled = formatScheduledLabel(current);
+                      return scheduled ? (
+                        <div className="lq-currentCard__scheduled">
+                          <span className="lq-currentCard__scheduledLabel">
+                            {t(scheduled.labelKey)}:
+                          </span>{" "}
+                          <strong>{scheduled.value}</strong>
+                        </div>
+                      ) : null;
+                    })()}
                     <div className="lq-currentCard__subRow">
                       <span>{current.phone}</span>
                       <span className="lq-sep" aria-hidden />
@@ -424,7 +498,7 @@ const LiveQueue: React.FC = () => {
                           </span>
                         </>
                       )}
-                      {current.time_label && !current.expected_at_label && (
+                      {current.time_label && (
                         <>
                           <span className="lq-sep" aria-hidden />
                           <span>
@@ -546,6 +620,9 @@ const LiveQueue: React.FC = () => {
                             {item.user.token && (
                               <span className="lq-tokenChip">{item.user.token}</span>
                             )}
+                            <span className="lq-badge lq-badge--apptType" data-type={item.user.appointment_type || "QUEUE"}>
+                              {appointmentTypeLabel(item.user.appointment_type)}
+                            </span>
                             <span className={`lq-badge lq-badge--${item.status}`}>
                               {item.status === "done"
                                 ? t("completed") || "Completed"
@@ -562,10 +639,28 @@ const LiveQueue: React.FC = () => {
                                 <span>{item.user.service_summary}</span>
                               </>
                             )}
+                            {item.user.appointment_type === "APPROXIMATE" &&
+                              item.user.delay_minutes != null &&
+                              item.user.delay_minutes > 0 && (
+                                <>
+                                  <span className="lq-sep" aria-hidden />
+                                  <span className="lq-row__delay">
+                                    ~{item.user.delay_minutes} {t("minLate") || "min late"}
+                                  </span>
+                                </>
+                              )}
                           </div>
                         </div>
                       </div>
                       <div className="lq-row__right">
+                        {(() => {
+                          const scheduled = formatScheduledLabel(item.user);
+                          return scheduled ? (
+                            <span className="lq-row__scheduled">
+                              {t(scheduled.labelKey)} {scheduled.value}
+                            </span>
+                          ) : null;
+                        })()}
                         {item.user.position != null && (
                           <span className="lq-row__position">
                             {t("position") || "Position"} #{item.user.position}

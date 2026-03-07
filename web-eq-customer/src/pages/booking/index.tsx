@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useBookingStore, type QueueOptionData, type QueueServiceInfo } from "../../store/booking.store";
+import { useBookingStore, type QueueOptionData, type QueueServiceInfo, type SlotData, type SlotsListResponse } from "../../store/booking.store";
 import { useAuthStore } from "../../store/auth.store";
 import { useQueueWebSocket } from "../../hooks/useQueueWebSocket";
 import { BookingService } from "../../services/booking/booking.service";
@@ -118,10 +118,15 @@ export default function BookingPage() {
   const [bookingInProgress, setBookingInProgress] = useState(false);
   const [queueOptions, setQueueOptions] = useState<QueueOptionData[]>([]);
   const [selectedQueueOption, setSelectedQueueOption] = useState<QueueOptionData | null>(null);
-  /** When a queue is selected, these are the queue_service_uuids the user has chosen for booking (editable). */
   const [selectedQueueServiceIds, setSelectedQueueServiceIds] = useState<string[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [appointmentMode, setAppointmentMode] = useState<"QUEUE" | "FIXED" | "APPROXIMATE">("QUEUE");
+  const [selectedSlot, setSelectedSlot] = useState<SlotData | null>(null);
+  const [timeSlots, setTimeSlots] = useState<SlotsListResponse | null>(null);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
+  const [slotPickerOpen, setSlotPickerOpen] = useState(false);
 
   const { connected: wsConnectedState } = useQueueWebSocket({
     businessId: businessId || "",
@@ -134,7 +139,6 @@ export default function BookingPage() {
   useEffect(() => {
     if (!businessId) return;
     if (selectedDate != null) return;
-    // In reschedule mode pre-select the original appointment date (if still future/today)
     if (rescheduleInitialDate && !isDateInPast(rescheduleInitialDate)) {
       setSelectedDate(rescheduleInitialDate);
     } else {
@@ -303,6 +307,13 @@ export default function BookingPage() {
     if (!option.available) return;
     setSelectedQueueOption(option);
     setSelectedQueueServiceIds(option.services?.map((s) => s.queue_service_uuid) ?? []);
+    setSelectedSlot(null);
+    setTimeSlots(null);
+    setSlotsError(null);
+    const mode = option.booking_mode;
+    if (mode === "FIXED") setAppointmentMode("FIXED");
+    else if (mode === "APPROXIMATE") setAppointmentMode("APPROXIMATE");
+    else setAppointmentMode("QUEUE");
     setSelectedQueue({
       queue_id: option.queue_id,
       queue_name: option.queue_name,
@@ -316,6 +327,46 @@ export default function BookingPage() {
       status: option.available ? "Available" : "Full",
     });
   };
+
+  /** Whether the selected queue supports scheduled slots (FIXED / APPROXIMATE / HYBRID). */
+  const queueSupportsScheduled = useMemo(() => {
+    const mode = selectedQueueOption?.booking_mode;
+    return mode === "FIXED" || mode === "APPROXIMATE" || mode === "HYBRID";
+  }, [selectedQueueOption?.booking_mode]);
+
+  /** Fetch time slots when queue + date + mode require it. */
+  useEffect(() => {
+    if (!selectedQueueOption || !selectedDate || !queueSupportsScheduled) return;
+    if (appointmentMode !== "FIXED" && appointmentMode !== "APPROXIMATE") {
+      setTimeSlots(null);
+      setSelectedSlot(null);
+      return;
+    }
+    let cancelled = false;
+    const bookingService = new BookingService();
+    setSlotsLoading(true);
+    setSlotsError(null);
+    bookingService
+      .getQueueSlots(selectedQueueOption.queue_id, selectedDate)
+      .then((res) => {
+        if (!cancelled) {
+          setTimeSlots(res);
+          setSlotsError(null);
+        }
+      })
+      .catch((err: any) => {
+        if (!cancelled) {
+          setSlotsError(err.response?.data?.detail || "Failed to load time slots.");
+          setTimeSlots(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSlotsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedQueueOption?.queue_id, selectedDate, appointmentMode, queueSupportsScheduled]);
 
   const removeQueueService = (queueServiceUuid: string) => {
     setSelectedQueueServiceIds((prev) => {
@@ -338,6 +389,10 @@ export default function BookingPage() {
     }
     if (selectedQueueOption && selectedQueueServiceIds.length === 0) {
       setError("Please select at least one service for this queue.");
+      return;
+    }
+    if ((appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && !selectedSlot) {
+      setError("Please select a time slot.");
       return;
     }
     if (isDateInPast(selectedDate)) {
@@ -377,6 +432,9 @@ export default function BookingPage() {
         queue_id:    queueId,
         queue_date:  selectedDate,
         service_ids: finalServiceIds,
+        ...((appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && selectedSlot?.uuid
+          ? { appointment_type: appointmentMode, slot_id: selectedSlot.uuid }
+          : {}),
       });
       if (result.already_in_queue) {
         setBookingConfirmation(result);
@@ -414,7 +472,10 @@ export default function BookingPage() {
     selectedDate !== "" &&
     !isDateInPast(selectedDate) &&
     serviceIds.length > 0;
-  const canConfirm = selectedQueueOption !== null || selectedQueue !== null;
+  const needsSlot = (appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && queueSupportsScheduled;
+  const canConfirm =
+    (selectedQueueOption !== null || selectedQueue !== null) &&
+    (!needsSlot || (needsSlot && selectedSlot !== null));
   const displayQueue = selectedQueueOption ?? selectedQueue;
   const alreadyInQueueData = bookingConfirmation?.already_in_queue ? bookingConfirmation : null;
 
@@ -677,6 +738,188 @@ export default function BookingPage() {
         </section>
       )}
 
+      {/* 3b. Appointment mode (Walk-in / Fixed / Approximate) when queue supports scheduled slots */}
+      {selectedQueueOption && queueSupportsScheduled && (
+        <section className="bp-section" aria-labelledby="bp-mode-title">
+          <h2 id="bp-mode-title" className="bp-section-title">Appointment type</h2>
+          <p className="bp-section-desc">Choose how you want to be scheduled</p>
+          <div className="bp-mode-options" role="group" aria-label="Appointment type">
+            {(selectedQueueOption.booking_mode === "HYBRID" || selectedQueueOption.booking_mode === "QUEUE") && (
+              <button
+                type="button"
+                className={`bp-mode-btn ${appointmentMode === "QUEUE" ? "selected" : ""}`}
+                onClick={() => {
+                  setAppointmentMode("QUEUE");
+                  setSelectedSlot(null);
+                  setSlotPickerOpen(false);
+                }}
+                aria-pressed={appointmentMode === "QUEUE"}
+              >
+                <span className="bp-mode-icon">🚶</span> Walk-in
+              </button>
+            )}
+            {(selectedQueueOption.booking_mode === "FIXED" || selectedQueueOption.booking_mode === "HYBRID") && (
+              <button
+                type="button"
+                className={`bp-mode-btn ${appointmentMode === "FIXED" ? "selected" : ""}`}
+                onClick={() => {
+                  setAppointmentMode("FIXED");
+                  setSelectedSlot(null);
+                  setSlotPickerOpen(true);
+                }}
+                aria-pressed={appointmentMode === "FIXED"}
+              >
+                <span className="bp-mode-icon">📌</span> Fixed time
+              </button>
+            )}
+            {(selectedQueueOption.booking_mode === "APPROXIMATE" || selectedQueueOption.booking_mode === "HYBRID") && (
+              <button
+                type="button"
+                className={`bp-mode-btn ${appointmentMode === "APPROXIMATE" ? "selected" : ""}`}
+                onClick={() => {
+                  setAppointmentMode("APPROXIMATE");
+                  setSelectedSlot(null);
+                  setSlotPickerOpen(true);
+                }}
+                aria-pressed={appointmentMode === "APPROXIMATE"}
+              >
+                <span className="bp-mode-icon">⏰</span> Approximate time
+              </button>
+            )}
+          </div>
+
+          {/* Selected slot chip or "Choose slot" prompt */}
+          {(appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && (
+            <div className="bp-slot-trigger-row">
+              {selectedSlot ? (
+                <div className="bp-selected-slot-chip">
+                  <span className="bp-selected-slot-chip__label">
+                    {appointmentMode === "FIXED" ? "Fixed" : "Approx"}&nbsp;
+                    Starts at {formatTimeToDisplay(selectedSlot.slot_start)} · {formatDurationMinutes(totalDuration)}
+                  </span>
+                  <button
+                    type="button"
+                    className="bp-selected-slot-chip__change"
+                    onClick={() => setSlotPickerOpen(true)}
+                    aria-label="Change time slot"
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="bp-choose-slot-btn"
+                  onClick={() => setSlotPickerOpen(true)}
+                >
+                  {slotsLoading ? "Loading slots…" : "Choose a time slot →"}
+                </button>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* 3c. Slot picker popup */}
+      {slotPickerOpen && (appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && (
+        <div
+          className="bp-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bp-slot-picker-title"
+          onClick={(e) => { if (e.target === e.currentTarget) setSlotPickerOpen(false); }}
+        >
+          <div className="bp-slot-picker-modal">
+            <div className="bp-slot-picker-header">
+              <div>
+                <h2 id="bp-slot-picker-title" className="bp-modal-title">
+                  {appointmentMode === "FIXED" ? "Fixed time slot" : "Approximate time slot"}
+                </h2>
+                <p className="bp-modal-subtitle">
+                  {selectedQueueOption?.queue_name} · {selectedDate ? formatDateDisplay(selectedDate) : ""}
+                </p>
+                <p className="bp-slot-picker-duration-hint">
+                  Your appointment will take about {formatDurationMinutes(totalDuration)}.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="bp-slot-picker-close"
+                onClick={() => setSlotPickerOpen(false)}
+                aria-label="Close slot picker"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bp-slot-picker-body">
+              {slotsLoading ? (
+                <div className="bp-loading">
+                  <div className="bp-spinner" aria-hidden />
+                  <p>Loading available slots…</p>
+                </div>
+              ) : slotsError ? (
+                <div className="bp-error" role="alert">
+                  <p>{slotsError}</p>
+                  <button
+                    type="button"
+                    className="bp-slot-retry-btn"
+                    onClick={() => {
+                      setSlotsError(null);
+                      setSlotsLoading(true);
+                      const bookingService = new BookingService();
+                      bookingService
+                        .getQueueSlots(selectedQueueOption!.queue_id, selectedDate!)
+                        .then((res) => { setTimeSlots(res); setSlotsLoading(false); })
+                        .catch((err: any) => {
+                          setSlotsError(err.response?.data?.detail || "Failed to load time slots.");
+                          setSlotsLoading(false);
+                        });
+                    }}
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : !timeSlots?.slots?.length ? (
+                <div className="bp-slot-picker-empty">
+                  <span className="bp-slot-picker-empty__icon">📅</span>
+                  <p className="bp-slot-picker-empty__title">No available slots</p>
+                  <p className="bp-slot-picker-empty__hint">
+                    {selectedDate === getToday()
+                      ? "All slots for today have passed. Try booking for tomorrow."
+                      : "No slots available for this date. Try another date."}
+                  </p>
+                </div>
+              ) : (
+                <div className="bp-slot-picker-grid" role="group" aria-label="Available time slots">
+                  {timeSlots.slots
+                    .filter((s) => s.available)
+                    .map((slot) => (
+                      <button
+                        key={slot.uuid}
+                        type="button"
+                        className={`bp-slot-picker-item ${selectedSlot?.uuid === slot.uuid ? "selected" : ""}`}
+                        onClick={() => {
+                          setSelectedSlot(slot);
+                          setSlotPickerOpen(false);
+                        }}
+                        aria-pressed={selectedSlot?.uuid === slot.uuid}
+                      >
+                        <span className="bp-slot-picker-item__start">{formatTimeToDisplay(slot.slot_start)}</span>
+                        <span className="bp-slot-picker-item__dash">–</span>
+                        <span className="bp-slot-picker-item__end">{formatTimeToDisplay(slot.slot_end)}</span>
+                        {slot.remaining > 0 && slot.remaining <= 3 && (slot.capacity ?? 0) > 1 && (
+                          <span className="bp-slot-picker-item__scarcity">{slot.remaining} left</span>
+                        )}
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 4. Summary & Fix Appointment */}
       {canConfirm && displayQueue && (
         <section className="bp-section bp-section-summary">
@@ -691,13 +934,20 @@ export default function BookingPage() {
               {selectedServices.length} {selectedServices.length === 1 ? t("service") : t("services")} · {selectedDate ? formatDateDisplay(selectedDate) : ""}
             </p>
             <p className="bp-summary-queue">
-              {displayQueue.queue_name} · Wait ~{formatDurationMinutes(displayQueue.estimated_wait_minutes)}
-              {selectedQueueOption?.estimated_wait_range && (
+              {displayQueue.queue_name}
+              {selectedSlot
+                ? ` · ${appointmentMode === "FIXED" ? "Fixed" : "Approx"} starts ${formatTimeToDisplay(selectedSlot.slot_start)} · ${formatDurationMinutes(totalDuration)}`
+                : ` · Wait ~${formatDurationMinutes(displayQueue.estimated_wait_minutes)}`
+              }
+              {!selectedSlot && selectedQueueOption?.estimated_wait_range && (
                 <span className="bp-summary-range"> ({selectedQueueOption.estimated_wait_range})</span>
               )}
             </p>
             <p className="bp-summary-meta">
-              Expected at: {formatTimeToDisplay(displayQueue.estimated_appointment_time)}
+              {selectedSlot
+                ? `Starts at ${formatTimeToDisplay(selectedSlot.slot_start)} · ${formatDurationMinutes(totalDuration)}`
+                : `Expected at: ${formatTimeToDisplay(displayQueue.estimated_appointment_time)}`
+              }
             </p>
           </div>
           <Button

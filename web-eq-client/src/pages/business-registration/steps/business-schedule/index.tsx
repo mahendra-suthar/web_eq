@@ -4,6 +4,7 @@ import Button from "../../../../components/button";
 import { DaySchedule } from "../../../../utils/businessRegistrationStore";
 import { BusinessService, ScheduleInput } from "../../../../services/business/business.service";
 import { DayOfWeek, DAYS_IN_WEEK, DAYS_OF_WEEK } from "../../../../utils/constants";
+import { uiDowToBackendDow } from "../../../../utils/utils";
 import "./business-schedule.scss";
 
 interface BusinessScheduleProps {
@@ -142,7 +143,7 @@ export default function BusinessSchedule({
         const scheduleInputs: ScheduleInput[] = isAlwaysOpen
           ? []
           : schedule.map((day) => ({
-              day_of_week: day.day_of_week,
+              day_of_week: uiDowToBackendDow(day.day_of_week),
               opening_time: day.is_open && day.opening_time ? day.opening_time : null,
               closing_time: day.is_open && day.closing_time ? day.closing_time : null,
               is_open: day.is_open,

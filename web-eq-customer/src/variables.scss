@@ -1,9 +1,56 @@
+// ─── Brand & primary ─────────────────────────────────────────────────────
 $primary: #00695C;
 $primary-dark: #004D40;
 $primary-light: #B2DFDB;
+
+// ─── Text ───────────────────────────────────────────────────────────────
 $text-primary: #1C252E;
 $text-secondary: #637381;
 $text-disabled: #919EAB;
+
+// ─── Semantic colors ─────────────────────────────────────────────────────
+$color-error: #b91c1c;
+$color-error-bg: #fef2f2;
+$color-error-border: #fecaca;
+$color-success: #166534;
+$color-success-bg: #f0fdf4;
+$color-success-border: #bbf7d0;
+$color-info: #0369a1;
+$color-info-bg: #e0f2fe;
+$color-info-border: #0ea5e9;
+$color-muted: #637381;
+
+// ─── Legacy (keep for gradual migration) ─────────────────────────────────
 $background-neutral: #F4F6F8;
 $error: #FFE9D5;
 $error-dark: #7A0916;
+
+// ─── Spacing scale (px) ──────────────────────────────────────────────────
+$space-xs: 4px;
+$space-sm: 8px;
+$space-md: 12px;
+$space-lg: 16px;
+$space-xl: 24px;
+$space-2xl: 32px;
+$space-3xl: 48px;
+$space-4xl: 64px;
+
+// ─── Typography scale ───────────────────────────────────────────────────
+$text-xs: 0.75rem;    // 12px
+$text-sm: 0.8125rem; // 13px
+$text-base: 0.875rem; // 14px
+$text-md: 0.9375rem; // 15px
+$text-lg: 1rem;      // 16px
+$text-xl: 1.125rem;  // 18px
+$text-2xl: 1.25rem;  // 20px
+$text-3xl: 1.5rem;   // 24px
+$text-4xl: 2rem;     // 32px
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+$font-weight-bold: 700;
+
+// ─── Breakpoints ────────────────────────────────────────────────────────
+$breakpoint-sm: 480px;
+$breakpoint-md: 600px;
+$breakpoint-lg: 768px;
+$breakpoint-xl: 1024px;

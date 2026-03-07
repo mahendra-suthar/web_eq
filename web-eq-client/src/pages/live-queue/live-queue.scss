@@ -578,6 +578,75 @@
   }
 }
 
+.lq-action-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+.lq-action-error-dismiss {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  &:hover { background: rgba(220, 38, 38, 0.2); }
+}
+
+.lq-badge--apptType {
+  background: rgba(100, 116, 139, 0.1);
+  border-color: rgba(100, 116, 139, 0.2);
+  color: #475569;
+  &[data-type="FIXED"] {
+    background: rgba(37, 99, 235, 0.1);
+    border-color: rgba(37, 99, 235, 0.2);
+    color: #1d4ed8;
+  }
+  &[data-type="APPROXIMATE"] {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.25);
+    color: #b45309;
+  }
+}
+
+.lq-currentCard__delay {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b45309;
+}
+
+.lq-currentCard__scheduled {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #475569;
+  .lq-currentCard__scheduledLabel {
+    font-weight: 600;
+    color: #64748b;
+  }
+  strong {
+    color: #0f172a;
+  }
+}
+
+.lq-row__delay {
+  font-weight: 600;
+  color: #b45309;
+}
+
+.lq-row__scheduled {
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+}
 
 /* Disabled button state */
 .lq-actionBtn:disabled,

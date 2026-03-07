@@ -22,7 +22,7 @@ export default function CustomerLayout() {
               EQ
             </h1>
 
-            <div style={{ flex: 1 }} />
+            <div className="util-flex-spacer" />
 
             {isAuthenticated() ? (
               <ProfileDropdown
@@ -46,7 +46,7 @@ export default function CustomerLayout() {
 
       <footer className="customer-footer">
         <div className="customer-footer-inner">
-          <p style={{ color: "#637381", fontSize: "14px", margin: 0 }}>
+          <p className="customer-footer__text">
             © {new Date().getFullYear()} EQ — Book appointments quickly.
           </p>
         </div>

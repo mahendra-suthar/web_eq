@@ -2,8 +2,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
 from uuid import UUID
-from typing import List, Optional, Any, Dict
-from datetime import date, datetime, time, timezone
+from typing import List, Optional, Any, Dict, Tuple
+from datetime import date, datetime, time, timedelta, timezone
 
 import pytz
 
@@ -20,22 +20,37 @@ from app.schemas.queue import (
     LiveQueueData,
     CustomerTodayAppointmentResponse,
     CustomerTodayAppointmentsResponse,
+    SlotsListResponse,
+    SlotData,
+    NextCustomerResponse,
 )
 from app.schemas.user import UserData
 from app.schemas.service import ServiceData
 from app.core.constants import (
     BUSINESS_REGISTERED, QUEUE_USER_REGISTERED,
     QUEUE_RUNNING, QUEUE_STOPPED,
-    QUEUE_USER_IN_PROGRESS,
+    QUEUE_USER_IN_PROGRESS, QUEUE_USER_COMPLETED,
+    TIME_FORMAT,
+    DEFAULT_AVG_TIME,
 )
 from app.core.utils import (
     build_live_queue_users_raw,
     format_time_12h,
     today_app_date,
+    current_time_app_tz,
     format_date_iso,
     appointment_time_to_enqueue_dequeue,
 )
 from app.services.booking_calculation_service import BookingCalculationService
+from app.services.slot_generation_service import SlotGenerationService
+from app.core.constants import (
+    BOOKING_MODE_FIXED,
+    BOOKING_MODE_APPROXIMATE,
+    BOOKING_MODE_HYBRID,
+    APPOINTMENT_TYPE_FIXED,
+    APPOINTMENT_TYPE_QUEUE,
+    APPOINTMENT_TYPE_APPROXIMATE,
+)
 
 
 class QueueController:
@@ -453,6 +468,31 @@ class QueueController:
                 if existing_booking is not None:
                     return existing_booking
 
+            slot_id = getattr(data, "slot_id", None)
+            appointment_type = (data.appointment_type or "QUEUE").upper()
+            scheduled_start = None
+            scheduled_end = None
+
+            if appointment_type in ("FIXED", "APPROXIMATE") and slot_id:
+                slot = self.queue_service.get_slot_by_id(slot_id)
+                if not slot:
+                    raise HTTPException(status_code=404, detail="Slot not found")
+                if str(slot.queue_id) != str(queue_id) or slot.slot_date != data.queue_date:
+                    raise HTTPException(status_code=400, detail="Slot does not match selected queue or date")
+                if slot.is_blocked:
+                    raise HTTPException(status_code=409, detail="Slot is not available")
+                reserved = self.queue_service.reserve_slot_atomic(slot_id)
+                if not reserved:
+                    raise HTTPException(status_code=409, detail="Slot is full")
+                scheduled_start = slot.slot_start
+                scheduled_end = slot.slot_end
+                metrics = {
+                    "position": 1,
+                    "wait_minutes": 0,
+                    "wait_range": "",
+                    "appointment_time": slot.slot_start.strftime(TIME_FORMAT) if slot.slot_start else "",
+                }
+
             total_service_time = sum((qs.avg_service_time or 5) for qs in queue_services)
             date_str = format_date_iso(data.queue_date)
             token_number = await queue_manager.generate_token_number(str(queue_id), date_str)
@@ -469,10 +509,14 @@ class QueueController:
                 token_number=token_number,
                 turn_time=total_service_time,
                 notes=data.notes,
-                is_scheduled=(data.queue_date > today_app_date()),
+                is_scheduled=(data.queue_date > today_app_date()) or appointment_type in ("FIXED", "APPROXIMATE"),
                 estimated_enqueue_time=estimated_enqueue_dt,
                 estimated_dequeue_time=estimated_dequeue_dt,
                 queue_services=queue_services,
+                appointment_type=appointment_type,
+                slot_id=slot_id,
+                scheduled_start=scheduled_start,
+                scheduled_end=scheduled_end,
             )
 
             if data.queue_date == today_app_date():
@@ -507,6 +551,104 @@ class QueueController:
             raise HTTPException(status_code=500, detail=f"Failed to create booking: {str(e)}")
 
     # ─────────────────────────────────────────────────────────────────────────
+    # Slots & Next customer (multi-mode appointments)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def get_queue_slots(self, queue_id: UUID, slot_date: date) -> SlotsListResponse:
+        queue = self.queue_service.get_queue_by_id(queue_id)
+        if not queue:
+            raise HTTPException(status_code=404, detail="Queue not found")
+        if queue.booking_mode not in (BOOKING_MODE_FIXED, BOOKING_MODE_APPROXIMATE, BOOKING_MODE_HYBRID):
+            raise HTTPException(status_code=400, detail="Queue does not support scheduled slots")
+
+        slot_svc = SlotGenerationService(self.db)
+        slots = slot_svc.get_or_generate_slots(queue_id, slot_date, queue=queue)
+
+        # Build (start, end) windows from active FIXED/APPROXIMATE bookings (business logic in controller).
+        booking_rows = self.queue_service.get_active_scheduled_bookings_for_date(queue_id, slot_date)
+        booking_windows: List[Tuple[time, time]] = []
+        for qu in booking_rows:
+            start_t = qu.scheduled_start
+            if not start_t:
+                continue
+            duration_minutes = sum(
+                (getattr(qus.queue_service, "avg_service_time", None) or DEFAULT_AVG_TIME)
+                for qus in (qu.queue_user_services or [])
+                if getattr(qus, "queue_service", None)
+            )
+            if duration_minutes <= 0:
+                duration_minutes = DEFAULT_AVG_TIME
+            end_dt = datetime.combine(slot_date, start_t) + timedelta(minutes=duration_minutes)
+            end_t = end_dt.time()
+            if end_dt.date() > slot_date:
+                end_t = time(23, 59, 59)
+            booking_windows.append((start_t, end_t))
+
+        # For today, skip slots that have already started so customers only see future slots.
+        today = today_app_date()
+        cutoff_time = current_time_app_tz() if slot_date == today else None
+
+        def slot_overlaps_booking(slot_start, slot_end, windows):
+            """True if [slot_start, slot_end) overlaps any (start, end) in windows."""
+            for b_start, b_end in windows:
+                if slot_start < b_end and slot_end > b_start:
+                    return True
+            return False
+
+        slot_list = []
+        for s in slots:
+            if cutoff_time is not None and s.slot_start <= cutoff_time:
+                continue
+            overlaps = slot_overlaps_booking(s.slot_start, s.slot_end, booking_windows)
+            base_available = not s.is_blocked and s.booked_count < s.capacity
+            available = base_available and not overlaps
+            remaining = 0 if overlaps else max(0, (s.capacity or 1) - s.booked_count)
+            slot_list.append(
+                SlotData(
+                    uuid=str(s.uuid),
+                    slot_start=s.slot_start.strftime("%H:%M") if s.slot_start else "",
+                    slot_end=s.slot_end.strftime("%H:%M") if s.slot_end else "",
+                    capacity=s.capacity,
+                    booked_count=s.booked_count,
+                    available=available,
+                    remaining=remaining,
+                )
+            )
+        return SlotsListResponse.from_queue_and_slots(queue, slot_date, slot_list)
+
+    def get_next_customer(self, queue_id: UUID, queue_date: date) -> Optional[NextCustomerResponse]:
+        queue = self.queue_service.get_queue_by_id(queue_id)
+        if not queue:
+            raise HTTPException(status_code=404, detail="Queue not found")
+        rows = self.queue_service.get_registered_queue_users_for_serving(queue_id, queue_date)
+        if not rows:
+            return None
+
+        ist = pytz.timezone(TIMEZONE)
+        now = datetime.now(ist)
+        today = now.date()
+        now_time = now.time()
+
+        def _sort_key(qu):
+            is_today = qu.queue_date == today
+            st = qu.scheduled_start
+            if qu.appointment_type == APPOINTMENT_TYPE_FIXED and qu.is_checked_in:
+                if not is_today or (st and st <= now_time):
+                    return (0, st or time(0), qu.enqueue_time or datetime.min)
+                return (3, st or time(0), qu.enqueue_time or datetime.min)
+            if qu.appointment_type == APPOINTMENT_TYPE_QUEUE:
+                return (1, time(0), qu.enqueue_time or datetime.min)
+            if qu.appointment_type == APPOINTMENT_TYPE_APPROXIMATE and qu.is_checked_in:
+                if not is_today or (st and st <= now_time):
+                    return (2, st or time(0), qu.enqueue_time or datetime.min)
+                return (4, st or time(0), qu.enqueue_time or datetime.min)
+            return (5, st or time(0), qu.enqueue_time or datetime.min)
+
+        rows.sort(key=_sort_key)
+        qu = rows[0]
+        return NextCustomerResponse.from_queue_user(qu)
+
+    # ─────────────────────────────────────────────────────────────────────────
     # Live Queue (Employee real-time view)
     # ─────────────────────────────────────────────────────────────────────────
 
@@ -534,6 +676,19 @@ class QueueController:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to get live queue: {str(e)}")
 
+    def compute_overrun_minutes(self, completed_user: Any, dequeue_time: datetime) -> int:
+        """Minutes the completed visit exceeded the planned turn_time. Used for delay propagation."""
+        if not getattr(completed_user, "enqueue_time", None) or not dequeue_time:
+            return 0
+        turn_time = getattr(completed_user, "turn_time", None)
+        if not turn_time or turn_time <= 0:
+            return 0
+        actual_minutes = int(
+            (dequeue_time - completed_user.enqueue_time).total_seconds() / 60
+        )
+        overrun = actual_minutes - int(turn_time)
+        return overrun if overrun > 0 else 0
+
     async def advance_queue(self, queue_id: UUID) -> LiveQueueData:
         try:
             queue = self.queue_service.get_queue_by_id(queue_id)
@@ -547,7 +702,36 @@ class QueueController:
                     detail="Employee is on leave today. Queue cannot be advanced.",
                 )
 
-            self.queue_service.advance_queue(queue_id, today)
+            # Business logic: who to complete, who to start, overrun, delay propagation
+            active_users = self.queue_service.get_active_queue_users_with_lock(queue_id, today)
+            in_progress = next(
+                (u for u in active_users if u.status == QUEUE_USER_IN_PROGRESS), None
+            )
+            waiting = sorted(
+                [u for u in active_users if u.status == QUEUE_USER_REGISTERED],
+                key=lambda u: (u.enqueue_time or u.created_at or datetime.min.replace(tzinfo=timezone.utc)),
+            )
+            if not in_progress and not waiting:
+                raise ValueError("No users to serve")
+
+            now = datetime.now(timezone.utc)
+            overrun = 0
+            if in_progress:
+                overrun = self.compute_overrun_minutes(in_progress, now)
+                self.queue_service.mark_queue_user_completed(in_progress.uuid, now)
+            if waiting:
+                first_waiting = waiting[0]
+                self.queue_service.mark_queue_user_in_progress(first_waiting.uuid, now)
+            if in_progress and overrun > 0:
+                self.queue_service.add_delay_to_later_approx_bookings(
+                    queue_id,
+                    today,
+                    in_progress.enqueue_time,
+                    getattr(in_progress, "created_at", None),
+                    in_progress.uuid,
+                    overrun,
+                )
+            self.db.commit()
 
             rows, svc_by_user = self.queue_service.get_live_queue_users_raw(queue_id, today)
             users_raw = build_live_queue_users_raw(rows, svc_by_user)

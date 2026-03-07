@@ -21,12 +21,17 @@ class Queue(BaseModel):
     is_counter = Column(Boolean, default=False)
     last_token_number = Column(String, nullable=True)
     qr_code = Column(String, nullable=True)
+    # Multi-mode appointment: QUEUE (walk-in only), FIXED, APPROXIMATE, HYBRID
+    booking_mode = Column(String(20), default="QUEUE", nullable=False)
+    slot_interval_minutes = Column(Integer, nullable=True)  # cadence for slot generation; null = use slot_duration
+    max_per_slot = Column(Integer, default=1, nullable=True)  # capacity per slot for FIXED/APPROXIMATE
 
     queue_users = relationship("QueueUser", back_populates="queue", lazy="select")
     business = relationship("Business", back_populates="queues", foreign_keys=[merchant_id], lazy="select")
     queue_services = relationship("QueueService", back_populates="queue", lazy="select")
     employees = relationship("Employee", back_populates="queue", lazy="select")
     current_serving_user = relationship("User", foreign_keys=[current_user], lazy="select")
+    appointment_slots = relationship("AppointmentSlot", back_populates="queue", lazy="select", foreign_keys="AppointmentSlot.queue_id")
 
 
 class QueueUser(BaseModel):
@@ -49,11 +54,37 @@ class QueueUser(BaseModel):
     reschedule_count = Column(Integer, default=0)
     joined_queue = Column(Boolean, default=False)
     is_scheduled = Column(Boolean, default=False, nullable=False)
+    # Multi-mode: QUEUE (walk-in), FIXED, APPROXIMATE
+    appointment_type = Column(String(20), default="QUEUE", nullable=False)
+    slot_id = Column(UUID(as_uuid=True), ForeignKey("appointment_slots.uuid", ondelete="SET NULL"), nullable=True)
+    scheduled_start = Column(Time, nullable=True)   # slot start for FIXED/APPROXIMATE
+    scheduled_end = Column(Time, nullable=True)     # slot end for APPROXIMATE window
+    is_checked_in = Column(Boolean, default=False, nullable=False)
+    check_in_time = Column(TIMESTAMP(timezone=True), nullable=True)
+    delay_minutes = Column(Integer, default=0, nullable=False)  # cascaded delay for APPROXIMATE
 
     queue = relationship("Queue", back_populates="queue_users", foreign_keys=[queue_id], lazy="select")
     user = relationship("User", back_populates="queue_users", foreign_keys=[user_id], lazy="select")
+    slot = relationship("AppointmentSlot", back_populates="queue_users", foreign_keys=[slot_id], lazy="select")
     reviews = relationship("Review", back_populates="queue_user", lazy="select")
     queue_user_services = relationship("QueueUserService", back_populates="queue_user", lazy="select")
+
+
+class AppointmentSlot(BaseModel):
+    """Generated time slots for FIXED/APPROXIMATE booking. Duration derived from queue's min service avg time."""
+    __tablename__ = "appointment_slots"
+
+    uuid = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    queue_id = Column(UUID(as_uuid=True), ForeignKey("queues.uuid", ondelete="CASCADE"), nullable=False, index=True)
+    slot_date = Column(Date, nullable=False, index=True)
+    slot_start = Column(Time, nullable=False)
+    slot_end = Column(Time, nullable=False)
+    capacity = Column(Integer, default=1, nullable=False)
+    booked_count = Column(Integer, default=0, nullable=False)
+    is_blocked = Column(Boolean, default=False, nullable=False)
+
+    queue = relationship("Queue", back_populates="appointment_slots", foreign_keys=[queue_id], lazy="select")
+    queue_users = relationship("QueueUser", back_populates="slot", foreign_keys="QueueUser.slot_id", lazy="select")
 
 
 class QueueService(BaseModel):

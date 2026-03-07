@@ -7,15 +7,15 @@ from app.models.address import Address
 from app.models.schedule import Schedule, ScheduleBreak, ScheduleException
 from app.models.employee import Employee
 from app.models.service import Service
-from app.models.queue import Queue, QueueUser, QueueService, QueueUserService
+from app.models.queue import Queue, QueueUser, QueueService, QueueUserService, AppointmentSlot
 from app.models.role import Role, UserRoles
 from app.models.review import Review
 
 __all__ = [
     "BaseModel",
-    "User", 
-    "UserLogin", 
-    "Business", 
+    "User",
+    "UserLogin",
+    "Business",
     "Category",
     "Address",
     "Schedule",
@@ -27,6 +27,7 @@ __all__ = [
     "QueueUser",
     "QueueService",
     "QueueUserService",
+    "AppointmentSlot",
     "Role",
     "UserRoles",
     "Review"

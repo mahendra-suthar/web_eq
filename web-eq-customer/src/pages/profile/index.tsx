@@ -9,6 +9,13 @@ import type {
 import { AppointmentService } from "../../services/appointment/appointment.service";
 import type { CustomerAppointmentListItem } from "../../services/appointment/appointment.service";
 import AppointmentActions from "../../components/appointment-actions";
+import LoadingSpinner from "../../components/loading-spinner";
+import ErrorMessage from "../../components/error-message";
+import {
+  formatAppointmentTimeSummary,
+  formatDelayMessage,
+  getApiErrorMessage,
+} from "../../utils/util";
 import "./profile.scss";
 
 const VALID_TABS = ["profile", "appointments", "settings"] as const;
@@ -40,8 +47,8 @@ function ProfileInfoSection() {
         date_of_birth: res.user.date_of_birth ?? undefined,
         gender: res.user.gender ?? undefined,
       });
-    } catch (e: any) {
-      setError(e?.customMessage || "Failed to load profile");
+    } catch (e) {
+      setError(getApiErrorMessage(e, "Failed to load profile"));
     } finally {
       setLoading(false);
     }
@@ -63,8 +70,8 @@ function ProfileInfoSection() {
       setData(updated);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
-    } catch (e: any) {
-      setError(e?.customMessage || "Failed to update profile");
+    } catch (e) {
+      setError(getApiErrorMessage(e, "Failed to update profile"));
     } finally {
       setSaving(false);
     }
@@ -72,8 +79,9 @@ function ProfileInfoSection() {
 
   if (loading) {
     return (
-      <div className="profile-section profile-section--loading">
-        <p>Loading profile…</p>
+      <div className="profile-section profile-section--loading loading-state">
+        <LoadingSpinner aria-label="Loading profile" size="md" />
+        <p className="loading-state__message">Loading profile…</p>
       </div>
     );
   }
@@ -82,8 +90,16 @@ function ProfileInfoSection() {
   return (
     <section className="profile-section profile-section--info">
       <h2 className="profile-section__title">Profile Info</h2>
-      {error && <div className="profile-section__error" role="alert">{error}</div>}
-      {success && <div className="profile-section__success" role="status">Profile updated.</div>}
+      {error && (
+        <div className="profile-section__error-wrap">
+          <ErrorMessage role="alert">{error}</ErrorMessage>
+        </div>
+      )}
+      {success && (
+        <div className="profile-section__success-wrap">
+          <ErrorMessage variant="success" role="status">Profile updated.</ErrorMessage>
+        </div>
+      )}
       <form onSubmit={handleSubmit} className="profile-form">
         <div className="profile-form__row">
           <label htmlFor="profile-full_name">Name</label>
@@ -171,8 +187,8 @@ function AppointmentsSection() {
       setList((prev) => (append ? [...prev, ...res.items] : res.items));
       setTotal(res.total);
       setHasMore(res.has_more);
-    } catch (e: any) {
-      setError(e?.customMessage || "Failed to load appointments");
+    } catch (e) {
+      setError(getApiErrorMessage(e, "Failed to load appointments"));
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -215,9 +231,16 @@ function AppointmentsSection() {
   return (
     <section className="profile-section profile-section--appointments">
       <h2 className="profile-section__title">Appointments</h2>
-      {error && <div className="profile-section__error" role="alert">{error}</div>}
+      {error && (
+        <div className="profile-section__error-wrap">
+          <ErrorMessage role="alert">{error}</ErrorMessage>
+        </div>
+      )}
       {loading ? (
-        <p className="profile-section__loading">Loading appointments…</p>
+        <div className="profile-section__loading-wrap loading-state">
+          <LoadingSpinner aria-label="Loading appointments" size="md" />
+          <p className="loading-state__message">Loading appointments…</p>
+        </div>
       ) : list.length === 0 ? (
         <p className="profile-section__empty">You have no appointments yet.</p>
       ) : (
@@ -237,7 +260,16 @@ function AppointmentsSection() {
                     <span>{item.queue_name}</span>
                     {item.service_summary && <span className="appointment-card__services">{item.service_summary}</span>}
                   </div>
-                  {(item.token_number != null || item.position != null || item.estimated_wait_minutes != null || item.estimated_appointment_time != null) && (
+                  {(item.token_number != null ||
+                    item.position != null ||
+                    item.estimated_wait_minutes != null ||
+                    formatAppointmentTimeSummary(
+                      item.appointment_type,
+                      item.scheduled_start ?? null,
+                      item.scheduled_end ?? null,
+                      item.estimated_appointment_time ?? null
+                    ) ||
+                    formatDelayMessage(item.delay_minutes ?? null)) && (
                     <div className="appointment-card__details">
                       {item.token_number != null && (
                         <span className="appointment-card__detail">Token: {item.token_number}</span>
@@ -251,8 +283,25 @@ function AppointmentsSection() {
                       {item.estimated_wait_range && (
                         <span className="appointment-card__detail">{item.estimated_wait_range}</span>
                       )}
-                      {item.estimated_appointment_time && (
-                        <span className="appointment-card__detail">Est. time: {item.estimated_appointment_time}</span>
+                      {formatAppointmentTimeSummary(
+                        item.appointment_type,
+                        item.scheduled_start ?? null,
+                        item.scheduled_end ?? null,
+                        item.estimated_appointment_time ?? null
+                      ) && (
+                        <span className="appointment-card__detail">
+                          {formatAppointmentTimeSummary(
+                            item.appointment_type,
+                            item.scheduled_start ?? null,
+                            item.scheduled_end ?? null,
+                            item.estimated_appointment_time ?? null
+                          )}
+                        </span>
+                      )}
+                      {formatDelayMessage(item.delay_minutes ?? null) && (
+                        <span className="appointment-card__detail">
+                          {formatDelayMessage(item.delay_minutes ?? null)}
+                        </span>
                       )}
                     </div>
                   )}

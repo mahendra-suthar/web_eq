@@ -10,6 +10,7 @@ from app.core.constants import (
     TIME_FORMAT_HM,
     DEFAULT_AVG_TIME,
     DEFAULT_OPEN_TIME,
+    APPOINTMENT_TYPE_APPROXIMATE,
 )
 from app.core.utils import today_app_date
 from app.models.schedule import ScheduleEntityType
@@ -266,6 +267,7 @@ class BookingCalculationService:
             return {
                 "queue_id": str(queue.uuid),
                 "queue_name": queue.name,
+                "booking_mode": getattr(queue, "booking_mode", None) or "QUEUE",
                 "position": 0,
                 "estimated_wait_minutes": 0,
                 "estimated_wait_range": "",
@@ -288,6 +290,7 @@ class BookingCalculationService:
         return {
             "queue_id": str(queue.uuid),
             "queue_name": queue.name,
+            "booking_mode": getattr(queue, "booking_mode", None) or "QUEUE",
             "position": position,
             "estimated_wait_minutes": wait_minutes,
             "estimated_wait_range": wait_range,
@@ -319,6 +322,7 @@ class BookingCalculationService:
             return {
                 "queue_id": str(queue.uuid),
                 "queue_name": queue.name,
+                "booking_mode": getattr(queue, "booking_mode", None) or "QUEUE",
                 "position": 0,
                 "estimated_wait_minutes": 0,
                 "estimated_wait_range": "",
@@ -340,6 +344,7 @@ class BookingCalculationService:
         return {
             "queue_id": str(queue.uuid),
             "queue_name": queue.name,
+            "booking_mode": getattr(queue, "booking_mode", None) or "QUEUE",
             "position": position,
             "estimated_wait_minutes": wait_minutes,
             "estimated_wait_range": wait_range,
@@ -433,6 +438,13 @@ class BookingCalculationService:
 
         current_time = self.now_ist()
         queue = self.queue.get_queue_by_id(existing_queue_user.queue_id)
+
+        # For APPROXIMATE bookings, include stored delay_minutes in the ETA so
+        # customers see a delay-aware "Expected at" time.
+        if getattr(existing_queue_user, "appointment_type", None) == APPOINTMENT_TYPE_APPROXIMATE:
+            delay = getattr(existing_queue_user, "delay_minutes", 0) or 0
+            wait_minutes = wait_minutes + int(delay)
+
         appointment_dt = self.resolve_today_appointment(queue, current_time, wait_minutes)
         return {
             "position": position,

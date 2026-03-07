@@ -31,12 +31,11 @@ export default function ProfileDropdown({ userName, onLogout }: ProfileDropdownP
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      const t = requestAnimationFrame(() => {
-        document.getElementById(PROFILE_DROPDOWN_FIRST_ITEM_ID)?.focus();
-      });
-      return () => cancelAnimationFrame(t);
-    }
+    if (!isOpen) return undefined;
+    const t = requestAnimationFrame(() => {
+      document.getElementById(PROFILE_DROPDOWN_FIRST_ITEM_ID)?.focus();
+    });
+    return () => cancelAnimationFrame(t);
   }, [isOpen]);
 
   useEffect(() => {
