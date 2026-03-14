@@ -1,0 +1,64 @@
+databases:
+  - name: web-eq-db
+    databaseName: web_eq_db
+    plan: free
+
+services:
+  # Redis (Render Key Value)
+  - type: keyvalue
+    name: web-eq-redis
+    plan: free
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: everywhere
+
+  # FastAPI backend
+  - type: web
+    name: web-eq-backend
+    runtime: python
+    rootDir: web-eq-server
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        fromDatabase:
+          name: web-eq-db
+          property: connectionString
+      # Set this in the Render dashboard if fromService property isn't available for Key Value
+      - key: REDIS_URL
+        sync: false
+      # Comma-separated list of allowed frontend origins
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+
+  # Admin frontend (Vite)
+  - type: web
+    name: web-eq-admin
+    runtime: static
+    rootDir: web-eq-client
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
+      - key: VITE_API_URL
+        sync: false
+
+  # Customer frontend (Vite)
+  - type: web
+    name: web-eq-customer
+    runtime: static
+    rootDir: web-eq-customer
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
+      - key: VITE_API_URL
+        sync: false
+

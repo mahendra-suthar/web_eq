@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from app.core.config import DB_HOST, DB_NAME, DB_PORT, DB_USER, DB_PASSWORD, DB_ECHO_LOGS
+from app.core.config import DATABASE_URL, DB_HOST, DB_NAME, DB_PORT, DB_USER, DB_PASSWORD, DB_ECHO_LOGS
 
 load_dotenv()
 
@@ -23,12 +23,17 @@ class DatabaseSettings(BaseSettings):
 
 # Use the settings
 db_settings = DatabaseSettings()
+db_url = DATABASE_URL or db_settings.DATABASE_URL
+# Render may provide postgres://; SQLAlchemy expects postgresql://
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
 engine = create_engine(
-    db_settings.DATABASE_URL,
+    db_url,
     echo=db_settings.DB_ECHO_LOGS,
     pool_pre_ping=True,
     pool_size=20,
-    max_overflow=30    
+    max_overflow=30,
 )
 
 # Define the Base class

@@ -5,5 +5,7 @@ export const getConfig = () => {
 };
 
 export const getApiUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (typeof envUrl === "string" && envUrl.trim() !== "") return envUrl.trim();
   return config.API_URL;
 };

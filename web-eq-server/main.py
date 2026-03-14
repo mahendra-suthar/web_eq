@@ -11,12 +11,13 @@ from app.routers.routers import routers
 from app.db.database import engine, Base, SessionLocal
 from app.middleware.auth_middleware import AuthMiddleware
 from app.services.queue_service import QueueService
+from app.core.config import CORS_ORIGINS
 
 # Import all models to ensure they're registered with SQLAlchemy
 from app.models import (
     User, UserLogin, Business, Category,
     Address, Schedule, ScheduleBreak, ScheduleException, Employee, Service,
-    Queue, QueueUser, QueueService as QueueServiceModel, QueueUserService,
+    Queue, QueueUser, QueueService as QueueServiceModel, QueueUserService, AppointmentSlot,
     Role, UserRoles, Review
 )  # noqa: F401
 
@@ -68,6 +69,9 @@ origins = [
     "http://localhost:5173",
 ]
 
+if CORS_ORIGINS:
+    origins.extend([o.strip() for o in CORS_ORIGINS.split(",") if o.strip()])
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -78,6 +82,10 @@ app.add_middleware(
 
 app.add_middleware(AuthMiddleware)
 app.include_router(routers, prefix="/api")
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
 
 
 if __name__ == "__main__":

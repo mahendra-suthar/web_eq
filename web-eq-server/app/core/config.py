@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Database configuration
+DATABASE_URL = os.getenv("DATABASE_URL")
 DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
 DB_HOST = os.getenv("DB_HOST", "localhost")
@@ -38,6 +39,10 @@ WEB_TOKEN_EXPIRE_MINUTES = int(os.getenv("WEB_TOKEN_EXPIRE_MINUTES", "60"))
 
 # Redis configuration
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+# CORS configuration
+# Comma-separated origins (e.g. "https://admin.onrender.com,https://customer.onrender.com")
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "")
 
 # Queue configuration
 MAX_QUEUE_SIZE = int(os.getenv("MAX_QUEUE_SIZE", "50"))
