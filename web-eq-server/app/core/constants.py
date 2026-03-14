@@ -1,6 +1,7 @@
 from datetime import time as _time
 
 UNPROTECTED_ROUTE_PATHS = [
+    "/healthz",  # Render / load balancer health checks – no auth
     "/api/auth/send-otp",
     "/api/auth/verify-otp",
     "/api/auth/verify-otp-customer",
