@@ -4,14 +4,6 @@ databases:
     plan: free
 
 services:
-  # Redis (Render Key Value)
-  - type: keyvalue
-    name: web-eq-redis
-    plan: free
-    ipAllowList:
-      - source: 0.0.0.0/0
-        description: everywhere
-
   # FastAPI backend
   - type: web
     name: web-eq-backend
@@ -27,7 +19,7 @@ services:
         fromDatabase:
           name: web-eq-db
           property: connectionString
-      # Set this in the Render dashboard if fromService property isn't available for Key Value
+      # Optional: set REDIS_URL in dashboard if using external Redis
       - key: REDIS_URL
         sync: false
       # Comma-separated list of allowed frontend origins
