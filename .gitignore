@@ -89,5 +89,9 @@ docker-compose.override.yml
 eq_backend/
 shoonit-bot-client/
 shoonit-bot-server/
-index.html
+# Ignore index.html at repo root only; frontend entry files must be tracked for Render build
+/index.html
+# Explicitly track Vite entry HTML for admin and customer (overrides any broader ignore)
+!web-eq-client/index.html
+!web-eq-customer/index.html
 pyrightconfig.json
