@@ -22,9 +22,10 @@ class AuthService:
             key="access_token",
             value=token,
             httponly=True,
-            samesite="lax",  # type: ignore
-            secure=False,
+            secure=True,
+            samesite="None",
             path="/",
+            max_age=60 * 60 * 24,
         )
 
     async def generate_auth_response(
