@@ -4,63 +4,251 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #E0F2F1;
+  background: var(--warm-white);
+}
 
-  .customer-appbar {
-    background-color: white;
-    color: $text-primary;
-    border-bottom: 1px solid #e0e0e0;
-    position: sticky;
-    top: 0;
-    z-index: 100;
+// ─── Navigation ───────────────────────────────────────────────────────────
+.cl-nav {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  height: 64px;
+  background: rgba(253, 250, 245, 0.90);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid $border-subtle;
+  transition: box-shadow 0.3s;
+
+  &--scrolled {
+    box-shadow: 0 4px 32px rgba(14, 74, 53, 0.08);
+  }
+}
+
+.cl-nav-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 48px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  @media (max-width: $breakpoint-lg) { padding: 0 24px; }
+  @media (max-width: $breakpoint-sm) { padding: 0 16px; }
+}
+
+// Logo
+.cl-nav-logo {
+  font-family: 'Fraunces', serif !important;
+  font-size: 26px !important;
+  font-weight: 700 !important;
+  color: $forest;
+  letter-spacing: -0.5px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.cl-nav-logo-dot {
+  color: $jade;
+  font-style: italic;
+}
+
+// Nav links
+.cl-nav-links {
+  display: flex;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+
+  @media (max-width: $breakpoint-lg) { display: none; }
+}
+
+.cl-nav-link {
+  display: block;
+  padding: 6px 14px;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  color: $muted-green;
+  text-decoration: none;
+  transition: color 0.2s;
+  white-space: nowrap;
+
+  &:hover { color: $forest; }
+}
+
+// Right-side auth buttons
+.cl-nav-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.cl-btn-ghost {
+  padding: 9px 20px;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  color: $forest;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s;
+
+  &:hover { color: $jade; }
+}
+
+.cl-btn-primary {
+  padding: 10px 22px;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  color: #fff;
+  background: $forest;
+  border: none;
+  cursor: pointer;
+  border-radius: $radius-full;
+  box-shadow: 0 2px 12px rgba(14, 74, 53, 0.30);
+  transition: background 0.25s, transform 0.25s, box-shadow 0.25s;
+
+  &:hover {
+    background: $jade;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(14, 74, 53, 0.35);
+  }
+}
+
+// ─── Main content ─────────────────────────────────────────────────────────
+.cl-main {
+  flex: 1;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+}
+
+// ─── Footer ───────────────────────────────────────────────────────────────
+.cl-footer {
+  background: $ink-dark;
+}
+
+.cl-footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 60px 48px 32px;
+
+  @media (max-width: $breakpoint-lg) { padding: 48px 24px 24px; }
+  @media (max-width: $breakpoint-sm) { padding: 40px 20px 20px; }
+}
+
+.cl-footer-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  gap: 48px;
+  padding-bottom: 48px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 32px;
+
+  @media (max-width: $breakpoint-lg) {
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
   }
 
-  .customer-toolbar {
+  @media (max-width: $breakpoint-sm) {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}
+
+// Brand column
+.cl-footer-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cl-footer-logo {
+  font-family: 'Fraunces', serif !important;
+  font-size: 26px !important;
+  font-weight: 700 !important;
+  color: #fff;
+  letter-spacing: -0.5px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  width: fit-content;
+}
+
+.cl-footer-logo-dot {
+  color: $jade;
+  font-style: italic;
+}
+
+.cl-footer-brand-desc {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 300 !important;
+  color: rgba(255, 255, 255, 0.45);
+  line-height: 1.65;
+  margin: 0;
+}
+
+// Link columns
+.cl-footer-col {
+  ul {
+    list-style: none;
+    margin: 0;
     padding: 0;
-    min-height: 64px;
-
-    .customer-toolbar-inner {
-      max-width: 1200px;
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      width: 100%;
-      padding: 0 $space-xl;
-    }
-
-    .customer-brand {
-      font-weight: 700;
-      color: $primary;
-      font-size: 24px;
-      font-family: "Noto Sans Hebrew", serif;
-      cursor: pointer;
-      margin: 0;
-    }
   }
 
-  .customer-main {
-    flex: 1;
-    display: block;
-    width: 100%;
-    overflow: hidden;
-  }
+  li { margin-bottom: 10px; }
+}
 
-  .customer-footer {
-    background-color: white;
-    border-top: 1px solid #e0e0e0;
-    padding: $space-xl 0;
+.cl-footer-col-heading {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #fff;
+  margin: 0 0 16px 0;
+}
 
-    .customer-footer-inner {
-      max-width: 1200px;
-      margin: 0 auto;
-      text-align: center;
-      padding: 0 $space-xl;
-    }
+.cl-footer-link {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 400 !important;
+  color: rgba(255, 255, 255, 0.40);
+  text-decoration: none;
+  transition: color 0.2s;
 
-    .customer-footer__text {
-      color: $text-secondary;
-      font-size: $text-base;
-      margin: 0;
-    }
-  }
+  &:hover { color: $mint; }
+}
+
+// Bottom bar
+.cl-footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 12.5px !important;
+  color: rgba(255, 255, 255, 0.30);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.cl-footer-bottom-links {
+  display: flex;
+  gap: 0;
+
+  .cl-footer-link { margin-left: 20px; }
 }

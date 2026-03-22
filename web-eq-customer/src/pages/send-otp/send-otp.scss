@@ -1,114 +1,28 @@
 @use "../../variables.scss" as *;
 
-.send-otp-page {
-  background: #fff;
-  padding: $space-3xl $space-2xl;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 420px;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  margin: 0 auto;
+// ── Phone input row ───────────────────────────────────────────────────────────
+.auth-phone-row { display: flex; gap: 10px; }
+
+.auth-country-select {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 14px; height: 52px; flex-shrink: 0;
+  background: $foam; border: 1.5px solid rgba(14, 74, 53, 0.2);
+  border-radius: 14px; font-size: 14px; font-weight: 500; color: $ink-dark;
+  white-space: nowrap; user-select: none;
 }
+.auth-country-flag { font-size: 18px; }
 
-.welcome-header {
-  text-align: center;
-  margin-bottom: $space-2xl;
-
-  .welcome-title {
-    color: $primary;
-    font-family: "Noto Sans Hebrew", serif;
-    font-size: $text-4xl;
-    font-weight: $font-weight-bold;
-    line-height: 40px;
-    margin: 0 0 $space-sm 0;
-  }
-
-  .welcome-subtitle {
-    color: $text-secondary;
-    font-family: "Noto Sans Hebrew", serif;
-    font-size: $text-base;
-    font-weight: 400;
-    line-height: 20px;
-    margin: 0;
-  }
-}
-
-.send-otp-form {
-  display: flex;
-  flex-direction: column;
-}
-
-.send-otp-form-fields {
-  display: flex;
-  flex-direction: column;
-  gap: $space-xl;
-}
-
-.phone-input-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: $space-sm;
-  margin-bottom: $space-sm;
-
-  .phone-input-label {
-    color: $primary-dark;
-    font-family: "Noto Sans Hebrew", serif;
-    font-size: $text-base;
-    font-weight: $font-weight-semibold;
-    line-height: 20px;
-    margin: 0 0 $space-sm 0;
-  }
-}
-
-.send-otp-form-action {
-  display: flex;
-  justify-content: center;
-  padding-top: $space-2xl;
-  margin-top: $space-sm;
-
-  .button {
-    width: 100%;
-    padding: 14px $space-xl;
-    font-size: $text-lg;
-    font-weight: $font-weight-semibold;
-    background-color: $primary;
-    border-radius: 8px;
-    text-transform: none;
-    color: white;
-    border: none;
-  }
-}
-
-.send-otp-hint {
-  color: $text-secondary;
-  font-size: $text-base;
-  margin: $space-sm 0 0 0;
-  font-family: "Noto Sans Hebrew", serif;
-}
-
-.send-otp-back-wrap {
-  text-align: center;
-  margin-top: $space-lg;
-}
-
-.send-otp-back-btn {
-  background: none;
-  border: none;
-  color: $primary;
-  cursor: pointer;
-  font-size: $text-base;
-  text-decoration: underline;
-  font-family: "Noto Sans Hebrew", serif;
-  padding: $space-sm $space-md;
-
-  &:hover {
-    color: $primary-dark;
-  }
+.auth-phone-input {
+  flex: 1; height: 52px; padding: 0 18px;
+  background: $warm-white; border: 1.5px solid rgba(14, 74, 53, 0.2);
+  border-radius: 14px; font-family: "DM Sans", "Noto Sans Hebrew", sans-serif;
+  font-size: 16px; font-weight: 500; color: $ink-dark; outline: none;
+  transition: all 0.25s; letter-spacing: 0.5px;
 
   &:focus {
-    outline: 2px solid $primary;
-    outline-offset: 2px;
+    border-color: $jade; background: white;
+    box-shadow: 0 0 0 4px rgba(26, 122, 86, 0.08);
   }
+  &::placeholder { color: #c8d8d0; font-weight: 300; font-size: 14px; letter-spacing: 0; }
+  &--error { border-color: #e05c5c; }
 }

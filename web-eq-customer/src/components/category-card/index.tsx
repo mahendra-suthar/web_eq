@@ -28,8 +28,8 @@ export default function CategoryCard({ category, onClick }: Props) {
     <div className="category-card">
       <div className="category-card-action" onClick={handleClick}>
         <div className="category-card-content">
-          <div className="category-card-emoji" aria-hidden="true">
-            {emoji}
+          <div className="category-card-emoji-wrap" aria-hidden="true">
+            <span className="category-card-emoji">{emoji}</span>
           </div>
           <div className="category-card-text">
             <h3 className="category-card-title">{category.name}</h3>

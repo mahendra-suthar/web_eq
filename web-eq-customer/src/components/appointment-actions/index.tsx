@@ -1,21 +1,8 @@
-/**
- * AppointmentActions – Edit (reschedule) and Cancel controls for an appointment card.
- *
- * Edit:   Navigates to the business booking page with reschedule context so the user
- *         goes through the familiar "choose services → date → queue → confirm" flow.
- *         On confirm, BookingPage calls PATCH /customer/appointments/{id} (reschedule)
- *         instead of POST /queue/book (create).
- *
- * Cancel: Opens an in-place confirmation modal; removes the user from the queue in
- *         real time via the cancel endpoint and immediately refreshes the list.
- */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppointmentService } from "../../services/appointment/appointment.service";
 import Button from "../button";
 import "./appointment-actions.scss";
-
-// ─── Shared appointment shape ─────────────────────────────────────────────────
 
 export interface AppointmentActionItem {
   queue_user_id: string;
@@ -29,12 +16,8 @@ export interface AppointmentActionItem {
   service_summary?: string | null;
 }
 
-// ─── Allowed status codes ─────────────────────────────────────────────────────
-
 const EDITABLE_STATUSES = [1];       // REGISTERED only
 const CANCELLABLE_STATUSES = [1, 2]; // REGISTERED + IN_PROGRESS
-
-// ─── Root component ──────────────────────────────────────────────────────────
 
 interface AppointmentActionsProps {
   appointment: AppointmentActionItem;
@@ -48,23 +31,18 @@ export default function AppointmentActions({
   const navigate = useNavigate();
   const [showCancel, setShowCancel] = useState(false);
 
-  const canEdit   = EDITABLE_STATUSES.includes(appointment.status);
+  const canEdit = EDITABLE_STATUSES.includes(appointment.status);
   const canCancel = CANCELLABLE_STATUSES.includes(appointment.status);
 
   if (!canEdit && !canCancel) return null;
 
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // Navigate to the business booking page carrying reschedule context.
-    // BookingPage will pre-fill services + date from location.state and, on
-    // confirm, call PATCH /customer/appointments/{queue_user_id} instead of
-    // POST /queue/book.
     navigate(`/business/${appointment.business_id}/book`, {
       state: {
-        selectedServices:     appointment.queue_service_uuids ?? [],
-        selectedServicesData: [],        // booking page resolves these from API
-        businessName:         appointment.business_name,
-        // Reschedule context
+        selectedServices: appointment.queue_service_uuids ?? [],
+        selectedServicesData: [], // booking page resolves these from API
+        businessName: appointment.business_name,
         rescheduleQueueUserId: appointment.queue_user_id,
         rescheduleInitialDate: appointment.queue_date,
       },
@@ -119,7 +97,7 @@ function CancelModal({
   onCancelled: () => void;
 }) {
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleConfirm = async () => {
     setLoading(true);
