@@ -88,28 +88,15 @@ export enum HttpStatus {
   UNAUTHORIZED = 401,
 }
 
-// ============================================================================
-// Day names (0 = Monday … 6 = Sunday)
-// ============================================================================
-
-export const DAY_NAMES = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-];
 
 // ============================================================================
-// Profile dropdown menu
+// Profile dropdown menu  (labels are resolved via i18n in the component)
 // ============================================================================
 
 export const PROFILE_DROPDOWN_MENU_ITEMS = [
-  { id: "profile", label: "Profile", path: "/profile?tab=profile" },
-  { id: "appointments", label: "Appointments", path: "/profile?tab=appointments" },
-  { id: "settings", label: "Settings", path: "/profile?tab=settings" },
+  { id: "profile", path: "/profile?tab=profile" },
+  { id: "appointments", path: "/profile?tab=appointments" },
+  { id: "settings", path: "/profile?tab=settings" },
 ] as const;
 
 export const PROFILE_DROPDOWN_FIRST_ITEM_ID = "profile-dropdown-item-profile";

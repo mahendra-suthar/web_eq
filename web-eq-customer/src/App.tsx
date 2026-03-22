@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import CustomerLayout from "./layouts/customer-layout";
+import AuthLayout from "./layouts/auth-layout";
 import { AuthFailureHandler } from "./components/AuthFailureHandler";
 import { GuestOnlyRoute } from "./components/GuestOnlyRoute";
 import LandingPage from "./pages/landing";
@@ -23,11 +24,15 @@ function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/orders" element={<Navigate to="/profile?tab=appointments" replace />} />
           <Route path="/settings" element={<Navigate to="/profile?tab=settings" replace />} />
+        </Route>
+
+        <Route element={<AuthLayout />}>
           <Route element={<GuestOnlyRoute />}>
             <Route path="/send-otp" element={<SendOTPPage />} />
             <Route path="/verify-otp" element={<VerifyOTPPage />} />
           </Route>
         </Route>
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -10,7 +10,6 @@ import { getNext7Days, getToday } from "../../utils/booking.utils";
 import { isDateInPast, formatDateDisplay, formatDurationMinutes, formatTimeToDisplay } from "../../utils/util";
 import { HttpStatus } from "../../utils/constants";
 import { saveBookingReturnState, getBookingReturnState, clearBookingReturnState } from "../../utils/bookingReturnState";
-import Button from "../../components/button";
 import "./booking.scss";
 
 export default function BookingPage() {
@@ -28,11 +27,11 @@ export default function BookingPage() {
     rescheduleInitialDate,
   } = useMemo(() => {
     const fromLocation = {
-      initialSelectedServices:     (location.state?.selectedServices     as string[])              || [],
+      initialSelectedServices: (location.state?.selectedServices as string[]) || [],
       initialSelectedServicesData: (location.state?.selectedServicesData as BusinessServiceData[]) || [],
-      initialBusinessName:         (location.state?.businessName         as string)                || "",
-      rescheduleQueueUserId:       (location.state?.rescheduleQueueUserId as string | undefined)   || undefined,
-      rescheduleInitialDate:       (location.state?.rescheduleInitialDate  as string | undefined)  || undefined,
+      initialBusinessName: (location.state?.businessName as string) || "",
+      rescheduleQueueUserId: (location.state?.rescheduleQueueUserId as string | undefined) || undefined,
+      rescheduleInitialDate: (location.state?.rescheduleInitialDate as string | undefined) || undefined,
     };
     if (
       fromLocation.initialSelectedServices.length > 0 ||
@@ -43,11 +42,11 @@ export default function BookingPage() {
     const stored = getBookingReturnState();
     if (stored?.returnTo && (stored.selectedServices?.length > 0 || stored.selectedServicesData?.length > 0)) {
       return {
-        initialSelectedServices:     stored.selectedServices                         || [],
-        initialSelectedServicesData: (stored.selectedServicesData || [])             as BusinessServiceData[],
-        initialBusinessName:         stored.businessName                             || "",
-        rescheduleQueueUserId:       stored.rescheduleQueueUserId,
-        rescheduleInitialDate:       stored.rescheduleInitialDate,
+        initialSelectedServices: stored.selectedServices || [],
+        initialSelectedServicesData: (stored.selectedServicesData || []) as BusinessServiceData[],
+        initialBusinessName: stored.businessName || "",
+        rescheduleQueueUserId: stored.rescheduleQueueUserId,
+        rescheduleInitialDate: stored.rescheduleInitialDate,
       };
     }
     return fromLocation;
@@ -60,10 +59,10 @@ export default function BookingPage() {
   useEffect(() => {
     if (!businessId || !isReschedule || !rescheduleQueueUserId) return;
     saveBookingReturnState({
-      returnTo:             `/business/${businessId}/book`,
-      selectedServices:     initialSelectedServices,
+      returnTo: `/business/${businessId}/book`,
+      selectedServices: initialSelectedServices,
       selectedServicesData: initialSelectedServicesData,
-      businessName:         initialBusinessName,
+      businessName: initialBusinessName,
       rescheduleQueueUserId,
       rescheduleInitialDate,
     });
@@ -84,9 +83,9 @@ export default function BookingPage() {
       const returnTo = `/business/${businessId}/book`;
       const state = {
         returnTo,
-        selectedServices:     initialSelectedServices,
+        selectedServices: initialSelectedServices,
         selectedServicesData: initialSelectedServicesData,
-        businessName:         initialBusinessName,
+        businessName: initialBusinessName,
         rescheduleQueueUserId,
         rescheduleInitialDate,
       };
@@ -162,7 +161,7 @@ export default function BookingPage() {
         setSelectedServices(selected);
       } catch (err: any) {
         console.error("Failed to load services:", err);
-        setError("Failed to load service details");
+        setError(t("bk.failedLoadService"));
       } finally {
         setLoading(false);
       }
@@ -240,7 +239,7 @@ export default function BookingPage() {
     } catch (err: any) {
       console.error("Failed to fetch booking preview:", err);
       const message =
-        err.response?.data?.detail || "Failed to load queue options. Please try again.";
+        err.response?.data?.detail || t("bk.failedLoadQueue");
       setPreviewError(message);
       setQueueOptions([]);
       setSelectedQueueOption(null);
@@ -356,7 +355,7 @@ export default function BookingPage() {
       })
       .catch((err: any) => {
         if (!cancelled) {
-          setSlotsError(err.response?.data?.detail || "Failed to load time slots.");
+          setSlotsError(err.response?.data?.detail || t("bk.failedLoadSlots"));
           setTimeSlots(null);
         }
       })
@@ -384,19 +383,19 @@ export default function BookingPage() {
     if (!businessId || !selectedDate) return;
     const queueId = selectedQueueOption?.queue_id ?? selectedQueue?.queue_id;
     if (!queueId) {
-      setError("Please select a queue.");
+      setError(t("bk.selectQueue"));
       return;
     }
     if (selectedQueueOption && selectedQueueServiceIds.length === 0) {
-      setError("Please select at least one service for this queue.");
+      setError(t("bk.selectService"));
       return;
     }
     if ((appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && !selectedSlot) {
-      setError("Please select a time slot.");
+      setError(t("bk.selectSlot"));
       return;
     }
     if (isDateInPast(selectedDate)) {
-      setError("Please select today or a future date.");
+      setError(t("bk.selectFutureDate"));
       return;
     }
 
@@ -417,11 +416,11 @@ export default function BookingPage() {
       // ── Reschedule mode: update existing appointment ──────────────────────
       if (isReschedule && rescheduleQueueUserId) {
         await bookingService.rescheduleAppointment(rescheduleQueueUserId, {
-          queue_id:    queueId,
-          queue_date:  selectedDate,
+          queue_id: queueId,
+          queue_date: selectedDate,
           service_ids: finalServiceIds,
         });
-        alert(t("appointmentRescheduled", { defaultValue: "Appointment rescheduled!" }));
+        alert(t("bk.rescheduled"));
         navigate("/profile?tab=appointments");
         return;
       }
@@ -429,8 +428,8 @@ export default function BookingPage() {
       // ── New booking mode ──────────────────────────────────────────────────
       const result = await bookingService.createBooking({
         business_id: businessId,
-        queue_id:    queueId,
-        queue_date:  selectedDate,
+        queue_id: queueId,
+        queue_date: selectedDate,
         service_ids: finalServiceIds,
         ...((appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && selectedSlot?.uuid
           ? { appointment_type: appointmentMode, slot_id: selectedSlot.uuid }
@@ -446,16 +445,16 @@ export default function BookingPage() {
       console.error(isReschedule ? "Reschedule failed:" : "Booking failed:", err);
       const errorMsg =
         err.response?.data?.detail ||
-        (isReschedule ? "Reschedule failed. Please try again." : "Booking failed. Please try again.");
+        (isReschedule ? t("bk.rescheduleFailed") : t("bookingFailed"));
       setError(errorMsg);
       if (err.response?.status === HttpStatus.UNAUTHORIZED) {
         alert(t("pleaseLogin"));
         navigate("/send-otp", {
           state: {
-            returnTo:             `/business/${businessId}/book`,
-            selectedServices:     initialSelectedServices,
+            returnTo: `/business/${businessId}/book`,
+            selectedServices: initialSelectedServices,
             selectedServicesData: initialSelectedServicesData,
-            businessName:         initialBusinessName,
+            businessName: initialBusinessName,
             rescheduleQueueUserId,
             rescheduleInitialDate,
           },
@@ -479,140 +478,147 @@ export default function BookingPage() {
   const displayQueue = selectedQueueOption ?? selectedQueue;
   const alreadyInQueueData = bookingConfirmation?.already_in_queue ? bookingConfirmation : null;
 
-  // ——— Main booking flow: Date → Services (table) → Time slots → Fix Appointment ———
+  // ——— Main booking flow ———
   return (
-    <div className="booking-page">
-      <header className="bp-header">
-        <h1 className="bp-title">
-          {isReschedule ? "Reschedule Appointment" : "Book Appointment"}
-        </h1>
-        {initialBusinessName && <p className="bp-business-name">{initialBusinessName}</p>}
-        {isReschedule && (
-          <p className="bp-reschedule-hint">
-            Choose a new date, queue, or both — your appointment will be updated.
-          </p>
-        )}
-        {selectedDate && (
-          <div className={`bp-ws-badge ${wsConnectedState ? "connected" : "disconnected"}`}>
-            <span className="bp-ws-dot" aria-hidden />
-            {wsConnectedState ? t("liveUpdates") : t("connecting")}
-          </div>
-        )}
-      </header>
+    <div className="bk-page">
 
-      {/* 1. Date selection — first */}
-      <section className="bp-section" aria-labelledby="bp-date-title">
-        <h2 id="bp-date-title" className="bp-section-title">{t("selectDate")}</h2>
-        <p className="bp-section-desc">Choose today or a future date</p>
-        <div className="bp-dates-grid" role="group" aria-label="Select date">
-          {selectableDates.map((date) => {
-            const disabled = isDateInPast(date);
-            return (
-              <button
-                key={date}
-                type="button"
-                className={`bp-date-card ${selectedDate === date ? "selected" : ""} ${disabled ? "disabled" : ""}`}
-                onClick={() => handleDateSelect(date)}
-                disabled={disabled}
-                aria-pressed={selectedDate === date}
-                aria-disabled={disabled}
-              >
-                <span className="bp-date-day">{formatDateDisplay(date).split(" ")[0]}</span>
-                <span className="bp-date-rest">{formatDateDisplay(date).split(" ").slice(1).join(" ")}</span>
-              </button>
-            );
-          })}
+      {/* ── Left panel ─────────────────────────────────────────────────── */}
+      <div className="bk-left">
+
+        {/* Step progress */}
+        <div className="bk-steps">
+          <div className="bk-step bk-step--done">
+            <div className="bk-step-num">✓</div>
+            <div className="bk-step-label">{t("bk.stepServices")}</div>
+          </div>
+          <div className="bk-step-connector" />
+          <div className="bk-step bk-step--active">
+            <div className="bk-step-num">2</div>
+            <div className="bk-step-label">{t("bk.stepDateSlot")}</div>
+          </div>
+          <div className="bk-step-connector" />
+          <div className="bk-step">
+            <div className="bk-step-num">3</div>
+            <div className="bk-step-label">{t("bk.stepConfirm")}</div>
+          </div>
+          <div className="bk-step-connector" />
+          <div className="bk-step">
+            <div className="bk-step-num">4</div>
+            <div className="bk-step-label">{t("bk.stepDone")}</div>
+          </div>
         </div>
-      </section>
 
-      {/* 2. Selected services — table (or queue-filtered editable list when queue chosen) + total */}
-      <section className="bp-section" aria-labelledby="bp-services-title">
-        <h2 id="bp-services-title" className="bp-section-title">{t("selectedServices")}</h2>
-        {loading && selectedServices.length === 0 ? (
-          <div className="bp-loading">
-            <div className="bp-spinner" aria-hidden />
-            <p>{t("loading")}</p>
-          </div>
-        ) : selectedServices.length === 0 && !selectedQueueOption ? (
-          <div className="bp-empty">
-            <p>{t("noServicesSelected")}</p>
-            <Button
-              text="Back to business"
-              color="outline-blue"
-              onClick={() => navigate(`/business/${businessId}`)}
-            />
-          </div>
-        ) : selectedQueueOption ? (
-          <div className="bp-services-wrap">
-            <p className="bp-services-queue-hint">
-              Services for <strong>{selectedQueueOption.queue_name}</strong> · You can remove or add services below.
-            </p>
-            <table className="bp-services-table">
-              <thead>
-                <tr>
-                  <th scope="col">Service</th>
-                  <th scope="col">Duration</th>
-                  <th scope="col" className="bp-th-price">Price</th>
-                  <th scope="col" className="bp-th-action" aria-label="Remove" />
-                </tr>
-              </thead>
-              <tbody>
-                {displayQueueServices.map((s) => (
-                  <tr key={s.queue_service_uuid}>
-                    <td className="bp-td-service">{s.service_name}</td>
-                    <td className="bp-td-duration">{formatDurationMinutes(s.duration ?? 0)}</td>
-                    <td className="bp-td-price">₹{s.price ?? 0}</td>
-                    <td className="bp-td-action">
-                      <button
-                        type="button"
-                        className="bp-service-remove"
-                        onClick={() => removeQueueService(s.queue_service_uuid)}
-                        disabled={displayQueueServices.length <= 1}
-                        title={displayQueueServices.length <= 1 ? "At least one service required" : "Remove service"}
-                        aria-label={`Remove ${s.service_name}`}
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {availableToAddQueueServices.length > 0 && (
-              <div className="bp-services-add">
-                <span className="bp-services-add-label">Add service:</span>
-                <div className="bp-services-add-btns">
-                  {availableToAddQueueServices.map((s) => (
-                    <button
-                      key={s.queue_service_uuid}
-                      type="button"
-                      className="bp-service-add-btn"
-                      onClick={() => addQueueService(s.queue_service_uuid)}
-                    >
-                      + {s.service_name} (₹{s.price ?? 0})
-                    </button>
-                  ))}
-                </div>
+        {/* Header */}
+        <header className="bk-header">
+          <button className="bk-back" onClick={() => navigate(`/business/${businessId}`)}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" /></svg>
+            {t("bk.backTo", { name: initialBusinessName || t("bk.book") })}
+          </button>
+          <h1 className="bk-title">
+            {isReschedule ? t("bk.reschedule") : t("bk.book")} <em>{t("bk.appointment")}</em>
+          </h1>
+          <div className="bk-biz-row">
+            {initialBusinessName && <span className="bk-biz-name">{initialBusinessName}</span>}
+            {selectedDate && (
+              <div className={`bk-live-badge${wsConnectedState ? "" : " bk-live-badge--off"}`}>
+                <span className="bk-live-dot" aria-hidden />
+                {wsConnectedState ? t("bk.liveQueueUpdates") : t("connecting")}
               </div>
             )}
-            <div className="bp-services-total">
-              <span className="bp-services-total-label">Total</span>
-              <span className="bp-services-total-duration">{formatDurationMinutes(totalDuration)}</span>
-              <span className="bp-services-total-amount">₹{totalPrice}</span>
+          </div>
+          {isReschedule && (
+            <p className="bk-reschedule-hint">{t("bk.rescheduleHint")}</p>
+          )}
+        </header>
+
+        {/* ── Section 1: Date ─────────────────────────────────────────── */}
+        <section className="bk-section">
+          <div className="bk-section-head">
+            <div>
+              <div className="bk-section-title"><span className="bk-section-num">1</span> {t("selectDate")}</div>
+              <div className="bk-section-sub">{t("bk.selectDateSub")}</div>
             </div>
           </div>
-        ) : (
-          <div className="bp-services-wrap">
-            <table className="bp-services-table">
-              <thead>
-                <tr>
-                  <th scope="col">Service</th>
-                  <th scope="col">Duration</th>
-                  <th scope="col" className="bp-th-price">Price</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedServices.map((service) => {
+          <div className="bk-date-strip" role="group" aria-label="Select date">
+            {selectableDates.map((date) => {
+              const disabled = isDateInPast(date);
+              const d = new Date(date + "T00:00:00");
+              const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+              const monNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+              const isToday = date === getToday();
+              return (
+                <button
+                  key={date}
+                  type="button"
+                  className={`bk-date-btn${selectedDate === date ? " bk-date-btn--active" : ""}${disabled ? " bk-date-btn--unavailable" : ""}`}
+                  onClick={() => handleDateSelect(date)}
+                  disabled={disabled}
+                  aria-pressed={selectedDate === date}
+                >
+                  {isToday && <span className="bk-date-now-tag">{t("bk.now")}</span>}
+                  <span className="bk-date-day">{isToday ? t("today") : dayNames[d.getDay()]}</span>
+                  <span className="bk-date-num">{d.getDate()}</span>
+                  <span className="bk-date-mon">{monNames[d.getMonth()]}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ── Section 2: Services ──────────────────────────────────────── */}
+        <section className="bk-section">
+          <div className="bk-section-head">
+            <div>
+              <div className="bk-section-title"><span className="bk-section-num">2</span> {t("selectedServices")}</div>
+              <div className="bk-section-sub">{t("bk.servicesSub")}</div>
+            </div>
+          </div>
+
+          {loading && selectedServices.length === 0 ? (
+            <div className="bk-loading"><div className="bk-spinner" aria-hidden /><p>{t("loading")}</p></div>
+          ) : selectedServices.length === 0 && !selectedQueueOption ? (
+            <div className="bk-empty">
+              <p>{t("noServicesSelected")}</p>
+              <button className="bk-outline-btn" onClick={() => navigate(`/business/${businessId}`)}>{t("bk.backToBusiness")}</button>
+            </div>
+          ) : (
+            <div className="bk-services-table">
+              <div className="bk-st-head">
+                <div className="bk-st-hcell">{t("bk.thService")}</div>
+                <div className="bk-st-hcell bk-st-hcell--right">{t("bk.thDuration")}</div>
+                <div className="bk-st-hcell bk-st-hcell--right">{t("bk.thPrice")}</div>
+              </div>
+
+              {selectedQueueOption ? (
+                <>
+                  {displayQueueServices.map((s) => (
+                    <div key={s.queue_service_uuid} className="bk-st-row">
+                      <div className="bk-st-name">
+                        {s.service_name}
+                        <button type="button" className="bk-remove-svc" onClick={() => removeQueueService(s.queue_service_uuid)} disabled={displayQueueServices.length <= 1} aria-label={`Remove ${s.service_name}`}>×</button>
+                      </div>
+                      <div className="bk-st-duration">
+                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        {formatDurationMinutes(s.duration ?? 0)}
+                      </div>
+                      <div className="bk-st-price">₹{s.price ?? 0}</div>
+                    </div>
+                  ))}
+                  {availableToAddQueueServices.length > 0 && (
+                    <div className="bk-st-add-row">
+                      <span className="bk-st-add-label">{t("bk.addService")}</span>
+                      <div className="bk-st-add-btns">
+                        {availableToAddQueueServices.map((s) => (
+                          <button key={s.queue_service_uuid} type="button" className="bk-service-add-btn" onClick={() => addQueueService(s.queue_service_uuid)}>
+                            + {s.service_name} (₹{s.price ?? 0})
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                selectedServices.map((service) => {
                   const resolved = resolvedByServiceUuid[service.service_uuid];
                   let durationStr: string;
                   let priceStr: string;
@@ -620,299 +626,301 @@ export default function BookingPage() {
                     durationStr = formatDurationMinutes(resolved.duration ?? 0);
                     priceStr = `₹${resolved.price ?? 0}`;
                   } else {
-                    const hasDurationRange =
-                      service.duration_min != null &&
-                      service.duration_max != null &&
-                      service.duration_min !== service.duration_max;
-                    const hasPriceRange =
-                      service.price_min != null &&
-                      service.price_max != null &&
-                      service.price_min !== service.price_max;
-                    durationStr = hasDurationRange
+                    const hasDurRange = service.duration_min != null && service.duration_max != null && service.duration_min !== service.duration_max;
+                    const hasPrRange = service.price_min != null && service.price_max != null && service.price_min !== service.price_max;
+                    durationStr = hasDurRange
                       ? `${formatDurationMinutes(service.duration_min ?? 0)} – ${formatDurationMinutes(service.duration_max ?? 0)}`
                       : formatDurationMinutes(service.duration ?? service.duration_min ?? service.duration_max ?? 0);
-                    priceStr = hasPriceRange
-                      ? `₹${service.price_min} – ₹${service.price_max}`
-                      : `₹${service.price ?? service.price_min ?? service.price_max ?? 0}`;
+                    priceStr = hasPrRange ? `₹${service.price_min} – ₹${service.price_max}` : `₹${service.price ?? service.price_min ?? service.price_max ?? 0}`;
                   }
                   return (
-                    <tr key={service.uuid}>
-                      <td className="bp-td-service">{service.name}</td>
-                      <td className="bp-td-duration">{durationStr}</td>
-                      <td className="bp-td-price">{priceStr}</td>
-                    </tr>
+                    <div key={service.uuid} className="bk-st-row">
+                      <div className="bk-st-name">{service.name}</div>
+                      <div className="bk-st-duration">
+                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        {durationStr}
+                      </div>
+                      <div className="bk-st-price">{priceStr}</div>
+                    </div>
+                  );
+                })
+              )}
+
+              {/* Total row */}
+              <div className="bk-st-row bk-st-row--total">
+                <div className="bk-st-name bk-st-name--total">{t("bk.total")}</div>
+                <div className="bk-st-duration">
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  {formatDurationMinutes(totalDuration)}
+                </div>
+                <div className="bk-st-price bk-st-price--total">
+                  {totalPriceRange ? `₹${totalPriceMin} – ₹${totalPriceMax}` : `₹${totalPrice}`}
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* ── Section 3: Queue selection ───────────────────────────────── */}
+        {canProceedToSlots && (
+          <section className="bk-section">
+            <div className="bk-section-head">
+              <div>
+                <div className="bk-section-title"><span className="bk-section-num">3</span> {t("selectTimeSlot")}</div>
+                <div className="bk-section-sub">{t("bk.queueSub")}</div>
+              </div>
+              {wsConnectedState && !previewLoading && <div className="bk-updated-tag">{t("bk.updatedNow")}</div>}
+            </div>
+
+            {previewLoading ? (
+              <div className="bk-loading"><div className="bk-spinner" aria-hidden /><p>{t("bk.loadingQueue")}</p></div>
+            ) : previewError ? (
+              <div className="bk-error" role="alert">
+                <p>{previewError}</p>
+                <button className="bk-outline-btn" onClick={fetchBookingPreview}>{t("bk.retry")}</button>
+              </div>
+            ) : queueOptions.length === 0 ? (
+              <div className="bk-empty"><p>{t("noSlotsAvailable")}</p><p>{t("bk.tryAnotherDate")}</p></div>
+            ) : (
+              <div className="bk-queue-grid">
+                {queueOptions.map((option) => {
+                  const isSelected = selectedQueueOption?.queue_id === option.queue_id;
+                  const isFull = !option.available;
+                  const tagClass = isFull ? "bk-tag--full" : option.is_recommended ? "bk-tag--available" : option.position <= 2 ? "bk-tag--limited" : "bk-tag--available";
+                  const tagLabel = isFull ? t("bk.tagFull") : option.unavailability_reason === "employee_not_available" ? t("bk.tagNA") : option.is_recommended ? t("bk.tagRecommended") : t("bk.tagAvailable");
+                  return (
+                    <div
+                      key={option.queue_id}
+                      className={`bk-queue-card${isSelected ? " bk-queue-card--selected" : ""}${isFull ? " bk-queue-card--full" : ""}`}
+                      onClick={() => !isFull && handleQueueOptionSelect(option)}
+                      role="radio"
+                      aria-checked={isSelected}
+                      tabIndex={isFull ? -1 : 0}
+                      onKeyDown={(e) => e.key === "Enter" && !isFull && handleQueueOptionSelect(option)}
+                    >
+                      <div className="bk-queue-head">
+                        <div className="bk-queue-name">{option.queue_name}</div>
+                        <div className={`bk-queue-tag ${tagClass}`}>{tagLabel}</div>
+                      </div>
+                      {option.unavailability_reason === "employee_not_available" ? (
+                        <p className="bk-queue-unavail">{t("employeeNotAvailableOnDay")}</p>
+                      ) : (
+                        <div className="bk-queue-stats">
+                          <div className="bk-q-stat">
+                            <div className="bk-q-stat-label">{t("bk.statPosition")}</div>
+                            <div className="bk-q-stat-value">#{option.position}</div>
+                            <div className="bk-q-stat-sub">{option.position === 1 ? t("bk.nextInLine") : t("bk.ahead", { n: option.position })}</div>
+                          </div>
+                          <div className="bk-q-stat">
+                            <div className="bk-q-stat-label">{t("bk.statEstWait")}</div>
+                            <div className="bk-q-stat-value">{formatDurationMinutes(option.estimated_wait_minutes)}</div>
+                            {option.estimated_wait_range && <div className="bk-q-stat-sub">{option.estimated_wait_range}</div>}
+                          </div>
+                          <div className="bk-q-stat bk-q-stat--full">
+                            <div className="bk-q-stat-label">{t("bk.statExpectedAt")}</div>
+                            <div className="bk-q-stat-value bk-q-stat-value--time">{formatTimeToDisplay(option.estimated_appointment_time)}</div>
+                          </div>
+                        </div>
+                      )}
+                      {isSelected && <div className="bk-queue-check" aria-hidden>✓</div>}
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
-            <div className="bp-services-total">
-              <span className="bp-services-total-label">Total</span>
-              <span className="bp-services-total-duration">{formatDurationMinutes(totalDuration)}</span>
-              <span className="bp-services-total-amount">
-                {totalPriceRange ? `₹${totalPriceMin} – ₹${totalPriceMax}` : `₹${totalPrice}`}
-              </span>
-            </div>
-          </div>
-        )}
-      </section>
+              </div>
+            )}
 
-      {/* 3. Queue options — when date + services selected (from booking-preview API) */}
-      {canProceedToSlots && (
-        <section className="bp-section" aria-labelledby="bp-slots-title">
-          <h2 id="bp-slots-title" className="bp-section-title">{t("selectTimeSlot")}</h2>
-          <p className="bp-section-desc">
-            Choose a queue · Position, wait time and appointment time shown below
-          </p>
-
-          {previewLoading ? (
-            <div className="bp-loading">
-              <div className="bp-spinner" aria-hidden />
-              <p>Loading queue options…</p>
-            </div>
-          ) : previewError ? (
-            <div className="bp-error" role="alert">
-              <p>{previewError}</p>
-              <Button text="Retry" color="outline-blue" onClick={fetchBookingPreview} />
-            </div>
-          ) : queueOptions.length === 0 ? (
-            <div className="bp-empty">
-              <p>{t("noSlotsAvailable")}</p>
-              <p className="bp-empty-hint">Try another date or check back later.</p>
-            </div>
-          ) : (
-            <div className="bp-slots-grid">
-              {queueOptions.map((option) => (
-                <button
-                  key={option.queue_id}
-                  type="button"
-                  className={`bp-slot-card ${selectedQueueOption?.queue_id === option.queue_id ? "selected" : ""} ${!option.available ? "unavailable" : ""} ${option.is_recommended ? "recommended" : ""}`}
-                  onClick={() => handleQueueOptionSelect(option)}
-                  disabled={!option.available}
-                  aria-pressed={selectedQueueOption?.queue_id === option.queue_id}
-                >
-                  <div className="bp-slot-header">
-                    <h3 className="bp-slot-queue">{option.queue_name}</h3>
-                    <span className={`bp-slot-status ${option.available ? "available" : option.unavailability_reason === "employee_not_available" ? "not-available" : "full"}`}>
-                      {option.is_recommended
-                        ? "Recommended"
-                        : option.available
-                        ? "Available"
-                        : option.unavailability_reason === "employee_not_available"
-                        ? t("employeeNotAvailable")
-                        : "Full"}
-                    </span>
-                  </div>
-                  {option.unavailability_reason === "employee_not_available" ? (
-                    <div className="bp-slot-unavailable-msg">
-                      <p>{t("employeeNotAvailableOnDay")}</p>
-                    </div>
-                  ) : (
-                    <div className="bp-slot-details">
-                      <p className="bp-slot-row">
-                        <span className="label">Position</span>
-                        <span className="value">#{option.position}</span>
-                      </p>
-                      <p className="bp-slot-row">
-                        <span className="label">Est. wait</span>
-                        <span className="value">{formatDurationMinutes(option.estimated_wait_minutes)}</span>
-                        {option.estimated_wait_range && (
-                          <span className="value bp-slot-range"> ({option.estimated_wait_range})</span>
-                        )}
-                      </p>
-                      <p className="bp-slot-row">
-                        <span className="label">Expected at</span>
-                        <span className="value">{formatTimeToDisplay(option.estimated_appointment_time)}</span>
-                      </p>
-                    </div>
-                  )}
+            {wsConnectedState && !previewLoading && queueOptions.length > 0 && (
+              <div className="bk-refresh-row">
+                <button type="button" className="bk-refresh-btn" onClick={fetchBookingPreview}>
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                  {t("bk.refreshEstimates")}
                 </button>
-              ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ── Appointment mode (FIXED / APPROXIMATE / HYBRID) ──────────── */}
+        {selectedQueueOption && queueSupportsScheduled && (
+          <section className="bk-section">
+            <div className="bk-section-head">
+              <div>
+                <div className="bk-section-title"><span className="bk-section-num">4</span> {t("bk.apptType")}</div>
+                <div className="bk-section-sub">{t("bk.apptTypeSub")}</div>
+              </div>
             </div>
-          )}
-
-          {wsConnectedState && !previewLoading && queueOptions.length > 0 && (
-            <button type="button" className="bp-refresh" onClick={fetchBookingPreview}>
-              ↻ Refresh estimates
-            </button>
-          )}
-        </section>
-      )}
-
-      {/* 3b. Appointment mode (Walk-in / Fixed / Approximate) when queue supports scheduled slots */}
-      {selectedQueueOption && queueSupportsScheduled && (
-        <section className="bp-section" aria-labelledby="bp-mode-title">
-          <h2 id="bp-mode-title" className="bp-section-title">Appointment type</h2>
-          <p className="bp-section-desc">Choose how you want to be scheduled</p>
-          <div className="bp-mode-options" role="group" aria-label="Appointment type">
-            {(selectedQueueOption.booking_mode === "HYBRID" || selectedQueueOption.booking_mode === "QUEUE") && (
-              <button
-                type="button"
-                className={`bp-mode-btn ${appointmentMode === "QUEUE" ? "selected" : ""}`}
-                onClick={() => {
-                  setAppointmentMode("QUEUE");
-                  setSelectedSlot(null);
-                  setSlotPickerOpen(false);
-                }}
-                aria-pressed={appointmentMode === "QUEUE"}
-              >
-                <span className="bp-mode-icon">🚶</span> Walk-in
-              </button>
-            )}
-            {(selectedQueueOption.booking_mode === "FIXED" || selectedQueueOption.booking_mode === "HYBRID") && (
-              <button
-                type="button"
-                className={`bp-mode-btn ${appointmentMode === "FIXED" ? "selected" : ""}`}
-                onClick={() => {
-                  setAppointmentMode("FIXED");
-                  setSelectedSlot(null);
-                  setSlotPickerOpen(true);
-                }}
-                aria-pressed={appointmentMode === "FIXED"}
-              >
-                <span className="bp-mode-icon">📌</span> Fixed time
-              </button>
-            )}
-            {(selectedQueueOption.booking_mode === "APPROXIMATE" || selectedQueueOption.booking_mode === "HYBRID") && (
-              <button
-                type="button"
-                className={`bp-mode-btn ${appointmentMode === "APPROXIMATE" ? "selected" : ""}`}
-                onClick={() => {
-                  setAppointmentMode("APPROXIMATE");
-                  setSelectedSlot(null);
-                  setSlotPickerOpen(true);
-                }}
-                aria-pressed={appointmentMode === "APPROXIMATE"}
-              >
-                <span className="bp-mode-icon">⏰</span> Approximate time
-              </button>
-            )}
-          </div>
-
-          {/* Selected slot chip or "Choose slot" prompt */}
-          {(appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && (
-            <div className="bp-slot-trigger-row">
-              {selectedSlot ? (
-                <div className="bp-selected-slot-chip">
-                  <span className="bp-selected-slot-chip__label">
-                    {appointmentMode === "FIXED" ? "Fixed" : "Approx"}&nbsp;
-                    Starts at {formatTimeToDisplay(selectedSlot.slot_start)} · {formatDurationMinutes(totalDuration)}
-                  </span>
-                  <button
-                    type="button"
-                    className="bp-selected-slot-chip__change"
-                    onClick={() => setSlotPickerOpen(true)}
-                    aria-label="Change time slot"
-                  >
-                    Change
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="bp-choose-slot-btn"
-                  onClick={() => setSlotPickerOpen(true)}
-                >
-                  {slotsLoading ? "Loading slots…" : "Choose a time slot →"}
+            <div className="bk-mode-options" role="group" aria-label="Appointment type">
+              {(selectedQueueOption.booking_mode === "HYBRID" || selectedQueueOption.booking_mode === "QUEUE") && (
+                <button type="button" className={`bk-mode-btn${appointmentMode === "QUEUE" ? " bk-mode-btn--selected" : ""}`} onClick={() => { setAppointmentMode("QUEUE"); setSelectedSlot(null); setSlotPickerOpen(false); }} aria-pressed={appointmentMode === "QUEUE"}>
+                  <span>🚶</span> {t("bk.walkin")}
+                </button>
+              )}
+              {(selectedQueueOption.booking_mode === "FIXED" || selectedQueueOption.booking_mode === "HYBRID") && (
+                <button type="button" className={`bk-mode-btn${appointmentMode === "FIXED" ? " bk-mode-btn--selected" : ""}`} onClick={() => { setAppointmentMode("FIXED"); setSelectedSlot(null); setSlotPickerOpen(true); }} aria-pressed={appointmentMode === "FIXED"}>
+                  <span>📌</span> {t("bk.fixedTime")}
+                </button>
+              )}
+              {(selectedQueueOption.booking_mode === "APPROXIMATE" || selectedQueueOption.booking_mode === "HYBRID") && (
+                <button type="button" className={`bk-mode-btn${appointmentMode === "APPROXIMATE" ? " bk-mode-btn--selected" : ""}`} onClick={() => { setAppointmentMode("APPROXIMATE"); setSelectedSlot(null); setSlotPickerOpen(true); }} aria-pressed={appointmentMode === "APPROXIMATE"}>
+                  <span>⏰</span> {t("bk.approxTime")}
                 </button>
               )}
             </div>
-          )}
-        </section>
-      )}
-
-      {/* 3c. Slot picker popup */}
-      {slotPickerOpen && (appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && (
-        <div
-          className="bp-modal-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="bp-slot-picker-title"
-          onClick={(e) => { if (e.target === e.currentTarget) setSlotPickerOpen(false); }}
-        >
-          <div className="bp-slot-picker-modal">
-            <div className="bp-slot-picker-header">
-              <div>
-                <h2 id="bp-slot-picker-title" className="bp-modal-title">
-                  {appointmentMode === "FIXED" ? "Fixed time slot" : "Approximate time slot"}
-                </h2>
-                <p className="bp-modal-subtitle">
-                  {selectedQueueOption?.queue_name} · {selectedDate ? formatDateDisplay(selectedDate) : ""}
-                </p>
-                <p className="bp-slot-picker-duration-hint">
-                  Your appointment will take about {formatDurationMinutes(totalDuration)}.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="bp-slot-picker-close"
-                onClick={() => setSlotPickerOpen(false)}
-                aria-label="Close slot picker"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="bp-slot-picker-body">
-              {slotsLoading ? (
-                <div className="bp-loading">
-                  <div className="bp-spinner" aria-hidden />
-                  <p>Loading available slots…</p>
-                </div>
-              ) : slotsError ? (
-                <div className="bp-error" role="alert">
-                  <p>{slotsError}</p>
-                  <button
-                    type="button"
-                    className="bp-slot-retry-btn"
-                    onClick={() => {
-                      setSlotsError(null);
-                      setSlotsLoading(true);
-                      const bookingService = new BookingService();
-                      bookingService
-                        .getQueueSlots(selectedQueueOption!.queue_id, selectedDate!)
-                        .then((res) => { setTimeSlots(res); setSlotsLoading(false); })
-                        .catch((err: any) => {
-                          setSlotsError(err.response?.data?.detail || "Failed to load time slots.");
-                          setSlotsLoading(false);
-                        });
-                    }}
-                  >
-                    Retry
+            {(appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && (
+              <div className="bk-slot-trigger-row">
+                {selectedSlot ? (
+                  <div className="bk-selected-slot-chip">
+                    <span className="bk-selected-slot-chip__label">
+                      {appointmentMode === "FIXED" ? t("bk.fixedChip") : t("bk.approxChip")} · {t("bk.startsAt", { time: formatTimeToDisplay(selectedSlot.slot_start) })} · {formatDurationMinutes(totalDuration)}
+                    </span>
+                    <button type="button" className="bk-selected-slot-chip__change" onClick={() => setSlotPickerOpen(true)}>{t("bk.change")}</button>
+                  </div>
+                ) : (
+                  <button type="button" className="bk-choose-slot-btn" onClick={() => setSlotPickerOpen(true)}>
+                    {slotsLoading ? t("bk.loadingSlots") : t("bk.chooseSlot")}
                   </button>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div className="bk-error" role="alert"><p>{error}</p></div>
+        )}
+
+      </div>{/* /bk-left */}
+
+      {/* ── Right panel ─────────────────────────────────────────────────── */}
+      <div className="bk-right">
+        <div className="bk-summary-title">{t("bk.summary")}</div>
+
+        {/* Biz strip */}
+        <div className="bk-biz-strip">
+          <div className="bk-biz-strip-avatar">{(initialBusinessName || "B").charAt(0).toUpperCase()}</div>
+          <div>
+            <div className="bk-biz-strip-name">{initialBusinessName || "Business"}</div>
+            {wsConnectedState && (
+              <div className="bk-biz-strip-meta">
+                <span className="bk-live-dot bk-live-dot--sm" />
+                {t("bk.liveActive")}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Summary rows */}
+        <div className="bk-summary-card">
+          <div className="bk-sc-row">
+            <div className="bk-sc-label">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              {t("bk.labelDate")}
+            </div>
+            <div className="bk-sc-value">{selectedDate ? formatDateDisplay(selectedDate) : <span className="bk-sc-empty">{t("bk.notSelected")}</span>}</div>
+          </div>
+          <div className="bk-sc-row">
+            <div className="bk-sc-label">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              {t("bk.labelQueue")}
+            </div>
+            <div className="bk-sc-value">{displayQueue ? displayQueue.queue_name : <span className="bk-sc-empty">{t("bk.notSelected")}</span>}</div>
+          </div>
+          <div className="bk-sc-row">
+            <div className="bk-sc-label">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              {t("bk.statExpectedAt")}
+            </div>
+            <div className="bk-sc-value">
+              {selectedSlot
+                ? formatTimeToDisplay(selectedSlot.slot_start)
+                : displayQueue?.estimated_appointment_time
+                ? formatTimeToDisplay(displayQueue.estimated_appointment_time)
+                : <span className="bk-sc-empty">–</span>}
+            </div>
+          </div>
+          <div className="bk-sc-row">
+            <div className="bk-sc-label">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+              {t("bk.thService")}
+            </div>
+            <div className="bk-sc-value">
+              {selectedServices.length > 0 ? selectedServices.map(s => s.name).join(" + ") : <span className="bk-sc-empty">{t("bk.none")}</span>}
+            </div>
+          </div>
+          <div className="bk-sc-row">
+            <div className="bk-sc-label">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              {t("bk.labelDuration")}
+            </div>
+            <div className="bk-sc-value">{totalDuration > 0 ? formatDurationMinutes(totalDuration) : <span className="bk-sc-empty">–</span>}</div>
+          </div>
+        </div>
+
+        {/* Total */}
+        <div className="bk-total-block">
+          <div className="bk-total-label">{t("bk.estimatedTotal")}</div>
+          <div className="bk-total-amount">{totalPriceRange ? `₹${totalPriceMin} – ₹${totalPriceMax}` : `₹${totalPrice}`}</div>
+          <div className="bk-total-sub">{t("bk.payAtCounter")}</div>
+        </div>
+
+        {/* Confirm */}
+        <button className="bk-confirm-btn" onClick={handleConfirm} disabled={!canConfirm || bookingInProgress}>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+          {bookingInProgress ? t("confirming") : isReschedule ? t("bk.confirmReschedule") : t("fixAppointment")}
+        </button>
+        <div className="bk-guarantee-row">
+          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          {t("bk.freeCancellation")}
+        </div>
+        <div className="bk-disclaimer">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <p>{t("bk.priceDisclaimer")}</p>
+        </div>
+      </div>{/* /bk-right */}
+
+      {/* ── Slot picker modal ────────────────────────────────────────────── */}
+      {slotPickerOpen && (appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && (
+        <div className="bk-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bk-slot-picker-title" onClick={(e) => { if (e.target === e.currentTarget) setSlotPickerOpen(false); }}>
+          <div className="bk-slot-picker-modal">
+            <div className="bk-slot-picker-header">
+              <div>
+                <h2 id="bk-slot-picker-title" className="bk-modal-title">{appointmentMode === "FIXED" ? t("bk.fixedSlotTitle") : t("bk.approxSlotTitle")}</h2>
+                <p className="bk-modal-subtitle">{selectedQueueOption?.queue_name} · {selectedDate ? formatDateDisplay(selectedDate) : ""}</p>
+                <p className="bk-slot-picker-hint">{t("bk.apptTakes", { duration: formatDurationMinutes(totalDuration) })}</p>
+              </div>
+              <button type="button" className="bk-slot-picker-close" onClick={() => setSlotPickerOpen(false)} aria-label="Close slot picker">✕</button>
+            </div>
+            <div className="bk-slot-picker-body">
+              {slotsLoading ? (
+                <div className="bk-loading"><div className="bk-spinner" aria-hidden /><p>{t("bk.loadingAvailSlots")}</p></div>
+              ) : slotsError ? (
+                <div className="bk-error" role="alert">
+                  <p>{slotsError}</p>
+                  <button type="button" className="bk-outline-btn" onClick={() => {
+                    setSlotsError(null); setSlotsLoading(true);
+                    const bookingService = new BookingService();
+                    bookingService.getQueueSlots(selectedQueueOption!.queue_id, selectedDate!)
+                      .then((res) => { setTimeSlots(res); setSlotsLoading(false); })
+                      .catch((err: any) => { setSlotsError(err.response?.data?.detail || t("bk.failedLoadSlots")); setSlotsLoading(false); });
+                  }}>{t("bk.retry")}</button>
                 </div>
               ) : !timeSlots?.slots?.length ? (
-                <div className="bp-slot-picker-empty">
-                  <span className="bp-slot-picker-empty__icon">📅</span>
-                  <p className="bp-slot-picker-empty__title">No available slots</p>
-                  <p className="bp-slot-picker-empty__hint">
-                    {selectedDate === getToday()
-                      ? "All slots for today have passed. Try booking for tomorrow."
-                      : "No slots available for this date. Try another date."}
-                  </p>
+                <div className="bk-slot-picker-empty">
+                  <span className="bk-slot-picker-empty__icon">📅</span>
+                  <p className="bk-slot-picker-empty__title">{t("bk.noSlots")}</p>
+                  <p className="bk-slot-picker-empty__hint">{selectedDate === getToday() ? t("bk.slotsTodayPassed") : t("bk.slotsNotAvailable")}</p>
                 </div>
               ) : (
-                <div className="bp-slot-picker-grid" role="group" aria-label="Available time slots">
-                  {timeSlots.slots
-                    .filter((s) => s.available)
-                    .map((slot) => (
-                      <button
-                        key={slot.uuid}
-                        type="button"
-                        className={`bp-slot-picker-item ${selectedSlot?.uuid === slot.uuid ? "selected" : ""}`}
-                        onClick={() => {
-                          setSelectedSlot(slot);
-                          setSlotPickerOpen(false);
-                        }}
-                        aria-pressed={selectedSlot?.uuid === slot.uuid}
-                      >
-                        <span className="bp-slot-picker-item__start">{formatTimeToDisplay(slot.slot_start)}</span>
-                        <span className="bp-slot-picker-item__dash">–</span>
-                        <span className="bp-slot-picker-item__end">{formatTimeToDisplay(slot.slot_end)}</span>
-                        {slot.remaining > 0 && slot.remaining <= 3 && (slot.capacity ?? 0) > 1 && (
-                          <span className="bp-slot-picker-item__scarcity">{slot.remaining} left</span>
-                        )}
-                      </button>
-                    ))}
+                <div className="bk-slot-picker-grid" role="group" aria-label="Available time slots">
+                  {timeSlots.slots.filter(s => s.available).map((slot) => (
+                    <button key={slot.uuid} type="button" className={`bk-slot-picker-item${selectedSlot?.uuid === slot.uuid ? " bk-slot-picker-item--selected" : ""}`} onClick={() => { setSelectedSlot(slot); setSlotPickerOpen(false); }} aria-pressed={selectedSlot?.uuid === slot.uuid}>
+                      <span className="bk-slot-start">{formatTimeToDisplay(slot.slot_start)}</span>
+                      <span className="bk-slot-dash">–</span>
+                      <span className="bk-slot-end">{formatTimeToDisplay(slot.slot_end)}</span>
+                      {slot.remaining > 0 && slot.remaining <= 3 && (slot.capacity ?? 0) > 1 && <span className="bk-slot-scarcity">{t("bk.slotLeft", { count: slot.remaining })}</span>}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -920,114 +928,27 @@ export default function BookingPage() {
         </div>
       )}
 
-      {/* 4. Summary & Fix Appointment */}
-      {canConfirm && displayQueue && (
-        <section className="bp-section bp-section-summary">
-          <div className="bp-summary-card">
-            <div className="bp-summary-row">
-              <span className="bp-summary-label">Total amount</span>
-              <span className="bp-summary-amount">
-                {totalPriceRange ? `₹${totalPriceMin} – ₹${totalPriceMax}` : `₹${totalPrice}`}
-              </span>
-            </div>
-            <p className="bp-summary-meta">
-              {selectedServices.length} {selectedServices.length === 1 ? t("service") : t("services")} · {selectedDate ? formatDateDisplay(selectedDate) : ""}
-            </p>
-            <p className="bp-summary-queue">
-              {displayQueue.queue_name}
-              {selectedSlot
-                ? ` · ${appointmentMode === "FIXED" ? "Fixed" : "Approx"} starts ${formatTimeToDisplay(selectedSlot.slot_start)} · ${formatDurationMinutes(totalDuration)}`
-                : ` · Wait ~${formatDurationMinutes(displayQueue.estimated_wait_minutes)}`
-              }
-              {!selectedSlot && selectedQueueOption?.estimated_wait_range && (
-                <span className="bp-summary-range"> ({selectedQueueOption.estimated_wait_range})</span>
-              )}
-            </p>
-            <p className="bp-summary-meta">
-              {selectedSlot
-                ? `Starts at ${formatTimeToDisplay(selectedSlot.slot_start)} · ${formatDurationMinutes(totalDuration)}`
-                : `Expected at: ${formatTimeToDisplay(displayQueue.estimated_appointment_time)}`
-              }
-            </p>
-          </div>
-          <Button
-            text={
-              bookingInProgress
-                ? t("confirming")
-                : isReschedule
-                ? t("confirmReschedule", { defaultValue: "Confirm Reschedule" })
-                : t("fixAppointment")
-            }
-            color="blue"
-            size="lg"
-            onClick={handleConfirm}
-            disabled={bookingInProgress}
-            loading={bookingInProgress}
-            className="bp-cta"
-          />
-        </section>
-      )}
-
-      {error && (
-        <div className="bp-error bp-error-inline" role="alert">
-          <p>{error}</p>
-        </div>
-      )}
-
-      {/* Already in queue popup */}
+      {/* ── Already in queue modal ───────────────────────────────────────── */}
       {alreadyInQueueData && (
-        <div
-          className="bp-modal-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="bp-already-in-queue-title"
-          onClick={() => setBookingConfirmation(null)}
-        >
-          <div
-            className="bp-modal-content"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="bp-already-in-queue-title" className="bp-modal-title">
-              {t("alreadyInQueueForToday")}
-            </h2>
-            <p className="bp-modal-subtitle">Your current queue details</p>
-            <div className="bp-modal-details">
-              <p className="bp-modal-row">
-                <span className="bp-modal-label">Queue</span>
-                <span className="bp-modal-value">{alreadyInQueueData.queue_name}</span>
-              </p>
-              <p className="bp-modal-row">
-                <span className="bp-modal-label">Position</span>
-                <span className="bp-modal-value">#{alreadyInQueueData.position}</span>
-              </p>
-              <p className="bp-modal-row">
-                <span className="bp-modal-label">Est. wait</span>
-                <span className="bp-modal-value">
+        <div className="bk-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bk-already-title" onClick={() => setBookingConfirmation(null)}>
+          <div className="bk-modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2 id="bk-already-title" className="bk-modal-title">{t("alreadyInQueueForToday")}</h2>
+            <p className="bk-modal-subtitle">{t("bk.alreadyQueueDetails")}</p>
+            <div className="bk-modal-details">
+              <div className="bk-modal-row"><span className="bk-modal-label">{t("bk.labelQueue")}</span><span className="bk-modal-value">{alreadyInQueueData.queue_name}</span></div>
+              <div className="bk-modal-row"><span className="bk-modal-label">{t("bk.statPosition")}</span><span className="bk-modal-value">#{alreadyInQueueData.position}</span></div>
+              <div className="bk-modal-row">
+                <span className="bk-modal-label">{t("bk.statEstWait")}</span>
+                <span className="bk-modal-value">
                   {formatDurationMinutes(alreadyInQueueData.estimated_wait_minutes)}
-                  {alreadyInQueueData.estimated_wait_range && (
-                    <span className="bp-modal-range"> ({alreadyInQueueData.estimated_wait_range})</span>
-                  )}
+                  {alreadyInQueueData.estimated_wait_range && <span className="bk-modal-range"> ({alreadyInQueueData.estimated_wait_range})</span>}
                 </span>
-              </p>
-              <p className="bp-modal-row">
-                <span className="bp-modal-label">Expected at</span>
-                <span className="bp-modal-value">{formatTimeToDisplay(alreadyInQueueData.estimated_appointment_time)}</span>
-              </p>
+              </div>
+              <div className="bk-modal-row"><span className="bk-modal-label">{t("bk.statExpectedAt")}</span><span className="bk-modal-value">{formatTimeToDisplay(alreadyInQueueData.estimated_appointment_time)}</span></div>
             </div>
-            <div className="bp-modal-actions">
-              <Button
-                text={t("back")}
-                color="outline-blue"
-                onClick={() => setBookingConfirmation(null)}
-              />
-              <Button
-                text={t("backToHome")}
-                color="blue"
-                onClick={() => {
-                  setBookingConfirmation(null);
-                  navigate("/");
-                }}
-              />
+            <div className="bk-modal-actions">
+              <button className="bk-outline-btn" onClick={() => setBookingConfirmation(null)}>{t("back")}</button>
+              <button className="bk-confirm-btn bk-confirm-btn--sm" onClick={() => { setBookingConfirmation(null); navigate("/"); }}>{t("backToHome")}</button>
             </div>
           </div>
         </div>

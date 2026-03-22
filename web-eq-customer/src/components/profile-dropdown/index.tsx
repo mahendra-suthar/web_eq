@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   PROFILE_DROPDOWN_MENU_ITEMS,
   PROFILE_DROPDOWN_FIRST_ITEM_ID,
@@ -24,6 +25,13 @@ function getInitials(name: string | null | undefined): string {
 
 export default function ProfileDropdown({ userName, onLogout }: ProfileDropdownProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+
+  const MENU_LABELS = useMemo<Record<string, string>>(() => ({
+    profile: t("profile.navProfile"),
+    appointments: t("profile.navAppointments"),
+    settings: t("profile.navSettings"),
+  }), [t]);
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -113,7 +121,7 @@ export default function ProfileDropdown({ userName, onLogout }: ProfileDropdownP
               onClick={() => handleMenuAction(item.path)}
               onKeyDown={(e) => handleKeyDown(e, () => handleMenuAction(item.path))}
             >
-              {item.label}
+              {MENU_LABELS[item.id]}
             </button>
           ))}
           <div className="profile-dropdown__divider" role="separator" />
@@ -124,7 +132,7 @@ export default function ProfileDropdown({ userName, onLogout }: ProfileDropdownP
             onClick={handleLogout}
             onKeyDown={(e) => handleKeyDown(e, handleLogout)}
           >
-            Logout
+            {t("profile.navSignOut")}
           </button>
         </div>
       </div>

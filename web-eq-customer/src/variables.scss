@@ -54,3 +54,35 @@ $breakpoint-sm: 480px;
 $breakpoint-md: 600px;
 $breakpoint-lg: 768px;
 $breakpoint-xl: 1024px;
+
+// ─── Shadow scale ────────────────────────────────────────────────────────
+$shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.06);
+$shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+$shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+$shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10), 0 4px 8px rgba(0, 0, 0, 0.05);
+$shadow-xl: 0 16px 40px rgba(0, 0, 0, 0.14), 0 8px 16px rgba(0, 0, 0, 0.06);
+$shadow-primary-sm: 0 4px 14px rgba(0, 105, 92, 0.25);
+$shadow-primary-md: 0 8px 24px rgba(0, 105, 92, 0.30);
+
+// ─── Surface / background shades ────────────────────────────────────────
+$surface-subtle: #f8fffe;
+$surface-tint:   #f0faf9;
+
+// ─── Border radius scale ─────────────────────────────────────────────────
+$radius-sm:   6px;
+$radius-md:   10px;
+$radius-lg:   16px;
+$radius-xl:   24px;
+$radius-full: 9999px;
+
+// ─── Premium color palette (used in landing + layout) ────────────────────
+$forest:        #0e4a35;   // deep forest green — primary dark
+$jade:          #1a7a56;   // jade green — primary
+$mint:          #b6e8d3;   // mint — light accent
+$foam:          #e8f7f1;   // foam — very light green bg
+$cream:         #f7f4ef;   // warm cream — section bg
+$warm-white:    #fdfaf5;   // warm white — page bg
+$gold:          #c9a84c;   // gold — accent / highlight
+$ink-dark:      #0d1a14;   // near-black with green tint — heading text
+$muted-green:   #6b7d74;   // muted green-gray — secondary text
+$border-subtle: rgba(14, 74, 53, 0.12); // subtle forest-tinted border

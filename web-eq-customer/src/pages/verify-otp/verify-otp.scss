@@ -1,266 +1,40 @@
 @use "../../variables.scss" as *;
 
-.verify-otp-page {
-  background: #fff;
-  padding: $space-3xl $space-2xl;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 420px;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  margin: 0 auto;
+// ── Individual OTP input boxes ────────────────────────────────────────────────
+.auth-otp-row {
+  display: flex; gap: 10px; justify-content: center;
+  margin-bottom: 6px;
 }
 
-.verify-otp-header {
-  margin-bottom: $space-2xl;
-  position: relative;
+.auth-otp-box {
+  width: 52px; height: 60px; text-align: center;
+  background: $warm-white; border: 1.5px solid rgba(14, 74, 53, 0.2);
+  border-radius: 14px;
+  font-family: "Fraunces", serif; font-size: 26px; font-weight: 700;
+  color: $forest; outline: none; transition: all 0.22s;
+  caret-color: $jade;
 
-  .back-button {
-    position: absolute;
-    left: 0;
-    top: 0;
-    background: none;
-    border: none;
-    font-size: $text-3xl;
-    cursor: pointer;
-    color: $primary-dark;
-    padding: 0;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-
-    &:hover {
-      opacity: 0.8;
-    }
-
-    &:focus {
-      outline: 2px solid $primary;
-      outline-offset: 2px;
-    }
+  &:focus {
+    border-color: $jade; background: white;
+    box-shadow: 0 0 0 4px rgba(26, 122, 86, 0.08);
+    transform: scale(1.06);
   }
-
-  .header-content {
-    text-align: center;
+  &--filled {
+    border-color: $jade; background: $foam;
   }
-
-  .verify-otp-title {
-    color: $primary;
-    font-family: "Noto Sans Hebrew", serif;
-    font-size: $text-4xl;
-    font-weight: $font-weight-bold;
-    line-height: 40px;
-    margin: 0 0 $space-sm 0;
-  }
-
-  .verify-otp-subtitle {
-    color: $text-secondary;
-    font-family: "Noto Sans Hebrew", serif;
-    font-size: $text-base;
-    font-weight: 400;
-    line-height: 20px;
-    margin: 0;
+  &--error {
+    border-color: #e05c5c; background: rgba(224, 92, 92, 0.08);
+    animation: otp-shake 0.35s ease;
   }
 }
 
-.verify-otp-form {
-  display: flex;
-  flex-direction: column;
+@keyframes otp-shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-6px); }
+  60%       { transform: translateX(6px); }
 }
 
-.verify-otp-form-fields {
-  display: flex;
-  flex-direction: column;
-  gap: $space-xl;
-}
-
-.phone-info-container {
-  display: flex;
-  justify-content: center;
-  margin-bottom: $space-sm;
-
-  .phone-display {
-    color: $primary-dark;
-    font-family: "Noto Sans Hebrew", serif;
-    font-size: $text-lg;
-    font-weight: $font-weight-semibold;
-    line-height: 24px;
-    margin: 0;
-  }
-}
-
-.otp-input-section {
-  display: flex;
-  flex-direction: column;
-  gap: $space-lg;
-}
-
-.otp-info-text {
-  color: $primary-dark;
-  font-family: "Noto Sans Hebrew", serif;
-  font-size: $text-base;
-  font-weight: $font-weight-semibold;
-  line-height: 20px;
-  margin: 0;
-  text-align: center;
-}
-
-.otp-container {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  direction: ltr;
-}
-
-.otp-input-hidden {
-  position: absolute;
-  opacity: 0;
-  pointer-events: auto;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-  border: none;
-  background: transparent;
-  font-size: 1px;
-  color: transparent;
-  z-index: 10;
-}
-
-.otp-container.invalid {
-  .otp-box .otp-slot {
-    background-color: $color-error-bg;
-    border-color: $color-error-border;
-
-    .otp-char.filled {
-      color: $color-error;
-    }
-
-    .otp-char.placeholder {
-      color: rgba($color-error, 0.5);
-    }
-  }
-}
-
-.otp-box {
-  display: flex;
-  justify-content: center;
-  gap: $space-md;
-  width: 100%;
-}
-
-.otp-slot {
-  height: 53px;
-  width: 53px;
-  border-radius: 8px;
-  font-size: $text-3xl;
-  font-weight: $font-weight-bold;
-  background-color: rgba(145, 158, 171, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid transparent;
-  transition: all 0.2s ease-in-out;
-
-  &.active {
-    background-color: rgba(145, 158, 171, 0.16);
-    border-color: $primary;
-  }
-}
-
-.otp-char {
-  font-weight: $font-weight-bold;
-  font-size: $text-3xl;
-  text-align: center;
-
-  &.placeholder {
-    color: $text-disabled;
-    font-size: $text-4xl;
-  }
-
-  &.filled {
-    color: $primary-dark;
-  }
-}
-
-.otp-validation-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: $space-lg;
-  padding-top: $space-lg;
-
-  .error-text {
-    color: $color-error;
-    font-size: $text-base;
-    font-weight: $font-weight-semibold;
-    margin: 0;
-  }
-}
-
-.resend-container {
-  display: flex;
-  align-items: center;
-  gap: $space-md;
-}
-
-.resend-button {
-  background-color: transparent;
-  color: $primary;
-  border: 1px solid $primary;
-  border-radius: 8px;
-  padding: $space-sm $space-lg;
-  font-size: $text-sm;
-  font-weight: $font-weight-bold;
-  font-family: "Noto Sans Hebrew", serif;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover:not(.disabled) {
-    background-color: rgba($primary, 0.1);
-  }
-
-  &:focus:not(.disabled) {
-    outline: 2px solid $primary;
-    outline-offset: 2px;
-  }
-
-  &.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    background-color: rgba(145, 158, 171, 0.08);
-    color: $text-secondary;
-    border-color: rgba(145, 158, 171, 0.3);
-  }
-}
-
-.countdown-text {
-  font-size: $text-lg;
-  font-weight: $font-weight-semibold;
-  color: $primary-dark;
-  font-family: "Noto Sans Hebrew", serif;
-  margin: 0;
-}
-
-.verify-otp-form-action {
-  display: flex;
-  justify-content: center;
-  padding-top: $space-2xl;
-  margin-top: $space-sm;
-
-  .button {
-    width: 100%;
-    padding: 14px $space-xl;
-    font-size: $text-lg;
-    font-weight: $font-weight-semibold;
-    background-color: $primary;
-    border-radius: 8px;
-    text-transform: none;
-    color: white;
-    border: none;
-  }
+@media (max-width: #{$breakpoint-md}) {
+  .auth-otp-box { width: 44px; height: 54px; font-size: 22px; }
+  .auth-otp-row { gap: 8px; }
 }
