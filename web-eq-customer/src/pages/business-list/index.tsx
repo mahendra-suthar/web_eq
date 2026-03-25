@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams, useLocation, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import BusinessCard from "../../components/business-card";
 import EmptyState from "../../components/empty-state";
@@ -8,51 +8,57 @@ import { BusinessService } from "../../services/business/business.service";
 import { CategoryService, type CategoryWithServicesData, type ServiceData } from "../../services/category/category.service";
 import { getCategoryEmoji } from "../../utils/category-emoji";
 import { useScrollReveal } from "../../hooks/useScrollReveal";
-import type { Business } from "../../mock/businesses";
+import type { Business } from "../../types/business";
 import "./business-list.scss";
 
 type SortKey = "recommended" | "open" | "rating" | "price-low" | "price-high";
 
 export default function BusinessListPage() {
   const { categoryId } = useParams<{ categoryId: string }>();
-  const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const passedCategory = (location.state?.category as CategoryWithServicesData) || null;
-
-  // ── State ────────────────────────────────────────────────────────────────
   const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [category, setCategory] = useState<CategoryWithServicesData | null>(passedCategory);
+  const [category, setCategory] = useState<CategoryWithServicesData | null>(null);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [categoryLoading, setCategoryLoading] = useState(!!categoryId);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [businessError, setBusinessError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>("recommended");
 
-  useScrollReveal([loading]);
+  const error = categoryError || businessError;
 
-  // ── Load category ────────────────────────────────────────────────────────
+  useScrollReveal([loading || categoryLoading]);
+
   useEffect(() => {
-    const loadCategory = async () => {
-      if (category || !categoryId) return;
+    setCategoryError(null);
+    setBusinessError(null);
+    setCategory(null);
+  }, [categoryId]);
+
+  useEffect(() => {
+    if (!categoryId) return;
+    let cancelled = false;
+    setCategoryLoading(true);
+    (async () => {
       try {
         const svc = new CategoryService();
-        const categories = await svc.getCategoriesWithServices();
-        const found = categories.find((c) => c.uuid === categoryId);
-        if (found) setCategory(found);
-        else setError(t("bl.notFoundTitle"));
+        const found = await svc.fetchCategoryForBusinessList(categoryId);
+        if (!cancelled) setCategory(found);
       } catch {
-        setError(t("bl.failedLoadCategory"));
+        if (!cancelled) setCategoryError(t("bl.failedLoadCategory"));
+      } finally {
+        if (!cancelled) setCategoryLoading(false);
       }
-    };
-    loadCategory();
-  }, [categoryId, category, t]);
+    })();
+    return () => { cancelled = true; };
+  }, [categoryId, t]);
 
-  // ── Fetch businesses ─────────────────────────────────────────────────────
   const fetchBusinesses = useCallback(async () => {
     if (!categoryId) return;
     try {
       setLoading(true);
-      setError(null);
+      setBusinessError(null);
       const svc = new BusinessService();
       const serviceIds = selectedServiceIds.length > 0 ? selectedServiceIds : undefined;
       const list = await svc.getBusinesses(categoryId, serviceIds);
@@ -79,7 +85,7 @@ export default function BusinessListPage() {
         }))
       );
     } catch {
-      setError(t("bl.failedLoadBusinesses"));
+      setBusinessError(t("bl.failedLoadBusinesses"));
     } finally {
       setLoading(false);
     }
@@ -87,7 +93,6 @@ export default function BusinessListPage() {
 
   useEffect(() => { fetchBusinesses(); }, [fetchBusinesses]);
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
   const handleServiceToggle = (serviceId: string) =>
     setSelectedServiceIds((prev) =>
       prev.includes(serviceId) ? prev.filter((id) => id !== serviceId) : [...prev, serviceId]
@@ -95,7 +100,6 @@ export default function BusinessListPage() {
 
   const handleClearFilters = () => setSelectedServiceIds([]);
 
-  // ── Computed ─────────────────────────────────────────────────────────────
   const openCount = useMemo(
     () => businesses.filter((b) => b.isOpen || b.isAlwaysOpen).length,
     [businesses]
@@ -127,7 +131,7 @@ export default function BusinessListPage() {
 
   const emoji = category ? getCategoryEmoji(category.name) : "";
 
-  if (!category && !loading && !error) {
+  if (!categoryId) {
     return (
       <div className="bl-page">
         <EmptyState title={t("bl.notFoundTitle")} hint={t("bl.notFoundHint")} />
@@ -138,7 +142,6 @@ export default function BusinessListPage() {
   return (
     <div className="bl-page">
 
-      {/* ── Dark Hero Banner ───────────────────────────────────── */}
       <div className="bl-hero">
         <div className="bl-hero-inner">
           <button className="bl-breadcrumb" onClick={() => navigate("/")} aria-label={t("bl.backToCategories")}>
@@ -203,7 +206,7 @@ export default function BusinessListPage() {
         </div>
       </div>
 
-      {/* ── Toolbar ────────────────────────────────────────────── */}
+      {/* Toolbar */}
       {(category?.services?.length ?? 0) > 0 && (
         <div className="bl-toolbar">
           <div className="bl-toolbar-inner">
@@ -264,7 +267,7 @@ export default function BusinessListPage() {
         </div>
       )}
 
-      {/* ── Active filter tags (only when filters are on) ──────── */}
+      {/* Active filter tags (only when filters are on) */}
       {!loading && !error && selectedServiceNames.length > 0 && (
         <div className="bl-results-meta">
           <div className="bl-results-meta-inner">
@@ -288,7 +291,7 @@ export default function BusinessListPage() {
         </div>
       )}
 
-      {/* ── Content ────────────────────────────────────────────── */}
+      {/* Content */}
       <div className="bl-content">
         <div className="bl-content-inner">
 

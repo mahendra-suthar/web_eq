@@ -28,7 +28,7 @@ interface BusinessQueueSetupProps {
   onBack?: () => void;
   employees: Employee[];
   businessId: string | null;
-  categoryId?: string;
+  subcategoryIds?: string[];
   initialData?: QueueData[];
 }
 
@@ -74,7 +74,7 @@ export default function BusinessQueueSetup({
   onBack,
   employees,
   businessId,
-  categoryId,
+  subcategoryIds,
   initialData,
 }: BusinessQueueSetupProps) {
   const { t } = useLayoutContext();
@@ -87,10 +87,10 @@ export default function BusinessQueueSetup({
   const [submitError, setSubmitError] = useState<string>("");
 
   useEffect(() => {
-    if (categoryId) {
+    if (subcategoryIds && subcategoryIds.length > 0) {
       setLoadingServices(true);
       serviceService
-        .getServicesByCategory(categoryId)
+        .getServicesByCategories(subcategoryIds)
         .then(setAvailableServices)
         .catch((err) => {
           console.error("Failed to fetch services:", err);
@@ -100,7 +100,7 @@ export default function BusinessQueueSetup({
     } else {
       setAvailableServices([]);
     }
-  }, [categoryId]);
+  }, [JSON.stringify(subcategoryIds)]);
 
   const [queues, setQueues] = useState<QueueBlockState[]>(() => {
     if (initialData?.length) {
@@ -241,7 +241,7 @@ export default function BusinessQueueSetup({
           }),
         })),
       };
-      const created = await queueService.createQueuesBatch(payload);
+      await queueService.createQueuesBatch(payload);
       const queuesForStore: QueueData[] = queues.map((q) => ({
         name: q.name.trim(),
         employee_id: q.employee_id,

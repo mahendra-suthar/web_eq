@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import List
@@ -11,10 +11,13 @@ from app.schemas.service import ServiceData
 service_router = APIRouter()
 
 
-@service_router.get("/get_services/{category_id}", response_model=List[ServiceData])
-async def get_available_services(category_id: UUID, db: Session = Depends(get_db)):
+@service_router.get("/get_services", response_model=List[ServiceData])
+async def get_services_by_categories(
+    category_ids: List[UUID] = Query(..., description="One or more subcategory UUIDs"),
+    db: Session = Depends(get_db),
+):
     controller = ServiceController(db)
-    return await controller.get_available_services(category_id)
+    return await controller.get_services_by_categories(category_ids)
 
 
 @service_router.get("/get_all_services", response_model=List[ServiceData])

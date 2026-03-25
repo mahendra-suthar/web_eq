@@ -162,6 +162,87 @@
   }
 }
 
+.subcat-chips-wrapper {
+  border-radius: 8px;
+  background: rgba(145, 158, 171, 0.08);
+  border: 2px solid transparent;
+  padding: 10px 12px;
+  min-height: 53px;
+  transition: border-color 0.2s ease;
+
+  &:focus-within {
+    border-color: $primary;
+    background: rgba(145, 158, 171, 0.12);
+  }
+
+  &.error {
+    background-color: rgba(255, 86, 48, 0.08);
+    border-color: #FF5630;
+
+    .error-text {
+      color: #FF5630;
+    }
+  }
+
+  .subcat-placeholder {
+    color: #919EAB;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 15px;
+    margin: 6px 0;
+  }
+
+  .error-text {
+    color: #FF5630;
+    font-size: 12px;
+    font-weight: 500;
+    margin-top: 6px;
+  }
+}
+
+.subcat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.subcat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 2px solid rgba(145, 158, 171, 0.32);
+  background: #fff;
+  color: $primary-dark;
+  font-family: "Noto Sans Hebrew", serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s ease;
+
+  &:hover {
+    border-color: $primary;
+    color: $primary;
+  }
+
+  &--selected {
+    background: $primary;
+    border-color: $primary;
+    color: #fff;
+
+    &:hover {
+      background: darken($primary, 8%);
+      border-color: darken($primary, 8%);
+      color: #fff;
+    }
+  }
+
+  &__check {
+    font-size: 12px;
+    line-height: 1;
+  }
+}
+
 .business-basic-info-form-action {
   display: flex;
   gap: 16px;

@@ -50,7 +50,7 @@ export class BookingService extends HttpClient {
       const url = `/queue/booking-preview?${params.toString()}`;
       return await this.post<BookingPreviewData>(url, {});
     } catch (error: any) {
-      console.error('Failed to fetch booking preview:', error);
+      if (import.meta.env.DEV) console.error('Failed to fetch booking preview:', error);
       throw error;
     }
   }
@@ -67,7 +67,7 @@ export class BookingService extends HttpClient {
       const url = `/queue/slots?${params.toString()}`;
       return await this.get<SlotsListResponse>(url);
     } catch (error: any) {
-      console.error('Failed to fetch queue slots:', error);
+      if (import.meta.env.DEV) console.error('Failed to fetch queue slots:', error);
       throw error;
     }
   }
@@ -94,7 +94,7 @@ export class BookingService extends HttpClient {
       const url = `/queue/available_slots/${businessId}?${params.toString()}`;
       return await this.get<AvailableSlotData[]>(url);
     } catch (error: any) {
-      console.error('Failed to fetch available slots:', error);
+      if (import.meta.env.DEV) console.error('Failed to fetch available slots:', error);
       throw error;
     }
   }
@@ -107,7 +107,7 @@ export class BookingService extends HttpClient {
     try {
       return await this.post<BookingData>('/queue/book', input);
     } catch (error: any) {
-      console.error('Failed to create booking:', error);
+      if (import.meta.env.DEV) console.error('Failed to create booking:', error);
       throw error;
     }
   }
@@ -124,7 +124,7 @@ export class BookingService extends HttpClient {
     try {
       await this.patch<unknown>(`/customer/appointments/${queueUserId}`, input);
     } catch (error: any) {
-      console.error('Failed to reschedule appointment:', error);
+      if (import.meta.env.DEV) console.error('Failed to reschedule appointment:', error);
       throw error;
     }
   }
@@ -136,7 +136,7 @@ export class BookingService extends HttpClient {
     try {
       return await this.get<BookingData[]>('/queue/my_bookings');
     } catch (error: any) {
-      console.error('Failed to fetch bookings:', error);
+      if (import.meta.env.DEV) console.error('Failed to fetch bookings:', error);
       throw error;
     }
   }

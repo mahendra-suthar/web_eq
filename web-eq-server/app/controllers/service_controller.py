@@ -12,13 +12,6 @@ class ServiceController:
         self.db = db
         self.service = ServiceService(db)
 
-    async def get_available_services(self, category_id: UUID) -> List[ServiceData]:
-        try:
-            services = self.service.get_services_by_category(category_id)
-            return [ServiceData.from_service(s) for s in services]
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to fetch services: {str(e)}")
-
     async def get_all_services(self) -> List[ServiceData]:
         try:
             services = self.service.get_all_services()
@@ -26,8 +19,14 @@ class ServiceController:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to fetch services: {str(e)}")
 
+    async def get_services_by_categories(self, category_ids: List[UUID]) -> List[ServiceData]:
+        try:
+            services = self.service.get_services_by_categories(category_ids)
+            return [ServiceData.from_service(s) for s in services]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch services: {str(e)}")
+
     async def get_services_by_business(self, business_id: UUID) -> List[ServiceData]:
-        """Return services in the business's category (for queue detail add-service)."""
         try:
             services = self.service.get_services_by_business_category(business_id)
             return [ServiceData.from_service(s) for s in services]

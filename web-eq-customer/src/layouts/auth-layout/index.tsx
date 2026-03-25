@@ -17,7 +17,7 @@ export default function AuthLayout() {
   const NAV_LINKS = [
     { label: t("nav.explore"), href: "/#categories" },
     { label: t("nav.howItWorks"), href: "/#how-it-works" },
-    { label: t("nav.forBusiness"), href: "#" },
+    { label: t("nav.forBusiness"), href: "/for-business" },
   ];
 
   return (

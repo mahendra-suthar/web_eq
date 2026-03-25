@@ -224,7 +224,13 @@ export default function BusinessRegistration() {
               })) || []
             }
             businessId={businessId}
-            categoryId={registrationData.category_id}
+            subcategoryIds={
+              registrationData.subcategory_ids?.length
+                ? registrationData.subcategory_ids
+                : registrationData.category_id
+                ? [registrationData.category_id]
+                : []
+            }
             initialData={
               registrationData.queues?.length
                 ? registrationData.queues

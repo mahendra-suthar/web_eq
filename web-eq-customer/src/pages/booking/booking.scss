@@ -1030,6 +1030,36 @@
   }
 }
 
+// ─── Toast ─────────────────────────────────────────────────────────────────────
+.bk-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(16px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: $forest;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 9999;
+
+  svg { flex-shrink: 0; color: $mint; }
+
+  &--show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+  }
+}
+
 // ─── Modals ────────────────────────────────────────────────────────────────────
 .bk-modal-overlay {
   position: fixed;

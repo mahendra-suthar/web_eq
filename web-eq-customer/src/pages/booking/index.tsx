@@ -113,6 +113,15 @@ export default function BookingPage() {
     setBookingConfirmation,
   } = useBookingStore();
 
+  const [toastMsg, setToastMsg] = useState("");
+  const [toastVisible, setToastVisible] = useState(false);
+
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 3500);
+  }, []);
+
   const [selectedServices, setSelectedServices] = useState<BusinessServiceData[]>(initialSelectedServicesData);
   const [bookingInProgress, setBookingInProgress] = useState(false);
   const [queueOptions, setQueueOptions] = useState<QueueOptionData[]>([]);
@@ -420,7 +429,7 @@ export default function BookingPage() {
           queue_date: selectedDate,
           service_ids: finalServiceIds,
         });
-        alert(t("bk.rescheduled"));
+        showToast(t("bk.rescheduled"));
         navigate("/profile?tab=appointments");
         return;
       }
@@ -439,7 +448,7 @@ export default function BookingPage() {
         setBookingConfirmation(result);
         return;
       }
-      alert(t("bookingConfirmed"));
+      showToast(t("bookingConfirmed"));
       navigate("/");
     } catch (err: any) {
       console.error(isReschedule ? "Reschedule failed:" : "Booking failed:", err);
@@ -448,8 +457,7 @@ export default function BookingPage() {
         (isReschedule ? t("bk.rescheduleFailed") : t("bookingFailed"));
       setError(errorMsg);
       if (err.response?.status === HttpStatus.UNAUTHORIZED) {
-        alert(t("pleaseLogin"));
-        navigate("/send-otp", {
+          navigate("/send-otp", {
           state: {
             returnTo: `/business/${businessId}/book`,
             selectedServices: initialSelectedServices,
@@ -927,6 +935,12 @@ export default function BookingPage() {
           </div>
         </div>
       )}
+
+      {/* ── Toast ───────────────────────────────────────────────────────── */}
+      <div className={`bk-toast${toastVisible ? " bk-toast--show" : ""}`} role="status" aria-live="polite">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        {toastMsg}
+      </div>
 
       {/* ── Already in queue modal ───────────────────────────────────────── */}
       {alreadyInQueueData && (

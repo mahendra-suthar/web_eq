@@ -44,7 +44,7 @@ export default function CustomerLayout() {
   const NAV_LINKS = [
     { key: "nav.explore", label: t("nav.explore"), href: "/#categories" },
     { key: "nav.howItWorks", label: t("nav.howItWorks"), href: "/#how-it-works" },
-    { key: "nav.forBusiness", label: t("nav.forBusiness"), href: "#" },
+    { key: "nav.forBusiness", label: t("nav.forBusiness"), href: "/for-business" },
   ];
 
   const FOOTER_COLS = [
@@ -59,16 +59,16 @@ export default function CustomerLayout() {
     {
       heading: t("footer.business"),
       links: [
-        { label: t("footer.linkListBusiness"), href: "#" },
-        { label: t("footer.linkDashboard"), href: "#" },
+        { label: t("footer.linkListBusiness"), href: "/for-business" },
+        { label: t("footer.linkDashboard"), href: "/for-business" },
       ],
     },
     {
       heading: t("footer.company"),
       links: [
-        { label: t("footer.linkAbout"), href: "#" },
-        { label: t("footer.linkBlog"), href: "#" },
-        { label: t("footer.linkContact"), href: "#" },
+        { label: t("footer.linkAbout"), href: "/about" },
+        { label: t("footer.linkBlog"), href: "/blog" },
+        { label: t("footer.linkContact"), href: "/contact" },
       ],
     },
   ];
@@ -166,8 +166,8 @@ export default function CustomerLayout() {
           <div className="cl-footer-bottom">
             <span>{t("footer.copyright", { year: new Date().getFullYear() })}</span>
             <div className="cl-footer-bottom-links">
-              <a href="#" className="cl-footer-link">{t("footer.linkPrivacy")}</a>
-              <a href="#" className="cl-footer-link">{t("footer.linkTerms")}</a>
+              <a href="/privacy" className="cl-footer-link">{t("footer.linkPrivacy")}</a>
+              <a href="/terms" className="cl-footer-link">{t("footer.linkTerms")}</a>
             </div>
           </div>
         </div>

@@ -5,6 +5,12 @@ export interface Category {
   name: string;
   description?: string;
   image?: string;
+  parent_category_id?: string | null;
+}
+
+export interface SubcategoryMinimal {
+  uuid: string;
+  name: string;
 }
 
 export interface BusinessBasicInfoInput {
@@ -71,11 +77,29 @@ export class BusinessService extends HttpClient {
 
   async getCategories(): Promise<Category[]> {
     try {
-      const response = await this.get<Category[]>("category/get_categories/");
-      return response;
+      const response = await this.get<Category[] | { data?: Category[] }>("category/get_categories");
+      const raw = Array.isArray(response) ? response : response?.data ?? [];
+      return raw;
     } catch (error: any) {
       console.error("Failed to fetch categories:", error);
       throw new Error(error?.response?.data?.detail?.message || "Failed to fetch categories");
+    }
+  }
+
+  async getSubcategories(parentUuid?: string): Promise<SubcategoryMinimal[]> {
+    try {
+      const qs =
+        parentUuid !== undefined && parentUuid !== ""
+          ? `?parent_uuid=${encodeURIComponent(parentUuid)}`
+          : "";
+      const response = await this.get<SubcategoryMinimal[] | { data?: SubcategoryMinimal[] }>(
+        `category/subcategories${qs}`
+      );
+      const raw = Array.isArray(response) ? response : response?.data ?? [];
+      return raw;
+    } catch (error: any) {
+      console.error("Failed to fetch subcategories:", error);
+      throw new Error(error?.response?.data?.detail?.message || "Failed to fetch subcategories");
     }
   }
 

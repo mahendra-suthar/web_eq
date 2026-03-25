@@ -70,6 +70,7 @@ export interface RegistrationData {
     business_email: string;
     about_business?: string;
     category_id: string;
+    subcategory_ids: string[];
     profile_picture?: File; // Note: File objects don't persist well in localStorage
     is_always_open: boolean;
     schedule: DaySchedule[];
@@ -98,6 +99,7 @@ export const useBusinessRegistrationStore = create(
             businessId: null,
             registrationData: {
                 is_always_open: false,
+                subcategory_ids: [],
                 schedule: [],
                 employees: [],
                 services: [],
@@ -120,6 +122,7 @@ export const useBusinessRegistrationStore = create(
                 businessId: null,
                 registrationData: {
                     is_always_open: false,
+                    subcategory_ids: [],
                     schedule: [],
                     employees: [],
                     services: [],
