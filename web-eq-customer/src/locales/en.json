@@ -135,6 +135,8 @@
     "slotsNotAvailable": "No slots available for this date. Try another date.",
     "slotLeft_one": "{{count}} left",
     "slotLeft_other": "{{count}} left",
+    "alreadyBooked": "Already booked",
+    "timeConflict": "You already have an appointment at {{time}} at {{business}}. Please choose a different date or time.",
     "alreadyQueueDetails": "Your current queue details"
   },
 

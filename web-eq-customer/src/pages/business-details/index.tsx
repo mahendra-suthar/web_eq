@@ -123,12 +123,11 @@ export default function BusinessDetailsPage() {
     !isNaN(business.address.latitude) &&
     !isNaN(business.address.longitude);
 
-  // Today's schedule
+  // Today's schedule.
   const todaySchedule = useMemo(() => {
     if (!business?.schedule?.schedules?.length) return null;
-    const jsDay = new Date().getDay(); // 0=Sun
-    const scheduleIdx = (jsDay + 6) % 7; // 0=Mon..6=Sun
-    return business.schedule.schedules.find((s) => s.day_of_week === scheduleIdx) ?? null;
+    const jsDay = new Date().getDay(); // 0=Sun…6=Sat, matches DB convention
+    return business.schedule.schedules.find((s) => s.day_of_week === jsDay) ?? null;
   }, [business]);
 
   if (loading) {
@@ -400,14 +399,17 @@ export default function BusinessDetailsPage() {
                 <div className="bdp-hours-always">{t("bd.alwaysOpenDesc")}</div>
               ) : (
                 <div className="bdp-hours-grid">
-                  {business.schedule!.schedules.map((day) => {
-                    const jsDay = new Date().getDay();
-                    const todayIdx = (jsDay + 6) % 7;
-                    const isToday = day.day_of_week === todayIdx;
+                  {business.schedule!.schedules
+                    .slice()
+                    .sort((a, b) => ((a.day_of_week + 6) % 7) - ((b.day_of_week + 6) % 7))
+                    .map((day) => {
+                    const jsDay = new Date().getDay(); // 0=Sun…6=Sat, same convention as DB
+                    const isToday = day.day_of_week === jsDay;
+                    const isoIdx = (day.day_of_week + 6) % 7;
                     return (
                       <div key={day.day_of_week} className={`bdp-hours-row${isToday ? " today" : ""}`}>
                         <div className="bdp-hours-day">
-                          {DAY_NAME(day.day_of_week)}
+                          {DAY_NAME(isoIdx)}
                           {isToday && <span className="bdp-today-badge">{t("today")}</span>}
                         </div>
                         {day.is_open && day.opening_time && day.closing_time ? (

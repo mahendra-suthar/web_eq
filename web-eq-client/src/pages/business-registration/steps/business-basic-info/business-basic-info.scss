@@ -1,4 +1,5 @@
 @use "../../../../variables.scss" as *;
+@use "sass:color";
 
 .business-basic-info-page {
   padding: 48px 56px;
@@ -231,8 +232,8 @@
     color: #fff;
 
     &:hover {
-      background: darken($primary, 8%);
-      border-color: darken($primary, 8%);
+      background: color.adjust($primary, $lightness: -8%);
+      border-color: color.adjust($primary, $lightness: -8%);
       color: #fff;
     }
   }

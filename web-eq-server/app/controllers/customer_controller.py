@@ -22,6 +22,8 @@ from app.schemas.customer import (
     CustomerAppointmentListItem,
     CustomerAppointmentListResponse,
     CustomerAppointmentDetailResponse,
+    CustomerUpcomingAppointmentItem,
+    CustomerUpcomingAppointmentsResponse,
 )
 from app.schemas.auth import UserRegistrationInput
 from app.core.constants import QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS
@@ -258,6 +260,14 @@ class CustomerController:
         if not refreshed:
             raise HTTPException(status_code=500, detail="Failed to reload appointment")
         return self.build_appointment_detail(refreshed)
+
+    def get_upcoming_appointments(self, user_id: UUID) -> CustomerUpcomingAppointmentsResponse:
+        rows = self.queue_service.get_user_upcoming_active_appointments(user_id)
+        items = [
+            CustomerUpcomingAppointmentItem.from_orm_row(qu, queue, business)
+            for qu, queue, business in rows
+        ]
+        return CustomerUpcomingAppointmentsResponse(items=items)
 
     # ──────────────────────────────────────────────────────────────────────────
 

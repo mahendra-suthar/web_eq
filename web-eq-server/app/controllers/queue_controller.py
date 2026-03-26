@@ -473,6 +473,20 @@ class QueueController:
             scheduled_start = None
             scheduled_end = None
 
+            if appointment_type == "QUEUE" and metrics.get("appointment_time"):
+                preliminary_service_time = sum((qs.avg_service_time or 5) for qs in queue_services)
+                queue_time_conflict = self.queue_service.get_queue_booking_at_estimated_time(
+                    user_id=user_id,
+                    queue_date=data.queue_date,
+                    appointment_time_str=metrics["appointment_time"],
+                    tolerance_minutes=max(preliminary_service_time, 15),
+                )
+                if queue_time_conflict:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="You already have an appointment around this time. Please choose a different date or time.",
+                    )
+
             if appointment_type in ("FIXED", "APPROXIMATE") and slot_id:
                 slot = self.queue_service.get_slot_by_id(slot_id)
                 if not slot:
@@ -481,6 +495,16 @@ class QueueController:
                     raise HTTPException(status_code=400, detail="Slot does not match selected queue or date")
                 if slot.is_blocked:
                     raise HTTPException(status_code=409, detail="Slot is not available")
+                conflict = self.queue_service.get_booking_at_time(
+                    user_id=user_id,
+                    queue_date=data.queue_date,
+                    slot_start=slot.slot_start,
+                )
+                if conflict:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="You already have an appointment at this time. Please choose a different time slot.",
+                    )
                 reserved = self.queue_service.reserve_slot_atomic(slot_id)
                 if not reserved:
                     raise HTTPException(status_code=409, detail="Slot is full")
