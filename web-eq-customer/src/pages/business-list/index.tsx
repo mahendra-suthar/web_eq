@@ -191,15 +191,6 @@ export default function BusinessListPage() {
                   <span className="bl-hero-stat-num">{openCount}</span>
                   <span className="bl-hero-stat-label">{t("bl.openNow")}</span>
                 </div>
-                {avgRating && (
-                  <>
-                    <div className="bl-hero-stat-divider" />
-                    <div className="bl-hero-stat">
-                      <span className="bl-hero-stat-num">{avgRating}★</span>
-                      <span className="bl-hero-stat-label">{t("bl.avgRating")}</span>
-                    </div>
-                  </>
-                )}
               </div>
             )}
           </div>

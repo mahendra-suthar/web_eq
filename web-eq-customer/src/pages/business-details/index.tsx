@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -7,10 +7,17 @@ import {
   type BusinessServiceData,
 } from "../../services/business/business.service";
 import {
+  ReviewService,
+  type ReviewData,
+  type BusinessReviewSummary,
+} from "../../services/review/review.service";
+import { useAuthStore } from "../../store/auth.store";
+import {
   formatFullAddress,
   getMapEmbedUrl,
   getGoogleMapsLink,
   formatDurationMinutes,
+  formatReviewDate,
 } from "../../utils/util";
 // Mon=0…Sun=6 → locale-aware day name via Intl (2024-01-01 is Monday)
 const DAY_NAME = (idx: number) =>
@@ -18,9 +25,11 @@ const DAY_NAME = (idx: number) =>
 import { getCategoryEmoji } from "../../utils/category-emoji";
 import LoadingSpinner from "../../components/loading-spinner";
 import ErrorMessage from "../../components/error-message";
+import ReviewModal from "../../components/review-modal";
+import StarRating from "../../components/star-rating";
 import "./business-details.scss";
 
-const TABS = ["Overview", "Services", "Hours", "Location"] as const;
+const TABS = ["Overview", "Services", "Hours", "Location", "Reviews"] as const;
 type Tab = typeof TABS[number];
 
 const TAB_IDS: Record<Tab, string> = {
@@ -28,20 +37,26 @@ const TAB_IDS: Record<Tab, string> = {
   Services: "bdp-services",
   Hours: "bdp-hours",
   Location: "bdp-location",
+  Reviews: "bdp-reviews",
 };
 
 export default function BusinessDetailsPage() {
   const { t } = useTranslation();
-  const TAB_LABELS = useMemo<Record<Tab, string>>(() => ({
-    Overview: t("bd.tabOverview"),
-    Services: t("bd.tabServices"),
-    Hours: t("bd.tabHours"),
-    Location: t("bd.tabLocation"),
-  }), [t]);
+  const TAB_LABELS = useMemo<Record<Tab, string>>(
+    () => ({
+      Overview: t("bd.tabOverview"),
+      Services: t("bd.tabServices"),
+      Hours: t("bd.tabHours"),
+      Location: t("bd.tabLocation"),
+      Reviews: t("bd.tabReviews"),
+    }),
+    [t]
+  );
 
   const { businessId } = useParams<{ businessId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const { isAuthenticated, userInfo } = useAuthStore();
 
   const [business, setBusiness] = useState<BusinessDetailData | null>(null);
   const [services, setServices] = useState<BusinessServiceData[]>([]);
@@ -50,28 +65,43 @@ export default function BusinessDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
 
+  // Reviews state
+  const [reviews, setReviews] = useState<ReviewData[]>([]);
+  const [reviewSummary, setReviewSummary] = useState<BusinessReviewSummary | null>(null);
+  const [myReview, setMyReview] = useState<ReviewData | null>(null);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+
   // Category info passed from list page (optional)
   const passedCategoryId = location.state?.categoryId as string | undefined;
   const passedCategoryName = location.state?.categoryName as string | undefined;
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!businessId) { setError(t("bd.businessIdRequired")); setLoading(false); return; }
+      if (!businessId) {
+        setError(t("bd.businessIdRequired"));
+        setLoading(false);
+        return;
+      }
       try {
         setLoading(true);
         setError(null);
         const svc = new BusinessService();
-        const [businessData, servicesData] = await Promise.all([
+        const rvSvc = new ReviewService();
+        const [businessData, servicesData, reviewsData, summaryData] = await Promise.all([
           svc.getBusinessDetails(businessId),
           svc.getBusinessServices(businessId),
+          rvSvc.getBusinessReviews(businessId),
+          rvSvc.getBusinessReviewSummary(businessId),
         ]);
         setBusiness(businessData);
         setServices(servicesData);
+        setReviews(reviewsData);
+        setReviewSummary(summaryData);
       } catch (err: any) {
         setError(
           err?.response?.data?.detail?.message ||
-          err?.response?.data?.detail ||
-          t("bd.failedLoad")
+            err?.response?.data?.detail ||
+            t("bd.failedLoad")
         );
       } finally {
         setLoading(false);
@@ -79,6 +109,31 @@ export default function BusinessDetailsPage() {
     };
     fetchData();
   }, [businessId]);
+
+  // Fetch current user's review separately so auth changes are reactive
+  useEffect(() => {
+    if (!businessId || !isAuthenticated()) {
+      setMyReview(null);
+      return;
+    }
+    const rvSvc = new ReviewService();
+    rvSvc
+      .getMyReview({ businessId })
+      .then((rv) => setMyReview(rv))
+      .catch(() => setMyReview(null));
+  }, [businessId, userInfo?.uuid]);
+
+  const handleReviewSuccess = useCallback((newReview: ReviewData) => {
+    setMyReview(newReview);
+    setReviews((prev) => [newReview, ...prev]);
+    setReviewSummary((prev) => {
+      if (!prev) return { average_rating: newReview.rating, review_count: 1 };
+      const newCount = prev.review_count + 1;
+      const newAvg = (prev.average_rating * prev.review_count + newReview.rating) / newCount;
+      return { average_rating: Math.round(newAvg * 10) / 10, review_count: newCount };
+    });
+    setReviewModalOpen(false);
+  }, []);
 
   const handleServiceToggle = (serviceId: string) =>
     setSelectedServices((prev) =>
@@ -109,26 +164,40 @@ export default function BusinessDetailsPage() {
   );
 
   const totalPriceMin = selectedServicesData.reduce(
-    (sum, s) => sum + (s.price_min ?? s.price ?? 0), 0
+    (sum, s) => sum + (s.price_min ?? s.price ?? 0),
+    0
   );
   const totalPriceMax = selectedServicesData.reduce(
-    (sum, s) => sum + (s.price_max ?? s.price ?? 0), 0
+    (sum, s) => sum + (s.price_max ?? s.price ?? 0),
+    0
   );
   const hasPriceRange = totalPriceMin !== totalPriceMax;
 
-  const addressLines = useMemo(() => formatFullAddress(business?.address ?? null), [business?.address]);
+  const addressLines = useMemo(
+    () => formatFullAddress(business?.address ?? null),
+    [business?.address]
+  );
   const hasCoords =
     business?.address?.latitude != null &&
     business?.address?.longitude != null &&
     !isNaN(business.address.latitude) &&
     !isNaN(business.address.longitude);
 
-  // Today's schedule.
   const todaySchedule = useMemo(() => {
     if (!business?.schedule?.schedules?.length) return null;
-    const jsDay = new Date().getDay(); // 0=Sun…6=Sat, matches DB convention
+    const jsDay = new Date().getDay();
     return business.schedule.schedules.find((s) => s.day_of_week === jsDay) ?? null;
   }, [business]);
+
+  // Rating bar counts from loaded reviews
+  const ratingCounts = useMemo(() => {
+    const counts: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    reviews.forEach((r) => {
+      const star = Math.round(r.rating);
+      if (star >= 1 && star <= 5) counts[star]++;
+    });
+    return counts;
+  }, [reviews]);
 
   if (loading) {
     return (
@@ -157,7 +226,6 @@ export default function BusinessDetailsPage() {
   const categoryEmoji = business.category_name ? getCategoryEmoji(business.category_name) : "";
   const categoryId = passedCategoryId ?? business.category_id ?? "";
   const categoryName = passedCategoryName ?? business.category_name ?? "";
-
   return (
     <div className="bdp-page">
       <div className="bdp-hero">
@@ -181,7 +249,11 @@ export default function BusinessDetailsPage() {
                   <span className="bdp-bc-sep">/</span>
                   <button
                     className="bdp-bc-link"
-                    onClick={() => navigate(`/categories/${categoryId}`, { state: { category: { uuid: categoryId, name: categoryName } } })}
+                    onClick={() =>
+                      navigate(`/categories/${categoryId}`, {
+                        state: { category: { uuid: categoryId, name: categoryName } },
+                      })
+                    }
                   >
                     {categoryName}
                   </button>
@@ -212,7 +284,11 @@ export default function BusinessDetailsPage() {
                 )}
                 <h1 className="bdp-hero-name">{business.name}</h1>
                 <div className="bdp-hero-meta">
-                  <div className={`bdp-status-pill ${isOpen ? "bdp-status-pill--open" : "bdp-status-pill--closed"}`}>
+                  <div
+                    className={`bdp-status-pill ${
+                      isOpen ? "bdp-status-pill--open" : "bdp-status-pill--closed"
+                    }`}
+                  >
                     <span className="bdp-status-dot" aria-hidden="true" />
                     {business.is_always_open
                       ? t("bd.alwaysOpen")
@@ -223,14 +299,37 @@ export default function BusinessDetailsPage() {
                       : t("bd.closed")}
                   </div>
 
-                  {todaySchedule?.is_open && todaySchedule.opening_time && todaySchedule.closing_time && (
+                  {todaySchedule?.is_open &&
+                    todaySchedule.opening_time &&
+                    todaySchedule.closing_time && (
+                      <>
+                        <div className="bdp-hero-sep" aria-hidden="true" />
+                        <div className="bdp-hero-meta-item">
+                          <svg
+                            width="12"
+                            height="12"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                          </svg>
+                          {todaySchedule.opening_time} – {todaySchedule.closing_time}
+                        </div>
+                      </>
+                    )}
+
+                  {reviewSummary && reviewSummary.review_count > 0 && (
                     <>
                       <div className="bdp-hero-sep" aria-hidden="true" />
-                      <div className="bdp-hero-meta-item">
-                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-                        </svg>
-                        {todaySchedule.opening_time} – {todaySchedule.closing_time}
+                      <div className="bdp-hero-meta-item bdp-hero-rating">
+                        <span className="bdp-hero-rating-star">★</span>
+                        <span>{reviewSummary.average_rating}</span>
+                        <span className="bdp-hero-rating-count">
+                          ({reviewSummary.review_count})
+                        </span>
                       </div>
                     </>
                   )}
@@ -253,6 +352,12 @@ export default function BusinessDetailsPage() {
                 onClick={() => scrollToSection(tab)}
               >
                 {TAB_LABELS[tab]}
+                {tab === "Reviews" && reviewSummary !== null && reviewSummary.review_count === 0 && (
+                  <span className="bdp-tab-new">New</span>
+                )}
+                {tab === "Reviews" && reviewSummary !== null && reviewSummary.review_count > 0 && (
+                  <span className="bdp-tab-count">{reviewSummary.review_count}</span>
+                )}
               </button>
             ))}
           </div>
@@ -269,7 +374,14 @@ export default function BusinessDetailsPage() {
                   href={`tel:${business.country_code ?? ""}${business.phone_number}`}
                   className="bdp-contact-chip"
                 >
-                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <svg
+                    width="15"
+                    height="15"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 3.07 8.81a19.79 19.79 0 0 1-3.07-8.68A2 2 0 0 1 2.18 0h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L6.91 7.91a16 16 0 0 0 6.17 6.17l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
                   </svg>
                   {business.country_code && <span>{business.country_code} </span>}
@@ -278,7 +390,14 @@ export default function BusinessDetailsPage() {
               )}
               {business.email && (
                 <a href={`mailto:${business.email}`} className="bdp-contact-chip">
-                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <svg
+                    width="15"
+                    height="15"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                     <polyline points="22,6 12,13 2,6" />
                   </svg>
@@ -307,7 +426,9 @@ export default function BusinessDetailsPage() {
                 {services.length > 0 && (
                   <div className="bdp-about-stat">
                     <div className="bdp-about-stat-label">{t("bd.servicesLabel")}</div>
-                    <div className="bdp-about-stat-value">{t("bd.service", { count: services.length })}</div>
+                    <div className="bdp-about-stat-value">
+                      {t("bd.service", { count: services.length })}
+                    </div>
                   </div>
                 )}
                 {todaySchedule?.is_open && todaySchedule.opening_time && (
@@ -345,10 +466,15 @@ export default function BusinessDetailsPage() {
                   : (service.price ?? service.price_min ?? service.price_max) != null
                   ? `₹${service.price ?? service.price_min ?? service.price_max}`
                   : null;
-                const durationVal = service.duration ?? service.duration_min ?? service.duration_max;
+                const durationVal =
+                  service.duration ?? service.duration_min ?? service.duration_max;
                 const durationLabel =
-                  hasDurationRange && service.duration_min != null && service.duration_max != null
-                    ? `${formatDurationMinutes(service.duration_min)} – ${formatDurationMinutes(service.duration_max)}`
+                  hasDurationRange &&
+                  service.duration_min != null &&
+                  service.duration_max != null
+                    ? `${formatDurationMinutes(service.duration_min)} – ${formatDurationMinutes(
+                        service.duration_max
+                      )}`
                     : durationVal != null
                     ? formatDurationMinutes(durationVal)
                     : null;
@@ -373,8 +499,16 @@ export default function BusinessDetailsPage() {
                       {durationLabel && (
                         <div className="bdp-service-meta">
                           <div className="bdp-service-duration">
-                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                              <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                            <svg
+                              width="12"
+                              height="12"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <circle cx="12" cy="12" r="10" />
+                              <polyline points="12 6 12 12 16 14" />
                             </svg>
                             ~{durationLabel}
                           </div>
@@ -399,27 +533,34 @@ export default function BusinessDetailsPage() {
                 <div className="bdp-hours-always">{t("bd.alwaysOpenDesc")}</div>
               ) : (
                 <div className="bdp-hours-grid">
-                  {business.schedule!.schedules
-                    .slice()
+                  {business
+                    .schedule!.schedules.slice()
                     .sort((a, b) => ((a.day_of_week + 6) % 7) - ((b.day_of_week + 6) % 7))
                     .map((day) => {
-                    const jsDay = new Date().getDay(); // 0=Sun…6=Sat, same convention as DB
-                    const isToday = day.day_of_week === jsDay;
-                    const isoIdx = (day.day_of_week + 6) % 7;
-                    return (
-                      <div key={day.day_of_week} className={`bdp-hours-row${isToday ? " today" : ""}`}>
-                        <div className="bdp-hours-day">
-                          {DAY_NAME(isoIdx)}
-                          {isToday && <span className="bdp-today-badge">{t("today")}</span>}
+                      const jsDay = new Date().getDay();
+                      const isToday = day.day_of_week === jsDay;
+                      const isoIdx = (day.day_of_week + 6) % 7;
+                      return (
+                        <div
+                          key={day.day_of_week}
+                          className={`bdp-hours-row${isToday ? " today" : ""}`}
+                        >
+                          <div className="bdp-hours-day">
+                            {DAY_NAME(isoIdx)}
+                            {isToday && (
+                              <span className="bdp-today-badge">{t("today")}</span>
+                            )}
+                          </div>
+                          {day.is_open && day.opening_time && day.closing_time ? (
+                            <div className="bdp-hours-time">
+                              {day.opening_time} – {day.closing_time}
+                            </div>
+                          ) : (
+                            <div className="bdp-hours-closed">{t("bd.closed")}</div>
+                          )}
                         </div>
-                        {day.is_open && day.opening_time && day.closing_time ? (
-                          <div className="bdp-hours-time">{day.opening_time} – {day.closing_time}</div>
-                        ) : (
-                          <div className="bdp-hours-closed">{t("bd.closed")}</div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
               )}
             </div>
@@ -436,7 +577,9 @@ export default function BusinessDetailsPage() {
               {addressLines.length > 0 && (
                 <div className="bdp-address-block">
                   {addressLines.map((line, i) => (
-                    <div key={i} className="bdp-address-line">{line}</div>
+                    <div key={i} className="bdp-address-line">
+                      {line}
+                    </div>
                   ))}
                 </div>
               )}
@@ -458,9 +601,17 @@ export default function BusinessDetailsPage() {
                     rel="noopener noreferrer"
                     className="bdp-map-link"
                   >
-                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <svg
+                      width="14"
+                      height="14"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                      <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
                     </svg>
                     {t("bd.viewOnMaps")}
                   </a>
@@ -468,17 +619,18 @@ export default function BusinessDetailsPage() {
               )}
             </div>
           )}
+
         </div>
 
         <div className="bdp-sidebar">
-          {/* Booking card */}
+          {/* Booking card — sticky wrapper so only the card sticks */}
+          <div className="bdp-booking-sticky">
           <div className="bdp-booking-card">
             <div className="bdp-booking-header">
               <div className="bdp-booking-title">{t("bd.bookSlotTitle")}</div>
               <div className="bdp-booking-sub">{t("bd.bookSlotSub")}</div>
             </div>
             <div className="bdp-booking-body">
-
               {/* Selected service preview */}
               {selectedServicesData.length > 0 && (
                 <div className="bdp-service-preview">
@@ -496,7 +648,10 @@ export default function BusinessDetailsPage() {
                   })}
                   {selectedServicesData.length > 1 && (
                     <div className="bdp-preview-total">
-                      Total: {hasPriceRange ? `₹${totalPriceMin} – ₹${totalPriceMax}` : `₹${totalPriceMin}`}
+                      Total:{" "}
+                      {hasPriceRange
+                        ? `₹${totalPriceMin} – ₹${totalPriceMax}`
+                        : `₹${totalPriceMin}`}
                     </div>
                   )}
                 </div>
@@ -506,43 +661,177 @@ export default function BusinessDetailsPage() {
                 className={`bdp-book-main-btn${selectedServices.length === 0 ? " disabled" : ""}`}
                 onClick={handleContinue}
               >
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="16"
+                  height="16"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                  <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
                   <line x1="3" y1="10" x2="21" y2="10" />
                 </svg>
-                {selectedServices.length === 0 ? t("bd.selectServiceFirst") : t("bd.bookAppointment")}
-              </button>
-
-              <button
-                className={`bdp-join-queue-btn${selectedServices.length === 0 ? " disabled" : ""}`}
-                onClick={handleContinue}
-              >
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" />
-                  <line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" />
-                  <line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
-                </svg>
-                {t("bd.joinVirtualQueue")}
+                {selectedServices.length === 0
+                  ? t("bd.selectServiceFirst")
+                  : t("bd.bookAppointment")}
               </button>
 
               {!isOpen && (
                 <div className="bdp-booking-note">
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <svg
+                    width="14"
+                    height="14"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
                     <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                   <p>
                     {t("bd.businessClosedNote")}
-                    {todaySchedule?.opening_time && ` ${t("bd.opensAt", { time: todaySchedule.opening_time })}`}
+                    {todaySchedule?.opening_time &&
+                      ` ${t("bd.opensAt", { time: todaySchedule.opening_time })}`}
                   </p>
                 </div>
               )}
             </div>
           </div>
+          </div>{/* /bdp-booking-sticky */}
 
+          {/* Reviews */}
+          <div className="bdp-section-card" id="bdp-reviews">
+            <div className="bdp-section-title bdp-reviews-header">
+              <div className="bdp-reviews-title-left">
+                <div className="bdp-section-icon">⭐</div>
+                {t("rv.title")}
+              </div>
+            </div>
+
+            {/* Summary */}
+            {reviewSummary && reviewSummary.review_count > 0 && (
+              <div className="bdp-review-summary">
+                <div className="bdp-review-avg-block">
+                  <div className="bdp-review-avg-num">{reviewSummary.average_rating}</div>
+                  <StarRating rating={reviewSummary.average_rating} size="md" />
+                  <div className="bdp-review-total-count">
+                    {t("rv.basedOn", { count: reviewSummary.review_count })}
+                  </div>
+                </div>
+                <div className="bdp-review-bars">
+                  {([5, 4, 3, 2, 1] as const).map((star) => {
+                    const count = ratingCounts[star] ?? 0;
+                    const pct =
+                      reviews.length > 0 ? Math.round((count / reviews.length) * 100) : 0;
+                    return (
+                      <div key={star} className="bdp-bar-row">
+                        <span className="bdp-bar-label">{star}★</span>
+                        <div className="bdp-bar-track" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                          <div className="bdp-bar-fill" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="bdp-bar-count">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* User's own review */}
+            {myReview && (
+              <div className="bdp-my-review">
+                <div className="bdp-my-review-label">{t("rv.alreadyReviewed")}</div>
+                <StarRating rating={myReview.rating} />
+                {myReview.comment && (
+                  <p className="bdp-my-review-comment">{myReview.comment}</p>
+                )}
+                {myReview.created_at && (
+                  <div className="bdp-my-review-date">
+                    {formatReviewDate(myReview.created_at)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {(reviewSummary?.review_count ?? 0) > 0 && (
+              <div className="bdp-section-divider" />
+            )}
+
+            {reviews.length === 0 ? (
+              <div className="bdp-reviews-empty">
+                <div className="bdp-reviews-empty-icon" aria-hidden="true">💬</div>
+                <div className="bdp-reviews-empty-title">{t("rv.emptyTitle")}</div>
+                <div className="bdp-reviews-empty-sub">{t("rv.emptySub")}</div>
+                {!isAuthenticated() && (
+                  <button
+                    className="bdp-review-signin-btn"
+                    onClick={() => navigate("/send-otp")}
+                  >
+                    {t("rv.signInReview")}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="bdp-reviews-list">
+                  {reviews.map((review) => (
+                    <div key={review.uuid} className="bdp-review-item">
+                      <div className="bdp-review-avatar" aria-hidden="true">
+                        {(review.user_name || t("rv.anonymous")).charAt(0).toUpperCase()}
+                      </div>
+                      <div className="bdp-review-body">
+                        <div className="bdp-review-meta">
+                          <span className="bdp-review-name">
+                            {review.user_name || t("rv.anonymous")}
+                          </span>
+                          {review.is_verified && (
+                            <span className="bdp-review-verified">{t("rv.verified")}</span>
+                          )}
+                          {review.created_at && (
+                            <span className="bdp-review-date">
+                              {formatReviewDate(review.created_at)}
+                            </span>
+                          )}
+                        </div>
+                        <StarRating rating={review.rating} />
+                        {review.comment && (
+                          <p className="bdp-review-comment">{review.comment}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {!isAuthenticated() && (
+                  <div className="bdp-review-signin-strip">
+                    <span>{t("rv.signInReview")}</span>
+                    <button
+                      className="bdp-review-signin-btn"
+                      onClick={() => navigate("/send-otp")}
+                    >
+                      {t("nav.signIn")}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Review Modal */}
+      <ReviewModal
+        open={reviewModalOpen}
+        onClose={() => setReviewModalOpen(false)}
+        businessId={businessId ?? ""}
+        businessName={business?.name ?? ""}
+        onSuccess={handleReviewSuccess}
+      />
     </div>
   );
 }

@@ -35,7 +35,6 @@ from app.core.constants import (
 )
 from app.core.utils import (
     build_live_queue_users_raw,
-    format_time_12h,
     today_app_date,
     current_time_app_tz,
     format_date_iso,
@@ -913,23 +912,10 @@ class QueueController:
                         service_names.append(qs.service.name)
             service_summary = " · ".join(service_names) if service_names else None
 
-            appointment_time_12h = None
-            appointment_time_str = metrics.get("appointment_time")
-            if appointment_time_str:
-                try:
-                    parts = appointment_time_str.split(":")
-                    if len(parts) >= 2:
-                        h, m = int(parts[0]), int(parts[1])
-                        appointment_time_12h = format_time_12h(
-                            datetime.combine(today_app_date(), time(h, m))
-                        )
-                except Exception:
-                    pass
-
             items.append(
                 CustomerTodayAppointmentResponse.from_queue_user_and_metrics(
                     qu, queue, business_id, business_name,
-                    metrics, service_summary, appointment_time_12h,
+                    metrics, service_summary, metrics.get("appointment_time"),
                     queue_service_uuids=qs_uuids,
                 )
             )

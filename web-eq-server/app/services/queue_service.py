@@ -18,6 +18,7 @@ from app.schemas.queue import (
     QueueServiceAddItem,
     QueueServiceUpdate,
 )
+from app.core.utils import today_app_date, parse_time_string
 from app.core.constants import (
     QUEUE_USER_REGISTERED,
     QUEUE_USER_IN_PROGRESS,
@@ -273,7 +274,6 @@ class QueueService:
 
         Only fetches the columns needed for time-conflict detection — no heavy service relations.
         """
-        from app.core.utils import today_app_date
         today = today_app_date()
         try:
             rows = (
@@ -305,7 +305,6 @@ class QueueService:
         estimated_enqueue_time is stored as a naive datetime in app timezone (see appointment_time_to_enqueue_dequeue),
         so direct comparison against a similarly-constructed naive datetime is correct.
         """
-        from app.core.utils import parse_time_string
         t = parse_time_string(appointment_time_str)
         if t is None:
             return None

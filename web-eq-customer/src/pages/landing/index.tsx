@@ -406,7 +406,11 @@ export default function LandingPage() {
                             {timeSummary && (
                               <div className="lp-today-stat">
                                 <span className="lp-today-stat-label">{t("landing.todayExpectedAt")}</span>
-                                <span className="lp-today-stat-value">{timeSummary}</span>
+                                <span className="lp-today-stat-value">
+                                  {timeSummary.startsWith("Expected at ")
+                                    ? timeSummary.slice("Expected at ".length)
+                                    : timeSummary}
+                                </span>
                                 <span className="lp-today-stat-sub">{t("landing.todayToday")}</span>
                               </div>
                             )}

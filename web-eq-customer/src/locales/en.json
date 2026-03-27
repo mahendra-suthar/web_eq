@@ -347,7 +347,8 @@
     "joinVirtualQueue": "Join Virtual Queue",
     "businessClosedNote": "Business is currently closed.",
     "opensAt": "Opens at {{time}}.",
-    "viewOnMaps": "View on Google Maps"
+    "viewOnMaps": "View on Google Maps",
+    "tabReviews": "Reviews"
   },
 
   "profile": {
@@ -420,5 +421,26 @@
     "dangerZoneTitle": "Danger Zone",
     "dangerZoneDesc": "Deleting your account is permanent and cannot be undone. All your bookings, history and data will be removed immediately.",
     "deleteAccount": "Delete my account"
+  }
+  ,
+  "rv": {
+    "title": "Customer Reviews",
+    "writeReview": "Write a Review",
+    "signInReview": "Sign in to leave a review",
+    "alreadyReviewed": "Your Review",
+    "emptyTitle": "No reviews yet",
+    "emptySub": "Be the first to share your experience!",
+    "ratingRequired": "Please select a rating",
+    "commentPlaceholder": "Share your experience with this business…",
+    "submitReview": "Submit Review",
+    "submitting": "Submitting…",
+    "submitError": "Failed to submit. Please try again.",
+    "basedOn_one": "Based on {{count}} review",
+    "basedOn_other": "Based on {{count}} reviews",
+    "verified": "Verified",
+    "anonymous": "Anonymous",
+    "modalTitle": "Write a Review",
+    "yourRating": "Your Rating",
+    "yourComment": "Your Comment (optional)"
   }
 }

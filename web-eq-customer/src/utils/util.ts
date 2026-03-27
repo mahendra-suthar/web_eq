@@ -152,6 +152,20 @@ export function formatDelayMessage(delayMinutes: number | null | undefined): str
   return `Running ~${delayMinutes} min late`;
 }
 
+/** Format a date string for review display (e.g. "Mar 28, 2026"). */
+export function formatReviewDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "";
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    }).format(new Date(dateStr));
+  } catch {
+    return dateStr;
+  }
+}
+
 // ============================================================================
 // API error handling
 // ============================================================================

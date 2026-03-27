@@ -1,4 +1,5 @@
 import { useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import "./modal.scss";
 
@@ -38,7 +39,7 @@ export default function Modal(props: ModalProps) {
 
   const contentClass = "modal-content " + (contentClassName || "").trim();
 
-  return (
+  return createPortal(
     <div
       className="modal-overlay"
       role={role}
@@ -52,6 +53,7 @@ export default function Modal(props: ModalProps) {
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
