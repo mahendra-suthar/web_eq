@@ -16,6 +16,15 @@ export interface BusinessReviewSummary {
   review_count: number;
 }
 
+export interface FeaturedReview {
+  uuid: string;
+  user_name: string | null;
+  business_name: string;
+  rating: number;
+  comment: string;
+  created_at: string | null;
+}
+
 export interface ReviewCreateInput {
   business_id: string;
   rating: number;
@@ -58,6 +67,15 @@ export class ReviewService extends HttpClient {
       return await this.get<ReviewData | null>(`/review/my_review?${query}`);
     } catch (error: any) {
       if (import.meta.env.DEV) console.error("Failed to fetch my review:", error);
+      throw error;
+    }
+  }
+
+  async getFeaturedReviews(limit = 6): Promise<FeaturedReview[]> {
+    try {
+      return await this.get<FeaturedReview[]>(`/review/featured?limit=${limit}`);
+    } catch (error: any) {
+      if (import.meta.env.DEV) console.error("Failed to fetch featured reviews:", error);
       throw error;
     }
   }

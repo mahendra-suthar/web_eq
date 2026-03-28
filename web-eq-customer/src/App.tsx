@@ -10,6 +10,7 @@ import BookingPage from "./pages/booking";
 import SendOTPPage from "./pages/send-otp";
 import VerifyOTPPage from "./pages/verify-otp";
 import ProfilePage from "./pages/profile";
+import SearchPage from "./pages/search";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           <Route path="/categories/:categoryId" element={<BusinessListPage />} />
           <Route path="/business/:businessId" element={<BusinessDetailsPage />} />
           <Route path="/business/:businessId/book" element={<BookingPage />} />
+          <Route path="/search" element={<SearchPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/orders" element={<Navigate to="/profile?tab=appointments" replace />} />
           <Route path="/settings" element={<Navigate to="/profile?tab=settings" replace />} />

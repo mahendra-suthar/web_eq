@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AppointmentService } from "../../services/appointment/appointment.service";
 import { ReviewService } from "../../services/review/review.service";
 import ReviewModal from "../review-modal";
+import Modal from "../modal";
 import Button from "../button";
 import "./appointment-actions.scss";
 
@@ -156,39 +157,31 @@ function CancelModal({
   };
 
   return (
-    <div
-      className="appt-modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="appt-cancel-title"
-      onClick={onClose}
-    >
-      <div className="appt-modal" onClick={(e) => e.stopPropagation()}>
-        <h3 id="appt-cancel-title" className="appt-modal__title">
-          Cancel appointment?
-        </h3>
-        <p className="appt-modal__desc">
-          You will be removed from{" "}
-          <strong>{appointment.queue_name}</strong> at{" "}
-          <strong>{appointment.business_name}</strong>. This cannot be undone.
-        </p>
-        {error && <p className="appt-modal__error" role="alert">{error}</p>}
-        <div className="appt-modal__actions">
-          <Button
-            text="Go back"
-            color="outline-blue"
-            onClick={onClose}
-            disabled={loading}
-          />
-          <Button
-            text={loading ? "Cancelling…" : "Yes, cancel"}
-            color="red"
-            onClick={handleConfirm}
-            disabled={loading}
-            loading={loading}
-          />
-        </div>
+    <Modal open onClose={onClose} titleId="appt-cancel-title" contentClassName="appt-modal">
+      <h3 id="appt-cancel-title" className="appt-modal__title">
+        Cancel appointment?
+      </h3>
+      <p className="appt-modal__desc">
+        You will be removed from{" "}
+        <strong>{appointment.queue_name}</strong> at{" "}
+        <strong>{appointment.business_name}</strong>. This cannot be undone.
+      </p>
+      {error && <p className="appt-modal__error" role="alert">{error}</p>}
+      <div className="appt-modal__actions">
+        <Button
+          text="Go back"
+          color="outline-blue"
+          onClick={onClose}
+          disabled={loading}
+        />
+        <Button
+          text={loading ? "Cancelling…" : "Yes, cancel"}
+          color="red"
+          onClick={handleConfirm}
+          disabled={loading}
+          loading={loading}
+        />
       </div>
-    </div>
+    </Modal>
   );
 }

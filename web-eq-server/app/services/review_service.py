@@ -4,6 +4,7 @@ from uuid import UUID
 from typing import List, Optional, Tuple
 
 from app.models.review import Review
+from app.models.business import Business
 
 
 class ReviewService:
@@ -83,4 +84,15 @@ class ReviewService:
             self.db.query(Review)
             .filter(Review.user_id == user_id, Review.queue_user_id == queue_user_id)
             .first()
+        )
+
+    def get_featured_reviews(self, limit: int = 6) -> List[Review]:
+        return (
+            self.db.query(Review)
+            .join(Business, Review.business_id == Business.uuid)
+            .options(joinedload(Review.user), joinedload(Review.business))
+            .filter(Review.comment.isnot(None), Review.comment != "", Review.rating >= 4)
+            .order_by(Review.created_at.desc())
+            .limit(limit)
+            .all()
         )

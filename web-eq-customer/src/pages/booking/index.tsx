@@ -153,23 +153,31 @@ export default function BookingPage() {
    * already holds. Covers both FIXED/APPROXIMATE (scheduled_start) and QUEUE
    * (estimated_appointment_time). Used to disable conflicting slots in the picker.
    */
+  const relevantAppointments = useMemo(
+    () =>
+      rescheduleQueueUserId
+        ? upcomingAppointments.filter((a) => a.queue_user_id !== rescheduleQueueUserId)
+        : upcomingAppointments,
+    [upcomingAppointments, rescheduleQueueUserId]
+  );
+
   const conflictedTimesSet = useMemo(() => {
     const set = new Set<string>();
-    upcomingAppointments.forEach((apt) => {
+    relevantAppointments.forEach((apt) => {
       const timeKey = apt.scheduled_start ?? apt.estimated_appointment_time;
       if (timeKey) set.add(`${apt.queue_date}|${timeKey}`);
     });
     return set;
-  }, [upcomingAppointments]);
+  }, [relevantAppointments]);
 
   /** Returns the conflicting appointment for a given date + slot_start, or undefined. */
   const getConflictForSlot = useCallback(
     (date: string, slotStart: string): UpcomingAppointmentItem | undefined =>
-      upcomingAppointments.find((apt) => {
+      relevantAppointments.find((apt) => {
         const timeKey = apt.scheduled_start ?? apt.estimated_appointment_time;
         return apt.queue_date === date && timeKey === slotStart;
       }),
-    [upcomingAppointments]
+    [relevantAppointments]
   );
 
   /**
@@ -194,13 +202,13 @@ export default function BookingPage() {
       normTime = `${String(h).padStart(2, "0")}:${m}`;
     }
     return (
-      upcomingAppointments.find((apt) => {
+      relevantAppointments.find((apt) => {
         if (apt.queue_date !== selectedDate) return false;
         const timeKey = apt.scheduled_start ?? apt.estimated_appointment_time;
         return timeKey === normTime;
       }) ?? null
     );
-  }, [selectedQueueOption, selectedDate, upcomingAppointments]);
+  }, [selectedQueueOption, selectedDate, relevantAppointments]);
 
   // Fetch business schedule once — used to disable closed dates in the date strip.
   useEffect(() => {

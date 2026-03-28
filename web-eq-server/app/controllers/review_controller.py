@@ -5,7 +5,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from app.services.review_service import ReviewService
-from app.schemas.review import ReviewCreateInput, ReviewData, BusinessReviewSummary
+from app.schemas.review import ReviewCreateInput, ReviewData, BusinessReviewSummary, FeaturedReviewData
 
 
 class ReviewController:
@@ -50,6 +50,16 @@ class ReviewController:
             raise HTTPException(status_code=500, detail="Database error")
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to get review summary: {str(e)}")
+
+    def get_featured_reviews(self, limit: int = 6) -> List[FeaturedReviewData]:
+        try:
+            reviews = self.review_service.get_featured_reviews(limit)
+            return [FeaturedReviewData.from_review(r) for r in reviews]
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise HTTPException(status_code=500, detail="Database error")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to get featured reviews: {str(e)}")
 
     def get_my_review(
         self,

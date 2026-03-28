@@ -11,6 +11,8 @@ import {
 } from "../../services/category/category.service";
 import { BusinessService } from "../../services/business/business.service";
 import { AppointmentService, type TodayAppointmentResponse } from "../../services/appointment/appointment.service";
+import { ReviewService, type FeaturedReview } from "../../services/review/review.service";
+import StarRating from "../../components/star-rating";
 import { useAuthStore } from "../../store/auth.store";
 import AppointmentActions from "../../components/appointment-actions";
 import LoadingSpinner from "../../components/loading-spinner";
@@ -27,12 +29,6 @@ import {
 import "./landing.scss";
 
 const FEATURED_LIMIT = 6;
-
-const TESTIMONIAL_META = [
-  { id: 1, initial: "P", gradient: "linear-gradient(135deg, #b6e8d3, #1a7a56)" },
-  { id: 2, initial: "R", gradient: "linear-gradient(135deg, #c9a84c, #f5d78e)" },
-  { id: 3, initial: "A", gradient: "linear-gradient(135deg, #a78bfa, #c4b5fd)" },
-];
 
 const HIW_META = [
   { num: "01", icon: "🔍" },
@@ -62,17 +58,52 @@ export default function LandingPage() {
   const [featuredBusinesses, setFeaturedBusinesses] = useState<Business[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [featuredError, setFeaturedError] = useState<string | null>(null);
+  const [featuredReviews, setFeaturedReviews] = useState<FeaturedReview[]>([]);
 
   const GENERIC_FILTERS = useMemo(
-    () => [t("landing.filterOpenNow"), t("landing.filterTopRated"), t("landing.filterNearby")],
+    () => [t("landing.filterOpenNow")],
     [t]
   );
 
-  const TESTIMONIALS = useMemo(() => [
-    { ...TESTIMONIAL_META[0], text: t("landing.testimonial1Text"), name: t("landing.testimonial1Name"), location: t("landing.testimonial1Location") },
-    { ...TESTIMONIAL_META[1], text: t("landing.testimonial2Text"), name: t("landing.testimonial2Name"), location: t("landing.testimonial2Location") },
-    { ...TESTIMONIAL_META[2], text: t("landing.testimonial3Text"), name: t("landing.testimonial3Name"), location: t("landing.testimonial3Location") },
+  const LP_FEATURES = useMemo(() => [
+    {
+      icon: (
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+        </svg>
+      ),
+      title: t("landing.featReal"),
+      sub: t("landing.featRealSub"),
+    },
+    {
+      icon: (
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+      ),
+      title: t("landing.featBook"),
+      sub: t("landing.featBookSub"),
+    },
+    {
+      icon: (
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      ),
+      title: t("landing.featSlot"),
+      sub: t("landing.featSlotSub"),
+    },
+    {
+      icon: (
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+      ),
+      title: t("landing.featFree"),
+      sub: t("landing.featFreeSub"),
+    },
   ], [t]);
+
 
   const HIW_STEPS = useMemo(() => HIW_META.map((m, i) => ({
     ...m,
@@ -153,6 +184,12 @@ export default function LandingPage() {
 
   useEffect(() => { fetchFeaturedBusinesses(); }, [fetchFeaturedBusinesses]);
 
+  useEffect(() => {
+    new ReviewService().getFeaturedReviews(6)
+      .then(setFeaturedReviews)
+      .catch(() => {});
+  }, []);
+
   const filterOpenNow = t("landing.filterOpenNow");
 
   const filteredBusinesses =
@@ -231,19 +268,24 @@ export default function LandingPage() {
                   placeholder={t("landing.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && scrollToSection(categoriesRef)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      searchQuery.trim()
+                        ? navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+                        : scrollToSection(categoriesRef);
+                    }
+                  }}
                   aria-label={t("landing.searchAriaLabel")}
                 />
               </div>
-              <div className="lp-search-divider" aria-hidden="true" />
-              <div className="lp-location-field">
-                <svg className="lp-location-icon" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
-                  <circle cx="12" cy="10" r="3" />
-                </svg>
-                <input type="text" defaultValue={t("landing.locationDefault")} aria-label={t("landing.locationAriaLabel")} readOnly />
-              </div>
-              <button className="lp-search-btn" onClick={() => scrollToSection(categoriesRef)}>
+              <button
+                className="lp-search-btn"
+                onClick={() =>
+                  searchQuery.trim()
+                    ? navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+                    : scrollToSection(categoriesRef)
+                }
+              >
                 {t("landing.searchBtn")}
               </button>
             </div>
@@ -281,29 +323,17 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Stats row */}
-          <div className="lp-hero-stats">
-            <div className="lp-stat">
-              <span className="lp-stat-number">
-                {featuredBusinesses.length > 0 ? `${featuredBusinesses.length}+` : "200+"}
-              </span>
-              <div className="lp-stat-label">{t("landing.statBusinesses")}</div>
-            </div>
-            <div className="lp-stat-sep" aria-hidden="true" />
-            <div className="lp-stat">
-              <span className="lp-stat-number">12k+</span>
-              <div className="lp-stat-label">{t("landing.statBookings")}</div>
-            </div>
-            <div className="lp-stat-sep" aria-hidden="true" />
-            <div className="lp-stat">
-              <span className="lp-stat-number">4.8★</span>
-              <div className="lp-stat-label">{t("landing.statRating")}</div>
-            </div>
-            <div className="lp-stat-sep" aria-hidden="true" />
-            <div className="lp-stat">
-              <span className="lp-stat-number">&lt;3 min</span>
-              <div className="lp-stat-label">{t("landing.statBookingTime")}</div>
-            </div>
+          {/* Feature highlights */}
+          <div className="lp-hero-features">
+            {LP_FEATURES.map((f, i) => (
+              <div key={i} className="lp-feature">
+                <span className="lp-feature-icon">{f.icon}</span>
+                <div className="lp-feature-text">
+                  <span className="lp-feature-title">{f.title}</span>
+                  <span className="lp-feature-sub">{f.sub}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -627,39 +657,38 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="lp-section lp-section-cream">
-        <div className="lp-section-container">
-          <div className="lp-section-header reveal">
-            <span className="lp-section-eyebrow">{t("landing.reviewsEyebrow")}</span>
-            <h2 className="lp-section-title">{t("landing.reviewsTitle")}</h2>
-          </div>
+      {/* Reviews */}
+      {featuredReviews.length > 0 && (
+        <section className="lp-section lp-section-cream">
+          <div className="lp-section-container">
+            <div className="lp-section-header reveal">
+              <span className="lp-section-eyebrow">{t("landing.reviewsEyebrow")}</span>
+              <h2 className="lp-section-title">{t("landing.reviewsTitle")}</h2>
+            </div>
 
-          <div className="lp-testi-grid">
-            {TESTIMONIALS.map((testi, i) => (
-              <div
-                key={testi.id}
-                className={`lp-testi-card reveal${i === 1 ? " reveal-delay-1" : i === 2 ? " reveal-delay-2" : ""}`}
-              >
-                <p className="lp-testi-text">{testi.text}</p>
-                <div className="lp-testi-author">
-                  <div
-                    className="lp-testi-avatar"
-                    style={{ background: testi.gradient }}
-                    aria-hidden="true"
-                  >
-                    {testi.initial}
-                  </div>
-                  <div>
-                    <div className="lp-testi-name">{testi.name}</div>
-                    <div className="lp-testi-handle">{testi.location}</div>
+            <div className="lp-testi-grid">
+              {featuredReviews.map((review, i) => (
+                <div
+                  key={review.uuid}
+                  className={`lp-testi-card reveal${i === 1 ? " reveal-delay-1" : i === 2 ? " reveal-delay-2" : ""}`}
+                >
+                  <StarRating rating={review.rating} size="sm" />
+                  <p className="lp-testi-text">{review.comment}</p>
+                  <div className="lp-testi-author">
+                    <div className="lp-testi-avatar" aria-hidden="true">
+                      {(review.user_name ?? "?")[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="lp-testi-name">{review.user_name ?? t("landing.anonymousReviewer")}</div>
+                      <div className="lp-testi-handle">{review.business_name}</div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <section className="lp-cta">
         <div className="lp-cta-bg" aria-hidden="true" />

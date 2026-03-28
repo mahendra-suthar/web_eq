@@ -131,6 +131,34 @@ class CustomerController:
         if date_changed and target_date < today:
             raise HTTPException(status_code=400, detail="Cannot reschedule to a past date")
 
+        if date_changed or queue_changed:
+            appointment_type = (getattr(qu, "appointment_type", None) or "QUEUE").upper()
+            if appointment_type in ("FIXED", "APPROXIMATE"):
+                scheduled_start = getattr(qu, "scheduled_start", None)
+                if scheduled_start:
+                    conflict = self.queue_service.get_booking_at_time(
+                        user_id=user_id,
+                        queue_date=target_date,
+                        slot_start=scheduled_start,
+                        exclude_queue_user_id=qu.uuid,
+                    )
+                    if conflict:
+                        raise HTTPException(
+                            status_code=409,
+                            detail="You already have an appointment at this time on the selected date.",
+                        )
+            else:
+                existing = self.queue_service.get_existing_same_day_booking(
+                    user_id=user_id,
+                    queue_id=target_queue_id,
+                    queue_date=target_date,
+                )
+                if existing and existing.uuid != qu.uuid:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="You already have an appointment in this queue on the selected date.",
+                    )
+
         if queue_changed:
             new_queue = self.queue_service.get_queue_by_id_and_business(
                 data.queue_id, business_id  # type: ignore[arg-type]

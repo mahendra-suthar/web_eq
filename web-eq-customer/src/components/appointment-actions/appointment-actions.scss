@@ -70,24 +70,7 @@
   border: 1px solid rgba($jade, 0.25);
 }
 
-// ─── Modal overlay ───
-.appt-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1100;
-  padding: 20px;
-  animation: appt-modal-fade 0.2s ease-out;
-}
-
-@keyframes appt-modal-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
+// ─── Modal content ───
 .appt-modal {
   background: #fff;
   border-radius: 16px;
