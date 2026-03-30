@@ -3,11 +3,11 @@ import { useTranslation } from "react-i18next";
 import { Outlet } from "react-router-dom";
 import "./layout.scss";
 
-interface LayoutContextType {
+export interface LayoutContextType {
   t: (key: string) => string;
 }
 
-const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
+export const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
 
 export const useLayoutContext = () => {
   const context = useContext(LayoutContext);
