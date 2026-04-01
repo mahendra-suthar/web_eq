@@ -245,6 +245,14 @@ const Dashboard = () => {
 
   const isOpen = isBusinessOpenToday(profile);
 
+  // Queue assigned to the owner as a self-employee
+  const ownerQueueId = profile?.employee?.queue_id ?? null;
+  const ownerLiveQueue = ownerQueueId ? businessData?.liveQueues[ownerQueueId] ?? null : null;
+  const ownerQueueName =
+    ownerLiveQueue?.queue_name ||
+    businessData?.queues.find((q) => q.uuid === ownerQueueId)?.name ||
+    'My Queue';
+
   const RefreshBar = () =>
     lastUpdated ? (
       <div className="dashboard-refresh-bar">
@@ -433,6 +441,49 @@ const Dashboard = () => {
             <div className="stat-label">Completed Today</div>
           </div>
         </div>
+
+        {/* My Queue — visible only when the owner is also a self-employee */}
+        {ownerQueueId && (
+          <div className="content-card my-queue-card">
+            <div className="card-header">
+              <div className="my-queue-title-group">
+                <span className="my-queue-badge">My Queue</span>
+                <h2 className="card-title">{ownerQueueName}</h2>
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => navigate(RouterConstant.ROUTERS_PATH.LIVE_QUEUE)}
+              >
+                Go Live
+              </button>
+            </div>
+            {ownerLiveQueue ? (
+              <div className="my-queue-stats">
+                <div className="mqs mqs-waiting">
+                  <span className="mqs-value">{ownerLiveQueue.waiting_count}</span>
+                  <span className="mqs-label">Waiting</span>
+                </div>
+                <div className="mqs mqs-inprogress">
+                  <span className="mqs-value">{ownerLiveQueue.in_progress_count}</span>
+                  <span className="mqs-label">In Progress</span>
+                </div>
+                <div className="mqs mqs-done">
+                  <span className="mqs-value">{ownerLiveQueue.completed_count}</span>
+                  <span className="mqs-label">Completed</span>
+                </div>
+                <div className="mqs mqs-total">
+                  <span className="mqs-value">
+                    {ownerLiveQueue.waiting_count + ownerLiveQueue.in_progress_count + ownerLiveQueue.completed_count}
+                  </span>
+                  <span className="mqs-label">Total Today</span>
+                </div>
+              </div>
+            ) : (
+              <div className="queue-card-no-live">Live data unavailable</div>
+            )}
+          </div>
+        )}
 
         <div className="content-card">
           <div className="card-header">

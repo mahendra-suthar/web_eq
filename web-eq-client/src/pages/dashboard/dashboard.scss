@@ -370,6 +370,75 @@
 
 // ─── Employee queue header ────────────────────────────────────────────────────
 
+// ─── My Queue (self-employed owner) ──────────────────────────────────────────
+
+.my-queue-card {
+  border-left: 4px solid #00695C;
+}
+
+.my-queue-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.my-queue-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  background: #00695C;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.my-queue-stats {
+  display: flex;
+  gap: 0;
+  margin-top: 20px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.mqs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 12px;
+  border-right: 1px solid #e2e8f0;
+  background: #f8fafc;
+
+  &:last-child {
+    border-right: none;
+  }
+}
+
+.mqs-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.mqs-label {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+  text-align: center;
+}
+
+.mqs-waiting   .mqs-value { color: #f59e0b; }
+.mqs-inprogress .mqs-value { color: #3b82f6; }
+.mqs-done      .mqs-value { color: #10b981; }
+.mqs-total     .mqs-value { color: #00695C; }
+
+// ─── Employee queue header ────────────────────────────────────────────────────
+
 .employee-queue-header {
   display: flex;
   align-items: center;

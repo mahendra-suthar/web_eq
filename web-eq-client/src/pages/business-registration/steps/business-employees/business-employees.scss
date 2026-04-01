@@ -64,6 +64,119 @@
   flex-direction: column;
 }
 
+// ─── Self-employee toggle card ────────────────────────────────────────────────
+
+.self-employee-toggle-card {
+  margin-bottom: 28px;
+  padding: 20px 24px;
+  background: rgba($primary, 0.04);
+  border: 1.5px solid rgba($primary, 0.2);
+  border-radius: 12px;
+}
+
+.self-employee-toggle-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.self-employee-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.self-employee-toggle-title {
+  font-family: "Noto Sans Hebrew", serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: $primary-dark;
+}
+
+.self-employee-toggle-desc {
+  font-family: "Noto Sans Hebrew", serif;
+  font-size: 13px;
+  color: #637381;
+}
+
+// Toggle switch
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+  cursor: pointer;
+
+  input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+
+    &:checked + .toggle-slider {
+      background-color: $primary;
+    }
+
+    &:checked + .toggle-slider::before {
+      transform: translateX(22px);
+    }
+
+    &:focus + .toggle-slider {
+      box-shadow: 0 0 0 3px rgba($primary, 0.2);
+    }
+  }
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background-color: #c4cdd5;
+  border-radius: 26px;
+  transition: background-color 0.2s ease;
+
+  &::before {
+    content: "";
+    position: absolute;
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    top: 3px;
+    background-color: white;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+}
+
+// ─── Owner employee card variant ──────────────────────────────────────────────
+
+.employee-card--owner {
+  border-color: rgba($primary, 0.3);
+  background: rgba($primary, 0.03);
+}
+
+.owner-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: $primary;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+
+// Read-only fields in owner card
+.employee-card--owner input[readonly] {
+  opacity: 0.65;
+  cursor: default;
+  background: rgba(145, 158, 171, 0.06);
+}
+
 .business-employees-form-fields {
   display: flex;
   flex-direction: column;

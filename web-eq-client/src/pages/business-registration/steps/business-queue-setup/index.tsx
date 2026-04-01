@@ -10,6 +10,7 @@ import "./business-queue-setup.scss";
 interface Employee {
   id: string;
   full_name: string;
+  is_owner?: boolean;
 }
 
 interface QueueBlockState {
@@ -363,7 +364,7 @@ export default function BusinessQueueSetup({
                       <option value="">{t("selectEmployee")}</option>
                       {employees.map((emp) => (
                         <option key={emp.id} value={emp.id}>
-                          {emp.full_name}
+                          {emp.is_owner ? `${emp.full_name} (You — Owner)` : emp.full_name}
                         </option>
                       ))}
                     </select>

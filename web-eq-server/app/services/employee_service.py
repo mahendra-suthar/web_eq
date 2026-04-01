@@ -26,6 +26,8 @@ class EmployeeService:
                 phone_number=emp.phone_number,
                 country_code=emp.country_code,
                 profile_picture=emp.profile_picture,
+                user_id=emp.user_id if emp.user_id else None,
+                is_verified=bool(emp.user_id),
             )
             for emp in data.employees
         ]
@@ -34,18 +36,21 @@ class EmployeeService:
             self.db.add_all(employees)
             self.db.flush()
 
-            # Generate unique invitation codes (stored on employee, 48h expiry)
-            codes_list = []
-            while len(codes_list) < len(employees):
-                c = generate_invitation_code(length=8, expires_in_hours=48).upper()
-                if c not in codes_list:
-                    codes_list.append(c)
             expires_at = now_utc() + timedelta(hours=48)
-
-            for emp, code in zip(employees, codes_list):
+            invitation_codes: List[str] = []
+            used_codes: set = set()
+            for emp in employees:
+                if emp.user_id:
+                    invitation_codes.append("")
+                    continue
+                while True:
+                    code = generate_invitation_code(length=8, expires_in_hours=48).upper()
+                    if code not in used_codes:
+                        used_codes.add(code)
+                        break
                 emp.invitation_code = code
                 emp.invitation_code_expires_at = expires_at
-            invitation_codes = codes_list
+                invitation_codes.append(code)
 
             schedule_svc = ScheduleService(self.db)
             employee_ids = [emp.uuid for emp in employees]

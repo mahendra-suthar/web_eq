@@ -189,6 +189,31 @@ export interface LiveQueueData {
     employee_on_leave?: boolean;  // true when queue's employee has no schedule / closed exception for this date
 }
 
+export interface WalkInBookingPayload {
+    business_id: string;
+    queue_id: string;
+    queue_date: string;          // YYYY-MM-DD
+    service_ids: string[];
+    recipient_phone: string;
+    recipient_country_code: string;
+    recipient_name?: string;
+    notes?: string;
+    appointment_type?: string;   // defaults to "QUEUE"
+}
+
+export interface WalkInBookingResponse {
+    uuid: string;
+    queue_id: string;
+    queue_name: string;
+    business_id: string;
+    business_name: string;
+    token_number?: string | null;
+    position?: number | null;
+    estimated_wait_minutes?: number | null;
+    appointment_time?: string | null;
+    queue_date: string;
+}
+
 export class QueueService extends HttpClient {
     constructor() {
         super();
@@ -389,6 +414,31 @@ export class QueueService extends HttpClient {
         } catch (error: any) {
             console.error("Failed to stop queue:", error);
             throw error;
+        }
+    }
+
+    async createWalkInBooking(payload: WalkInBookingPayload): Promise<WalkInBookingResponse> {
+        try {
+            return await this.post<WalkInBookingResponse>("/queue/book", {
+                business_id: payload.business_id,
+                queue_id: payload.queue_id,
+                queue_date: payload.queue_date,
+                service_ids: payload.service_ids,
+                recipient_phone: payload.recipient_phone,
+                recipient_country_code: payload.recipient_country_code,
+                recipient_name: payload.recipient_name ?? null,
+                notes: payload.notes ?? null,
+                appointment_type: payload.appointment_type ?? "QUEUE",
+            });
+        } catch (error: any) {
+            console.error("Failed to create walk-in booking:", error);
+            const message =
+                error?.response?.data?.detail?.message ||
+                error?.response?.data?.detail ||
+                "Failed to add customer";
+            const customError: any = new Error(message);
+            customError.errorCode = error?.response?.data?.detail?.error_code;
+            throw customError;
         }
     }
 }

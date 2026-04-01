@@ -9,6 +9,7 @@ class EmployeeCreate(BaseModel):
     country_code: Optional[str] = None
     phone_number: Optional[str] = None
     profile_picture: Optional[str] = None
+    user_id: Optional[UUID] = None
 
 
 class EmployeeUpdate(BaseModel):

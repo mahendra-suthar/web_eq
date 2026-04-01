@@ -4,6 +4,7 @@ import { EmployeeData } from "../../utils/businessRegistrationStore";
 interface CreateEmployeesPayload {
     business_id: string;
     employees: {
+        user_id?: string | null;
         full_name: string;
         email?: string | null;
         country_code?: string | null;
@@ -41,6 +42,7 @@ export class EmployeeService extends HttpClient {
             const payload: CreateEmployeesPayload = {
                 business_id: businessId,
                 employees: employees.map(emp => ({
+                    ...(emp.user_id && emp.user_id.trim() ? { user_id: emp.user_id } : {}),
                     full_name: emp.full_name,
                     email: emp.email || null,
                     country_code: emp.country_code || null,
