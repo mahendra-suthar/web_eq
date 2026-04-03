@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import { getApiUrl } from "../configs/config";
+import { getWsBaseUrl } from "../configs/config";
 import type { LiveQueueData } from "../services/queue/queue.service";
 
 type EventHandler = (data: LiveQueueData) => void;
@@ -69,11 +69,7 @@ export function useLiveQueueWS(
 
     const connect = useCallback(() => {
         if (!isMountedRef.current || !queueId || !dateStr) return;
-
-        // Derive WS URL from API_URL (http→ws, https→wss)
-        const apiUrl = getApiUrl().replace(/^http/, "ws");
-        const wsUrl = `${apiUrl}/ws/live/${encodeURIComponent(queueId)}/${dateStr}`;
-
+        const wsUrl = `${getWsBaseUrl()}/ws/live/${encodeURIComponent(queueId)}/${dateStr}`;
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
@@ -81,7 +77,6 @@ export function useLiveQueueWS(
             if (!isMountedRef.current) { ws.close(); return; }
             reconnectAttemptRef.current = 0;
 
-            // Keepalive ping
             clearPingTimer();
             pingTimerRef.current = setInterval(() => {
                 if (ws.readyState === WebSocket.OPEN) {

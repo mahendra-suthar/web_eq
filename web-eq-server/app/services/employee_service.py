@@ -158,6 +158,20 @@ class EmployeeService:
         except SQLAlchemyError:
             raise
 
+    def get_verified_employee_by_queue(self, queue_id: UUID, business_id: UUID) -> Optional[Employee]:
+        try:
+            return (
+                self.db.query(Employee)
+                .filter(
+                    Employee.queue_id == queue_id,
+                    Employee.business_id == business_id,
+                    Employee.user_id.isnot(None),
+                )
+                .first()
+            )
+        except SQLAlchemyError:
+            raise
+
     def get_employee_by_phone(self, country_code: str, phone_number: str) -> Optional[Employee]:
         try:
             return self.db.query(Employee).filter(

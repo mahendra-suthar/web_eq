@@ -2,15 +2,29 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/auth.store";
+import { AuthService } from "../../services/auth/auth.service";
+import { useNotificationStore } from "../../store/notification.store";
 import ProfileDropdown from "../../components/profile-dropdown";
+import NotificationBell from "../../components/notification/NotificationBell";
+import { useNotificationWS } from "../../hooks/useNotificationWS";
+import "../../components/notification/notification.scss";
 import "./layout.scss";
 
 export default function CustomerLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
-  const { userInfo, isAuthenticated, resetUser } = useAuthStore();
   const [scrolled, setScrolled] = useState(false);
+  const { userInfo, isAuthenticated, resetUser, token, profileType } = useAuthStore();
+
+  useEffect(() => {
+    if (isAuthenticated() && profileType && profileType !== "CUSTOMER") {
+      resetUser();
+      navigate("/send-otp", { replace: true });
+    }
+  }, [isAuthenticated, profileType, resetUser, navigate]);
+
+  useNotificationWS(userInfo?.uuid ?? null, token);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -18,8 +32,10 @@ export default function CustomerLayout() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await new AuthService().logout();
     resetUser();
+    useNotificationStore.getState().reset();
     navigate("/");
   };
 
@@ -101,10 +117,13 @@ export default function CustomerLayout() {
             </ul>
 
             {isAuthenticated() ? (
-              <ProfileDropdown
-                userName={userInfo?.full_name ?? undefined}
-                onLogout={handleLogout}
-              />
+              <>
+                <NotificationBell />
+                <ProfileDropdown
+                  userName={userInfo?.full_name ?? undefined}
+                  onLogout={handleLogout}
+                />
+              </>
             ) : (
               <>
                 <button

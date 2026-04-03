@@ -4,17 +4,24 @@ import { useTranslation } from 'react-i18next';
 import { RouterConstant } from '../../routers/index';
 import { useUserStore } from '../../utils/userStore';
 import { ProfileService } from '../../services/profile/profile.service';
+import { OTPService } from '../../services/otp/otp.service';
 import { ProfileType } from '../../utils/constants';
+import { useNotificationWS } from '../../hooks/useNotificationWS';
+import { useNotificationStore } from '../../utils/notificationStore';
+import NotificationBell from './NotificationBell';
+import './notification.scss';
 
 const Topbar = () => {
     const { t } = useTranslation();
     const location = useLocation();
     const navigate = useNavigate();
     const { ROUTERS_PATH } = RouterConstant;
-    const { resetUser, profile, setProfile } = useUserStore();
+    const { resetUser, profile, setProfile, token } = useUserStore();
     const profileService = useMemo(() => new ProfileService(), []);
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const userId = profile?.user?.uuid ?? null;
+    useNotificationWS(userId, token);
 
     const pageTitle = useMemo(() => {
         const path = location.pathname;
@@ -88,8 +95,10 @@ const Topbar = () => {
         setShowDropdown(false);
     };
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        await new OTPService().logout();
         resetUser();
+        useNotificationStore.getState().reset();
         localStorage.removeItem('web-eq-user');
         localStorage.removeItem('web-eq-business-registration');
         navigate(ROUTERS_PATH.ROOT_PATH);
@@ -111,10 +120,7 @@ const Topbar = () => {
             </div>
 
             <div className="top-bar-actions">
-                <button className="notification-btn">
-                    🔔
-                    <span className="notification-badge">5</span>
-                </button>
+                <NotificationBell />
                 <div className="settings-dropdown-container" ref={dropdownRef}>
                     <button 
                         className="notification-btn" 

@@ -16,8 +16,9 @@ UNPROTECTED_ROUTE_PATHS = [
     "/api/docs",
     "/api/openapi.json",
     "/api/redoc",
-    "/api/ws/booking/",  # WebSocket – auth handled in handler
-    "/api/ws/live/",     # WebSocket – auth handled in handler
+    "/api/ws/booking/",         # WebSocket – auth handled in handler
+    "/api/ws/live/",            # WebSocket – auth handled in handler
+    "/api/ws/notifications/",   # WebSocket – auth handled in handler
 ]
 
 # Mobile User-Agent patterns for client type detection
@@ -87,3 +88,10 @@ BOOKING_MODE_HYBRID = "HYBRID"
 APPOINTMENT_TYPE_QUEUE = "QUEUE"
 APPOINTMENT_TYPE_FIXED = "FIXED"
 APPOINTMENT_TYPE_APPROXIMATE = "APPROXIMATE"
+
+# Notification event type constants
+NOTIF_BOOKING_CONFIRMED = "BOOKING_CONFIRMED"
+NOTIF_NEW_CUSTOMER      = "NEW_CUSTOMER"
+NOTIF_IN_SERVICE        = "IN_SERVICE"
+NOTIF_CALLED_NEXT       = "CALLED_NEXT"
+NOTIF_SERVICE_COMPLETED = "SERVICE_COMPLETED"

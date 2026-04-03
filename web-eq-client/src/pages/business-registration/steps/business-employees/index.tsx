@@ -5,6 +5,7 @@ import { EmployeeData } from "../../../../utils/businessRegistrationStore";
 import { useBusinessRegistrationStore } from "../../../../utils/businessRegistrationStore";
 import { useUserStore } from "../../../../utils/userStore";
 import { EmployeeService } from "../../../../services/employee/employee.service";
+import { emailRegex, phoneRegex } from "../../../../utils/utils";
 import { toast } from "react-toastify";
 import "./business-employees.scss";
 
@@ -133,14 +134,14 @@ export default function BusinessEmployees({
         isValid = false;
       }
 
-      if (emp.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emp.email)) {
+      if (emp.email && !emailRegex.test(emp.email)) {
         errs.email = t("emailInvalid");
         isValid = false;
       }
 
       if (!emp.is_owner && emp.phone_number?.trim()) {
         const digits = emp.phone_number.replace(/\D/g, "");
-        if (digits.length !== 10 || !/^[6789]/.test(digits)) {
+        if (!phoneRegex.test(digits)) {
           errs.phone_number = t("invalidPhoneFormat") || "Invalid phone number";
           isValid = false;
         }

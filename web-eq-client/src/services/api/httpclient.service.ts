@@ -6,6 +6,7 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 import { getApiUrl } from '../../configs/config';
+import { useUserStore } from '../../utils/userStore';
 
 
 class HttpClient {
@@ -26,6 +27,10 @@ class HttpClient {
           config.headers['Content-Type'] = 'application/json';
         }
         config.withCredentials = true;
+        const token = useUserStore.getState().token;
+        if (token) {
+          config.headers['Authorization'] = `Bearer ${token}`;
+        }
         return config;
       },
       this.handleRequestError

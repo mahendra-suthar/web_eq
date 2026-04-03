@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { useLayoutContext } from "../../layouts/general-layout";
-import { getConfig } from "../../configs/config";
+import { getMapboxToken } from "../../configs/config";
 import AddressMap from "../address-map";
 import "./address-search.scss";
 
@@ -58,17 +58,6 @@ export default function AddressSearch({ onAddressSelect, initialValue = "" }: Ad
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const debounceTimerRef = useRef<number | null>(null);
-
-  const getMapboxToken = (): string => {
-    try {
-      const configData = getConfig();
-      const token = (configData as any).MAPBOX_ACCESS_TOKEN || import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || "";
-      return token === "YOUR_MAPBOX_ACCESS_TOKEN_HERE" ? "" : token;
-    } catch (error) {
-      console.error("Error loading Mapbox token:", error);
-      return "";
-    }
-  };
 
   const searchAddresses = useCallback(async (query: string) => {
     const token = getMapboxToken();
@@ -412,7 +401,7 @@ export default function AddressSearch({ onAddressSelect, initialValue = "" }: Ad
       </p>
       {!getMapboxToken() ? (
         <p className="address-search-error">
-          Mapbox access token not configured. Please add MAPBOX_ACCESS_TOKEN to config.json
+          Mapbox access token not configured. Please set VITE_MAPBOX_TOKEN in your .env.local file.
         </p>
       ) : error ? (
         <p className="address-search-error">

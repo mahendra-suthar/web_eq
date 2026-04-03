@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/auth.store";
+import { useNotificationStore } from "../../store/notification.store";
 import { AuthService } from "../../services/auth/auth.service";
 import type { CustomerProfileResponse, CustomerProfileUpdateInput } from "../../services/auth/auth.service";
 import { AppointmentService } from "../../services/appointment/appointment.service";
@@ -693,8 +694,10 @@ export default function ProfilePage() {
     [setSearchParams]
   );
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await new AuthService().logout();
     resetUser();
+    useNotificationStore.getState().reset();
     navigate("/");
   };
 

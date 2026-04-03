@@ -144,7 +144,7 @@ class AuthController:
                 self.role_controller.assign_role_to_user(user.uuid, "CUSTOMER")  # type: ignore[arg-type]
             client_type = detect_client_type(request, data.client_type)
             return await self.auth_service.generate_auth_response(
-                user, response, client_type, user_type="CUSTOMER"
+                user, response, client_type, user_type="CUSTOMER", profile_type="CUSTOMER"
             )
         except HTTPException:
             raise

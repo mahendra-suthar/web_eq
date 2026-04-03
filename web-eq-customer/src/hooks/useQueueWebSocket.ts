@@ -3,7 +3,7 @@
  */
 import { useEffect, useRef, useCallback } from 'react';
 import { useBookingStore, type QueueUpdateMessage } from '../store/booking.store';
-import { getApiUrl } from '../configs/config';
+import { getWsBaseUrl } from '../configs/config';
 import { MAX_RECONNECT_ATTEMPTS, INITIAL_RECONNECT_DELAY_MS, MAX_RECONNECT_DELAY_MS } from '../utils/constants';
 
 interface UseQueueWebSocketOptions {
@@ -31,15 +31,7 @@ export function useQueueWebSocket({
   
   const connect = useCallback(() => {
     if (!enabled || !businessId || !date) return;
-    
-    const apiUrl = getApiUrl();
-    const wsProtocol = apiUrl.startsWith('https') ? 'wss' : 'ws';
-    const wsHost = apiUrl.replace(/^https?:\/\//, '').replace(/\/api$/, '');
-    let wsUrl = `${wsProtocol}://${wsHost}/api/ws/booking/${businessId}/${date}`;
-    
-    if (token) {
-      wsUrl += `?token=${token}`;
-    }
+    const wsUrl = `${getWsBaseUrl()}/ws/booking/${businessId}/${date}`;
     
     try {
       const ws = new WebSocket(wsUrl);

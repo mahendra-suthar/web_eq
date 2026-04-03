@@ -6,6 +6,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 import { getApiUrl } from '../../configs/config';
+import { useAuthStore } from '../../store/auth.store';
 
 
 class HttpClient {
@@ -25,11 +26,16 @@ class HttpClient {
         if (!(config.data instanceof FormData)) {
           config.headers['Content-Type'] = 'application/json';
         }
-        config.withCredentials = true; // Cookies are used for authentication
+        config.withCredentials = true;
+        // app's session even when another app's cookie exists on the same domain.
+        const token = useAuthStore.getState().token;
+        if (token) {
+          config.headers['Authorization'] = `Bearer ${token}`;
+        }
         return config;
       },
       this.handleRequestError
-    ); 
+    );
 
     this.instance.interceptors.request.use(
       this.handleRequestConfig,

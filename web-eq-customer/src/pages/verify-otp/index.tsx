@@ -16,13 +16,11 @@ export default function VerifyOTPPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { setUserInfo } = useAuthStore();
-
+  const { setUserInfo, setToken, setProfileType } = useAuthStore();
   const phone = (location.state?.phone as string) || "";
   const phoneNumber = (location.state?.phoneNumber as string) || "";
   const countryCode = (location.state?.countryCode as string) || DEFAULT_COUNTRY_CODE;
 
-  // ── Booking return state ─────────────────────────────────────────────────
   const {
     returnTo,
     selectedServices,
@@ -135,12 +133,11 @@ export default function VerifyOTPPage() {
             : null,
         });
         setUserInfo(toUserData(response.user));
+        setProfileType(response.profile_type ?? "CUSTOMER");
+        if (response.token?.access_token) {
+          setToken(response.token.access_token);
+        }
         setSuccess(true);
-
-        // Enrich with profile in the background (cookie may not be set on same tick)
-        authService.getCustomerProfile()
-          .then((profile) => { if (profile?.user) setUserInfo(toUserData(profile.user)); })
-          .catch(() => {});
 
         setTimeout(() => {
           if (returnTo) {
@@ -186,7 +183,6 @@ export default function VerifyOTPPage() {
     }
   };
 
-  // ── Resend ───────────────────────────────────────────────────────────────
   const handleResend = async () => {
     if (!phoneNumber) return;
     setResendLoading(true);
@@ -204,7 +200,6 @@ export default function VerifyOTPPage() {
     }
   };
 
-  // ── Shared band elements ─────────────────────────────────────────────────
   const BandDeco = () => (
     <>
       <div className="auth-band-deco auth-band-deco-1" aria-hidden="true" />
@@ -213,7 +208,6 @@ export default function VerifyOTPPage() {
     </>
   );
 
-  // ── STEP 3: Success ───────────────────────────────────────────────────────
   if (success) {
     return (
       <div className="auth-wrap">
@@ -247,7 +241,7 @@ export default function VerifyOTPPage() {
     );
   }
 
-  // ── STEP 2: OTP entry ─────────────────────────────────────────────────────
+  // STEP 2: OTP entry
   return (
     <div className="auth-wrap">
       <div className="auth-card">

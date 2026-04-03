@@ -1,10 +1,10 @@
+import logging
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
 from uuid import UUID
 from typing import List, Optional, Any, Dict, Tuple
 from datetime import date, datetime, time, timedelta, timezone
-
 import pytz
 
 from app.core.constants import TIMEZONE
@@ -43,6 +43,14 @@ from app.core.utils import (
 from app.services.booking_calculation_service import BookingCalculationService
 from app.services.slot_generation_service import SlotGenerationService
 from app.services.user_service import UserService
+from app.services.employee_service import EmployeeService
+from app.services.notification_triggers import (
+    notify_booking_confirmed,
+    notify_new_customer,
+    notify_in_service,
+    notify_called_next,
+    notify_service_completed,
+)
 from app.core.constants import (
     BOOKING_MODE_FIXED,
     BOOKING_MODE_APPROXIMATE,
@@ -53,11 +61,15 @@ from app.core.constants import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 class QueueController:
     def __init__(self, db: Session):
         self.db = db
         self.queue_service = QueueService(db)
         self.business_service = BusinessService(db)
+        self.employee_service = EmployeeService(db)
 
     async def create_queue(self, data: QueueCreate) -> QueueData:
         try:
@@ -572,11 +584,40 @@ class QueueController:
                 BookingServiceData(**d)
                 for d in self.queue_service.get_booking_services_data(queue_services)
             ]
-            return BookingData.from_booking_created(
+            result = BookingData.from_booking_created(
                 queue_user, str(queue_id), queue.name,
                 str(data.business_id), business.name, data.queue_date,
                 metrics, services_data, token_number,
             )
+
+            # Fire-and-forget notifications — failures must never block booking
+            try:
+                assigned_emp = self.employee_service.get_verified_employee_by_queue(
+                    queue_id=queue_id, business_id=data.business_id
+                )
+                employee_user_id = assigned_emp.user_id if assigned_emp else None
+
+                await notify_booking_confirmed(
+                    db=self.db,
+                    user_id=booking_user_id,
+                    token_number=str(token_number),
+                    wait_minutes=int(metrics.get("wait_minutes") or 0),
+                    queue_name=queue.name or "",
+                    business_name=business.name or "",
+                )
+                await notify_new_customer(
+                    db=self.db,
+                    business_owner_id=business.owner_id,
+                    employee_user_id=employee_user_id,
+                    token_number=str(token_number),
+                    queue_name=queue.name or "",
+                )
+            except Exception:
+                logger.warning(
+                    "Notification failed for booking token=%s", token_number, exc_info=True
+                )
+
+            return result
 
         except HTTPException:
             self.db.rollback()
@@ -770,6 +811,35 @@ class QueueController:
                     overrun,
                 )
             self.db.commit()
+
+            # Fire-and-forget notifications — must not block queue advance
+            try:
+                if in_progress:
+                    await notify_service_completed(
+                        db=self.db,
+                        user_id=in_progress.user_id,
+                        token_number=str(in_progress.token_number or ""),
+                        queue_name=queue.name or "",
+                    )
+                if waiting:
+                    await notify_in_service(
+                        db=self.db,
+                        user_id=first_waiting.user_id,
+                        token_number=str(first_waiting.token_number or ""),
+                        queue_name=queue.name or "",
+                    )
+                    if len(waiting) > 1:
+                        called_next = waiting[1]
+                        await notify_called_next(
+                            db=self.db,
+                            user_id=called_next.user_id,
+                            token_number=str(called_next.token_number or ""),
+                            queue_name=queue.name or "",
+                        )
+            except Exception:
+                logger.warning(
+                    "Notification failed for advance_queue queue_id=%s", queue_id, exc_info=True
+                )
 
             rows, svc_by_user = self.queue_service.get_live_queue_users_raw(queue_id, today)
             users_raw = build_live_queue_users_raw(rows, svc_by_user)
