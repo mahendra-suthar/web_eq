@@ -6,8 +6,8 @@ UNPROTECTED_ROUTE_PATHS = [
     "/api/auth/verify-otp",
     "/api/auth/verify-otp-customer",
     "/api/auth/business-verify-otp",
-    "/api/category/get_categories",
-    "/api/category/get_categories_with_services",
+    "/api/category/",  # public category reads (get_categories, tree)
+    "/api/service/get_services/",  # global services by category (business list filters, anonymous)
     "/api/business/get_businesses",
     "/api/business/get_business_details/",  # Allow all business detail and service endpoints
     "/api/business/get_business_services/",  # Allow all business detail and service endpoints

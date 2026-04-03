@@ -16,6 +16,7 @@ from app.schemas.customer import (
     AppointmentUpdateInput,
     CustomerAppointmentListResponse,
     CustomerAppointmentDetailResponse,
+    CustomerUpcomingAppointmentsResponse,
 )
 from app.schemas.queue import CustomerTodayAppointmentsResponse
 from app.middleware.permissions import get_current_user
@@ -81,6 +82,19 @@ async def get_appointments(
 ):
     controller = CustomerController(db)
     return controller.get_appointments(current_user.uuid, limit=limit, offset=offset)
+
+
+@customer_router.get(
+    "/appointments/upcoming",
+    response_model=CustomerUpcomingAppointmentsResponse,
+    summary="List upcoming active appointments (for booking conflict detection)",
+)
+async def get_upcoming_appointments(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    controller = CustomerController(db)
+    return controller.get_upcoming_appointments(current_user.uuid)
 
 
 @customer_router.get(

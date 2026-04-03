@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppointmentService } from "../../services/appointment/appointment.service";
+import { ReviewService } from "../../services/review/review.service";
+import ReviewModal from "../review-modal";
+import Modal from "../modal";
 import Button from "../button";
 import "./appointment-actions.scss";
 
@@ -18,6 +21,7 @@ export interface AppointmentActionItem {
 
 const EDITABLE_STATUSES = [1];       // REGISTERED only
 const CANCELLABLE_STATUSES = [1, 2]; // REGISTERED + IN_PROGRESS
+const COMPLETED_STATUS = 3;
 
 interface AppointmentActionsProps {
   appointment: AppointmentActionItem;
@@ -30,11 +34,21 @@ export default function AppointmentActions({
 }: AppointmentActionsProps) {
   const navigate = useNavigate();
   const [showCancel, setShowCancel] = useState(false);
+  const [showReview, setShowReview] = useState(false);
+  const [hasReviewed, setHasReviewed] = useState(false);
 
   const canEdit = EDITABLE_STATUSES.includes(appointment.status);
   const canCancel = CANCELLABLE_STATUSES.includes(appointment.status);
+  const canReview = appointment.status === COMPLETED_STATUS;
 
-  if (!canEdit && !canCancel) return null;
+  useEffect(() => {
+    if (!canReview) return;
+    new ReviewService().getMyReview({ queueUserId: appointment.queue_user_id })
+      .then((r) => { if (r) setHasReviewed(true); })
+      .catch(() => {});
+  }, [appointment.queue_user_id, canReview]);
+
+  if (!canEdit && !canCancel && !canReview) return null;
 
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -72,6 +86,27 @@ export default function AppointmentActions({
             Cancel
           </button>
         )}
+        {canReview && !hasReviewed && (
+          <button
+            type="button"
+            className="appt-actions__btn appt-actions__btn--review"
+            onClick={(e) => { e.stopPropagation(); setShowReview(true); }}
+            aria-label={`Write a review for ${appointment.business_name}`}
+          >
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+            Write a Review
+          </button>
+        )}
+        {canReview && hasReviewed && (
+          <span className="appt-actions__reviewed">
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            Reviewed
+          </span>
+        )}
       </div>
 
       {showCancel && (
@@ -81,11 +116,18 @@ export default function AppointmentActions({
           onCancelled={onUpdated}
         />
       )}
+
+      <ReviewModal
+        open={showReview}
+        onClose={() => setShowReview(false)}
+        businessId={appointment.business_id}
+        businessName={appointment.business_name}
+        queueUserId={appointment.queue_user_id}
+        onSuccess={() => { setHasReviewed(true); setShowReview(false); }}
+      />
     </>
   );
 }
-
-// ─── Cancel confirmation modal ────────────────────────────────────────────────
 
 function CancelModal({
   appointment,
@@ -115,39 +157,31 @@ function CancelModal({
   };
 
   return (
-    <div
-      className="appt-modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="appt-cancel-title"
-      onClick={onClose}
-    >
-      <div className="appt-modal" onClick={(e) => e.stopPropagation()}>
-        <h3 id="appt-cancel-title" className="appt-modal__title">
-          Cancel appointment?
-        </h3>
-        <p className="appt-modal__desc">
-          You will be removed from{" "}
-          <strong>{appointment.queue_name}</strong> at{" "}
-          <strong>{appointment.business_name}</strong>. This cannot be undone.
-        </p>
-        {error && <p className="appt-modal__error" role="alert">{error}</p>}
-        <div className="appt-modal__actions">
-          <Button
-            text="Go back"
-            color="outline-blue"
-            onClick={onClose}
-            disabled={loading}
-          />
-          <Button
-            text={loading ? "Cancelling…" : "Yes, cancel"}
-            color="red"
-            onClick={handleConfirm}
-            disabled={loading}
-            loading={loading}
-          />
-        </div>
+    <Modal open onClose={onClose} titleId="appt-cancel-title" contentClassName="appt-modal">
+      <h3 id="appt-cancel-title" className="appt-modal__title">
+        Cancel appointment?
+      </h3>
+      <p className="appt-modal__desc">
+        You will be removed from{" "}
+        <strong>{appointment.queue_name}</strong> at{" "}
+        <strong>{appointment.business_name}</strong>. This cannot be undone.
+      </p>
+      {error && <p className="appt-modal__error" role="alert">{error}</p>}
+      <div className="appt-modal__actions">
+        <Button
+          text="Go back"
+          color="outline-blue"
+          onClick={onClose}
+          disabled={loading}
+        />
+        <Button
+          text={loading ? "Cancelling…" : "Yes, cancel"}
+          color="red"
+          onClick={handleConfirm}
+          disabled={loading}
+          loading={loading}
+        />
       </div>
-    </div>
+    </Modal>
   );
 }

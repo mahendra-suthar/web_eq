@@ -1,0 +1,23 @@
+export type Business = {
+  id: string;
+  name: string;
+  categoryId: string;
+  rating: number;
+  reviewCount: number;
+  location: string;
+  distance?: string;
+  image?: string;
+  description: string;
+  isOpen: boolean;
+  isAlwaysOpen?: boolean;
+  opensAt?: string | null;
+  closesAt?: string | null;
+  nextAvailableTime?: string;
+  phone?: string;
+  email?: string;
+  serviceNames?: string[];
+  minPrice?: number | null;
+  maxPrice?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+};

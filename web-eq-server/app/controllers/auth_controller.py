@@ -180,23 +180,7 @@ class AuthController:
                 data.country_code, data.phone_number, data.client_type
             )
             entity_id = UUID(str(user.uuid))  # type: ignore[arg-type]
-
             employee = self.employee_service.get_employee_by_phone(data.country_code, data.phone_number)
-            if employee and (employee.user_id is None or employee.user_id == entity_id):
-                self.role_controller.assign_role_to_user(user.uuid, "EMPLOYEE")  # type: ignore[arg-type]
-                if employee.is_verified:
-                    next_step = "dashboard"
-                else:
-                    next_step = "invitation_code"
-                return await self.auth_service.generate_auth_response(
-                    user,
-                    response,
-                    client_type,
-                    user_type="EMPLOYEE",
-                    next_step=next_step,
-                    profile_type="EMPLOYEE",
-                )
-
             business = self.business_service.get_business_by_owner(entity_id)
             if business:
                 self.role_controller.assign_role_to_user(user.uuid, "BUSINESS")  # type: ignore[arg-type]
@@ -211,6 +195,22 @@ class AuthController:
                     user_type="BUSINESS",
                     next_step=next_step,
                     profile_type="BUSINESS",
+                )
+
+            # Pure employee (no business ownership) — handle invitation / verified flow
+            if employee and (employee.user_id is None or employee.user_id == entity_id):
+                self.role_controller.assign_role_to_user(user.uuid, "EMPLOYEE")  # type: ignore[arg-type]
+                if employee.is_verified:
+                    next_step = "dashboard"
+                else:
+                    next_step = "invitation_code"
+                return await self.auth_service.generate_auth_response(
+                    user,
+                    response,
+                    client_type,
+                    user_type="EMPLOYEE",
+                    next_step=next_step,
+                    profile_type="EMPLOYEE",
                 )
 
             if user.full_name and str(user.full_name).strip():

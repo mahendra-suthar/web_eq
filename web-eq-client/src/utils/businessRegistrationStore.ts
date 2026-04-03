@@ -26,6 +26,8 @@ export interface AddressData {
 
 export interface EmployeeData {
     uuid?: string;
+    user_id?: string;
+    is_owner?: boolean;
     full_name: string;
     email?: string;
     country_code?: string;
@@ -70,6 +72,7 @@ export interface RegistrationData {
     business_email: string;
     about_business?: string;
     category_id: string;
+    subcategory_ids: string[];
     profile_picture?: File; // Note: File objects don't persist well in localStorage
     is_always_open: boolean;
     schedule: DaySchedule[];
@@ -83,11 +86,19 @@ interface BusinessRegistrationState {
     currentStep: number;
     businessId: string | null;
     registrationData: Partial<RegistrationData>;
+    isSelfEmployee: boolean;
+    ownerEmployeeId: string | null;
+    entryPhone: { localNumber: string; countryCode: string } | null;
+    entryUserType: string;
 
     setStep: (step: number) => void;
     setBusinessId: (id: string | null) => void;
     setRegistrationData: (data: Partial<RegistrationData>) => void;
     updateRegistrationData: (data: Partial<RegistrationData>) => void;
+    setSelfEmployee: (value: boolean) => void;
+    setOwnerEmployeeId: (id: string | null) => void;
+    setEntryPhone: (phone: { localNumber: string; countryCode: string } | null) => void;
+    setEntryUserType: (userType: string) => void;
     resetRegistration: () => void;
 }
 
@@ -96,8 +107,13 @@ export const useBusinessRegistrationStore = create(
         (set) => ({
             currentStep: 1,
             businessId: null,
+            isSelfEmployee: false,
+            ownerEmployeeId: null,
+            entryPhone: null,
+            entryUserType: "",
             registrationData: {
                 is_always_open: false,
+                subcategory_ids: [],
                 schedule: [],
                 employees: [],
                 services: [],
@@ -105,21 +121,27 @@ export const useBusinessRegistrationStore = create(
             },
 
             setStep: (step) => set({ currentStep: step }),
-
             setBusinessId: (id) => set({ businessId: id }),
-
             setRegistrationData: (data) => set({ registrationData: data }),
-
             updateRegistrationData: (data) =>
                 set((state) => ({
                     registrationData: { ...state.registrationData, ...data }
                 })),
 
+            setSelfEmployee: (value) => set({ isSelfEmployee: value }),
+            setOwnerEmployeeId: (id) => set({ ownerEmployeeId: id }),
+            setEntryPhone: (phone) => set({ entryPhone: phone }),
+            setEntryUserType: (userType) => set({ entryUserType: userType }),
             resetRegistration: () => set({
                 currentStep: 1,
                 businessId: null,
+                isSelfEmployee: false,
+                ownerEmployeeId: null,
+                entryPhone: null,
+                entryUserType: "",
                 registrationData: {
                     is_always_open: false,
+                    subcategory_ids: [],
                     schedule: [],
                     employees: [],
                     services: [],

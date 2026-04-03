@@ -1,13 +1,13 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { QueueService, LiveQueueData, LiveQueueUserItem, QueueData } from "../../services/queue/queue.service";
+import { QueueService, LiveQueueData, QueueData } from "../../services/queue/queue.service";
 import { useUserStore } from "../../utils/userStore";
 import { useLiveQueueWS } from "../../hooks/useLiveQueueWS";
 import { QueueUserStatus } from "../../utils/constants";
 import { formatDurationMinutes, formatTimeToDisplay } from "../../utils/utils";
+import AddCustomerModal from "../../components/add-customer-modal";
 import "./live-queue.scss";
 
-// ─── helpers ───────────────────────────────────────────────────────────────
 
 const queueService = new QueueService();
 
@@ -132,6 +132,7 @@ const LiveQueue: React.FC = () => {
   const [nextLoading, setNextLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
 
   const todayLabel = useMemo(() => {
     try {
@@ -374,6 +375,14 @@ const LiveQueue: React.FC = () => {
               disabled={loading}
             >
               ↻
+            </button>
+            <button
+              type="button"
+              className="lq-actionBtn lq-actionBtn--addCustomer"
+              onClick={() => setShowAddCustomer(true)}
+              disabled={!selectedQueueId || actionsDisabled}
+            >
+              <span aria-hidden>+</span> {t("addCustomer") || "Add Customer"}
             </button>
             <button
               type="button"
@@ -688,6 +697,18 @@ const LiveQueue: React.FC = () => {
           </section>
         )}
       </div>
+
+      {showAddCustomer && businessId && (
+        <AddCustomerModal
+          queueId={queues.length <= 1 ? selectedQueueId ?? undefined : undefined}
+          queues={queues.map((q) => ({ id: String(q.uuid), name: q.name }))}
+          businessId={businessId}
+          onClose={() => setShowAddCustomer(false)}
+          onSuccess={() => {
+            if (selectedQueueId) fetchLiveQueue(selectedQueueId);
+          }}
+        />
+      )}
     </div>
   );
 };

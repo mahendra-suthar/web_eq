@@ -87,6 +87,28 @@ class UserService:
         self.db.refresh(new_user)
         return new_user
 
+    def find_or_create_guest_user(
+        self, phone_number: str, country_code: str, full_name: Optional[str] = None
+    ) -> User:
+        existing = self.get_user_by_phone(country_code, phone_number)
+        if existing:
+            if full_name and not existing.full_name:
+                existing.full_name = full_name
+                self.db.commit()
+                self.db.refresh(existing)
+            return existing
+
+        guest = User(
+            country_code=country_code,
+            phone_number=phone_number,
+            full_name=full_name or "",
+            email_verify=False,
+        )
+        self.db.add(guest)
+        self.db.commit()
+        self.db.refresh(guest)
+        return guest
+
     def update_user_profile(self, user: User, data: UserRegistrationInput) -> User:
         """Partial update: only set fields that are present in the payload."""
         user_obj = self.db.query(User).filter(User.uuid == user.uuid).first()

@@ -46,7 +46,6 @@ export function useQueueWebSocket({
       wsRef.current = ws;
       
       ws.onopen = () => {
-        console.log('WebSocket connected');
         setWsConnected(true);
         reconnectAttempts.current = 0;
       };
@@ -68,29 +67,26 @@ export function useQueueWebSocket({
             case 'pong':
               break;
             default:
-              console.log('Unknown message type:', message.type);
+              break;
           }
         } catch (e) {
-          console.error('Error parsing WebSocket message:', e);
+          if (import.meta.env.DEV) console.error('Error parsing WebSocket message:', e);
         }
       };
       
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        if (import.meta.env.DEV) console.error('WebSocket error:', error);
         setError('Connection error. Retrying...');
       };
       
-      ws.onclose = (event) => {
-        console.log('WebSocket closed:', event.code, event.reason);
+      ws.onclose = () => {
         setWsConnected(false);
         wsRef.current = null;
-        
+
         if (enabled && reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
           const delay = Math.min(INITIAL_RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts.current), MAX_RECONNECT_DELAY_MS);
           reconnectAttempts.current++;
-          
-          console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current})`);
-          
+
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
           }, delay);
@@ -98,7 +94,7 @@ export function useQueueWebSocket({
       };
       
     } catch (e) {
-      console.error('Failed to create WebSocket:', e);
+      if (import.meta.env.DEV) console.error('Failed to create WebSocket:', e);
       setError('Failed to connect to real-time updates');
     }
   }, [businessId, date, enabled, token, updateFromWebSocket, setWsConnected, setError]);

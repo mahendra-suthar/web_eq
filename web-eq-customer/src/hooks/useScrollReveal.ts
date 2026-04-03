@@ -10,28 +10,30 @@ import { useEffect } from "react";
  */
 export function useScrollReveal(deps: unknown[] = []) {
   useEffect(() => {
+    let observer: IntersectionObserver | null = null;
     // Small delay so React has committed the new DOM nodes
     const timer = setTimeout(() => {
       const reveals = document.querySelectorAll<HTMLElement>(".reveal");
 
-      const observer = new IntersectionObserver(
+      observer = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
             if (entry.isIntersecting) {
               entry.target.classList.add("visible");
-              observer.unobserve(entry.target);
+              observer?.unobserve(entry.target);
             }
           });
         },
         { threshold: 0.12 }
       );
 
-      reveals.forEach((el) => observer.observe(el));
-
-      return () => observer.disconnect();
+      reveals.forEach((el) => observer?.observe(el));
     }, 50);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      observer?.disconnect();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 }

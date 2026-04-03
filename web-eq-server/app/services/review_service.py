@@ -1,9 +1,10 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from uuid import UUID
 from typing import List, Optional, Tuple
 
 from app.models.review import Review
+from app.models.business import Business
 
 
 class ReviewService:
@@ -29,6 +30,7 @@ class ReviewService:
     def get_reviews_by_business(self, business_id: UUID, limit: int = 50, offset: int = 0) -> List[Review]:
         return (
             self.db.query(Review)
+            .options(joinedload(Review.user))
             .filter(Review.business_id == business_id)
             .order_by(Review.created_at.desc())
             .offset(offset)
@@ -37,7 +39,6 @@ class ReviewService:
         )
 
     def get_review_summary_by_business(self, business_id: UUID) -> Tuple[float, int]:
-        """Returns (average_rating, review_count) for a business"""
         result = (
             self.db.query(
                 func.coalesce(func.avg(Review.rating), 0.0),
@@ -51,7 +52,6 @@ class ReviewService:
         return avg_rating, count
 
     def get_review_summaries_by_businesses(self, business_ids: List[UUID]) -> dict[UUID, Tuple[float, int]]:
-        """Returns {business_id: (average_rating, review_count)} for multiple businesses in one query"""
         if not business_ids:
             return {}
 
@@ -77,4 +77,22 @@ class ReviewService:
             self.db.query(Review)
             .filter(Review.user_id == user_id, Review.business_id == business_id)
             .first()
+        )
+
+    def get_user_review_for_appointment(self, user_id: UUID, queue_user_id: UUID) -> Optional[Review]:
+        return (
+            self.db.query(Review)
+            .filter(Review.user_id == user_id, Review.queue_user_id == queue_user_id)
+            .first()
+        )
+
+    def get_featured_reviews(self, limit: int = 6) -> List[Review]:
+        return (
+            self.db.query(Review)
+            .join(Business, Review.business_id == Business.uuid)
+            .options(joinedload(Review.user), joinedload(Review.business))
+            .filter(Review.comment.isnot(None), Review.comment != "", Review.rating >= 4)
+            .order_by(Review.created_at.desc())
+            .limit(limit)
+            .all()
         )

@@ -54,6 +54,30 @@ class ReviewData(BaseModel):
         )
 
 
+class FeaturedReviewData(BaseModel):
+    uuid: str
+    user_name: Optional[str] = None
+    business_name: str
+    rating: float
+    comment: str
+    created_at: Optional[str] = None
+
+    @classmethod
+    def from_review(cls, review) -> "FeaturedReviewData":
+        user_name = None
+        if review.user:
+            user_name = review.user.full_name if hasattr(review.user, "full_name") else None
+        business_name = review.business.name if review.business else ""
+        return cls(
+            uuid=str(review.uuid),
+            user_name=user_name,
+            business_name=business_name,
+            rating=review.rating,
+            comment=review.comment or "",
+            created_at=str(review.created_at) if review.created_at else None,
+        )
+
+
 class BusinessReviewSummary(BaseModel):
     average_rating: float
     review_count: int

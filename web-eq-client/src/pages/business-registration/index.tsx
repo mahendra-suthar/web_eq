@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -40,11 +40,24 @@ export default function BusinessRegistration() {
     setBusinessId,
     updateRegistrationData,
     resetRegistration,
+    entryPhone,
+    entryUserType,
+    setEntryPhone,
+    setEntryUserType,
   } = useBusinessRegistrationStore();
   const { profile, setNextStep, setProfile } = useUserStore();
 
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+
+  useEffect(() => {
+    if (phoneObj && (!entryPhone || !entryPhone.localNumber)) {
+      setEntryPhone({ localNumber: phoneObj.localNumber, countryCode: phoneObj.countryCode });
+    }
+    if (userType && !entryUserType) {
+      setEntryUserType(userType);
+    }
+  }, []);
 
   useEffect(() => {
     if (nextStepFromState && nextStepFromState >= 1 && nextStepFromState <= TOTAL_STEPS) {
@@ -134,11 +147,10 @@ export default function BusinessRegistration() {
       setStep(currentStep - 1);
       setError("");
     } else {
+      const phone = phoneObj ?? (entryPhone ? entryPhone : undefined);
+      const resolvedUserType = userType || entryUserType;
       navigate(ROUTERS_PATH.VERIFYOTP, {
-        state: {
-          phone: phoneObj,
-          userType: userType,
-        },
+        state: { phone, userType: resolvedUserType },
       });
     }
   };
@@ -221,10 +233,17 @@ export default function BusinessRegistration() {
               registrationData.employees?.map((emp) => ({
                 id: emp.uuid || "",
                 full_name: emp.full_name,
+                is_owner: emp.is_owner ?? false,
               })) || []
             }
             businessId={businessId}
-            categoryId={registrationData.category_id}
+            subcategoryIds={
+              registrationData.subcategory_ids?.length
+                ? registrationData.subcategory_ids
+                : registrationData.category_id
+                ? [registrationData.category_id]
+                : []
+            }
             initialData={
               registrationData.queues?.length
                 ? registrationData.queues

@@ -135,6 +135,8 @@
     "slotsNotAvailable": "No slots available for this date. Try another date.",
     "slotLeft_one": "{{count}} left",
     "slotLeft_other": "{{count}} left",
+    "alreadyBooked": "Already booked",
+    "timeConflict": "You already have an appointment at {{time}} at {{business}}. Please choose a different date or time.",
     "alreadyQueueDetails": "Your current queue details"
   },
 
@@ -207,17 +209,17 @@
     "heroSub": "Find the right business, pick a date, and confirm your slot — all in minutes with live queue updates.",
     "searchPlaceholder": "Search services, businesses...",
     "searchAriaLabel": "Search services or businesses",
-    "locationAriaLabel": "Location",
-    "locationDefault": "India",
     "searchBtn": "Search",
     "filterQuick": "Quick:",
     "filterOpenNow": "Open now",
-    "filterTopRated": "⭐ Top rated",
-    "filterNearby": "📍 Nearby",
-    "statBusinesses": "Businesses listed",
-    "statBookings": "Bookings made",
-    "statRating": "Average rating",
-    "statBookingTime": "Avg booking time",
+    "featReal": "Real-time queue",
+    "featRealSub": "Live position updates",
+    "featBook": "Book in minutes",
+    "featBookSub": "No calls, no waiting",
+    "featSlot": "Slot confirmed",
+    "featSlotSub": "Your spot, guaranteed",
+    "featFree": "Free to use",
+    "featFreeSub": "Always, for everyone",
     "todayEyebrow": "Your day",
     "todayTitleLine": "Today's",
     "todayTitleEm": "appointments",
@@ -244,6 +246,7 @@
     "noCategories": "No categories available.",
     "noResultsFor": "No results for \"{{query}}\"",
     "tryDifferentSearch": "Try a different search term.",
+    "services": "services",
     "hiwEyebrow": "Process",
     "hiwTitle": "From search to seat",
     "hiwTitleEm": "in four steps",
@@ -265,8 +268,9 @@
     "noBizTitle": "No businesses yet",
     "noBizHint": "Browse by category above to discover businesses.",
     "showAllBusinesses": "Show all businesses",
-    "reviewsEyebrow": "Reviews",
-    "reviewsTitle": "People love it",
+    "reviewsEyebrow": "Real Reviews",
+    "reviewsTitle": "What customers are saying",
+    "anonymousReviewer": "Anonymous",
     "testimonial1Text": "I used to spend 45 minutes waiting at my dermatologist. Now I join the queue from home and arrive exactly on time. Genuinely changed my weekly routine.",
     "testimonial1Name": "Priya Mehta",
     "testimonial1Location": "Satellite, Ahmedabad",
@@ -284,6 +288,20 @@
     "ctaGetStarted": "Get started — it's free"
   },
 
+  "search": {
+    "placeholder": "Search businesses, services...",
+    "searchBtn": "Search",
+    "backHome": "Home",
+    "resultCount": "{{count}} result for \"{{query}}\"",
+    "resultCount_other": "{{count}} results for \"{{query}}\"",
+    "noResults": "No results for \"{{query}}\"",
+    "allBusinesses": "All businesses ({{count}})",
+    "emptyTitle": "No businesses found",
+    "emptyHint": "Try a different keyword or browse all businesses.",
+    "showAll": "Show all businesses",
+    "fetchError": "Failed to load businesses",
+    "tryAgain": "Please try again."
+  },
   "bl": {
     "allCategories": "All categories",
     "instantBooking": "⚡ Instant booking",
@@ -344,7 +362,8 @@
     "joinVirtualQueue": "Join Virtual Queue",
     "businessClosedNote": "Business is currently closed.",
     "opensAt": "Opens at {{time}}.",
-    "viewOnMaps": "View on Google Maps"
+    "viewOnMaps": "View on Google Maps",
+    "tabReviews": "Reviews"
   },
 
   "profile": {
@@ -417,5 +436,26 @@
     "dangerZoneTitle": "Danger Zone",
     "dangerZoneDesc": "Deleting your account is permanent and cannot be undone. All your bookings, history and data will be removed immediately.",
     "deleteAccount": "Delete my account"
+  }
+  ,
+  "rv": {
+    "title": "Customer Reviews",
+    "writeReview": "Write a Review",
+    "signInReview": "Sign in to leave a review",
+    "alreadyReviewed": "Your Review",
+    "emptyTitle": "No reviews yet",
+    "emptySub": "Be the first to share your experience!",
+    "ratingRequired": "Please select a rating",
+    "commentPlaceholder": "Share your experience with this business…",
+    "submitReview": "Submit Review",
+    "submitting": "Submitting…",
+    "submitError": "Failed to submit. Please try again.",
+    "basedOn_one": "Based on {{count}} review",
+    "basedOn_other": "Based on {{count}} reviews",
+    "verified": "Verified",
+    "anonymous": "Anonymous",
+    "modalTitle": "Write a Review",
+    "yourRating": "Your Rating",
+    "yourComment": "Your Comment (optional)"
   }
 }

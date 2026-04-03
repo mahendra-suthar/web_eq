@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import type { Business } from "../../mock/businesses";
+import type { Business } from "../../types/business";
 import "./business-card.scss";
 
 const CARD_GRADIENTS = [

@@ -18,6 +18,7 @@ from app.schemas.queue import (
     QueueServiceAddItem,
     QueueServiceUpdate,
 )
+from app.core.utils import today_app_date, parse_time_string
 from app.core.constants import (
     QUEUE_USER_REGISTERED,
     QUEUE_USER_IN_PROGRESS,
@@ -263,6 +264,93 @@ class QueueService:
     def count_appointments_for_user(self, user_id: UUID) -> int:
         try:
             return self.db.query(QueueUser).filter(QueueUser.user_id == user_id).count()
+        except SQLAlchemyError:
+            raise
+
+    def get_user_upcoming_active_appointments(
+        self, user_id: UUID
+    ) -> List[Tuple[QueueUser, "Queue", "Business"]]:
+        """Return active (waiting/in_progress) appointments from today onwards for conflict checking.
+
+        Only fetches the columns needed for time-conflict detection — no heavy service relations.
+        """
+        today = today_app_date()
+        try:
+            rows = (
+                self.db.query(QueueUser, Queue, Business)
+                .join(Queue, Queue.uuid == QueueUser.queue_id)
+                .join(Business, Business.uuid == Queue.merchant_id)
+                .filter(
+                    QueueUser.user_id == user_id,
+                    QueueUser.queue_date >= today,
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                )
+                .order_by(QueueUser.queue_date.asc(), QueueUser.scheduled_start.asc())
+                .all()
+            )
+            return [(qu, q, b) for qu, q, b in rows]
+        except SQLAlchemyError:
+            raise
+
+    def get_queue_booking_at_estimated_time(
+        self,
+        user_id: UUID,
+        queue_date: date,
+        appointment_time_str: str,   # "HH:MM" 24-hour, app-timezone naive
+        tolerance_minutes: int = 30,
+    ) -> Optional[QueueUser]:
+        """Check if the user already has an active QUEUE booking whose estimated appointment
+        time falls within ±tolerance_minutes of the new booking's estimated time on the same date.
+
+        estimated_enqueue_time is stored as a naive datetime in app timezone (see appointment_time_to_enqueue_dequeue),
+        so direct comparison against a similarly-constructed naive datetime is correct.
+        """
+        t = parse_time_string(appointment_time_str)
+        if t is None:
+            return None
+        target_dt = datetime.combine(queue_date, t)
+        window_start = target_dt - timedelta(minutes=tolerance_minutes)
+        window_end = target_dt + timedelta(minutes=tolerance_minutes)
+        try:
+            return (
+                self.db.query(QueueUser)
+                .filter(
+                    QueueUser.user_id == user_id,
+                    QueueUser.queue_date == queue_date,
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                    QueueUser.estimated_enqueue_time.isnot(None),
+                    QueueUser.estimated_enqueue_time >= window_start,
+                    QueueUser.estimated_enqueue_time <= window_end,
+                )
+                .first()
+            )
+        except SQLAlchemyError:
+            raise
+
+    def get_booking_at_time(
+        self,
+        user_id: UUID,
+        queue_date: date,
+        slot_start: "time",
+        exclude_queue_user_id: Optional[UUID] = None,
+    ) -> Optional[QueueUser]:
+        """Check if the user already has an active FIXED/APPROXIMATE booking at the given time on the given date.
+        Used as the authoritative server-side conflict guard inside create_booking.
+        Pass exclude_queue_user_id when rescheduling so the appointment being moved is not counted.
+        """
+        try:
+            q = (
+                self.db.query(QueueUser)
+                .filter(
+                    QueueUser.user_id == user_id,
+                    QueueUser.queue_date == queue_date,
+                    QueueUser.scheduled_start == slot_start,
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                )
+            )
+            if exclude_queue_user_id:
+                q = q.filter(QueueUser.uuid != exclude_queue_user_id)
+            return q.first()
         except SQLAlchemyError:
             raise
 

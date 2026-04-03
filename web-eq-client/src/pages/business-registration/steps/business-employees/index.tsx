@@ -1,11 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useLayoutContext } from "../../../../layouts/general-layout";
 import Button from "../../../../components/button";
 import { EmployeeData } from "../../../../utils/businessRegistrationStore";
-import "./business-employees.scss";
-
+import { useBusinessRegistrationStore } from "../../../../utils/businessRegistrationStore";
+import { useUserStore } from "../../../../utils/userStore";
 import { EmployeeService } from "../../../../services/employee/employee.service";
 import { toast } from "react-toastify";
+import "./business-employees.scss";
 
 interface BusinessEmployeesProps {
   onNext: (data: { employees: EmployeeData[] }) => void;
@@ -14,6 +15,16 @@ interface BusinessEmployeesProps {
   businessId: string | null;
 }
 
+type EmployeeWithPreview = EmployeeData & { preview?: string };
+
+const EMPTY_EMPLOYEE = (): EmployeeWithPreview => ({
+  full_name: "",
+  email: "",
+  country_code: "+91",
+  phone_number: "",
+  preview: "",
+});
+
 export default function BusinessEmployees({
   onNext,
   onBack,
@@ -21,53 +32,93 @@ export default function BusinessEmployees({
   businessId,
 }: BusinessEmployeesProps) {
   const { t } = useLayoutContext();
-  const employeeService = new EmployeeService();
-  const [loading, setLoading] = useState(false);
-  const [employees, setEmployees] = useState<Array<EmployeeData & { preview?: string }>>(
-    initialData?.map((emp) => ({ ...emp, preview: "" })) || []
+  const employeeService = useMemo(() => new EmployeeService(), []);
+  const { profile } = useUserStore();
+  const { setSelfEmployee } = useBusinessRegistrationStore();
+  const [selfEmployee, setSelfEmployeeLocal] = useState(
+    () => !!initialData?.some((e) => e.is_owner)
   );
-  const initialMap = React.useMemo(() => {
-    return new Map(initialData?.map(e => [e.uuid, e]) || []);
-  }, [initialData]);
 
-  const [errors, setErrors] = useState<{
-    [key: number]: { full_name?: string; email?: string; phone_number?: string; profile_picture?: string };
-  }>({});
+  const [loading, setLoading] = useState(false);
+  const [employees, setEmployees] = useState<EmployeeWithPreview[]>(
+    () => initialData?.map((emp) => ({ ...emp, preview: "" })) ?? []
+  );
+  const [errors, setErrors] = useState<
+    Record<number, { full_name?: string; email?: string; phone_number?: string; profile_picture?: string }>
+  >({});
+  const initialMap = useMemo(
+    () => new Map(initialData?.map((e) => [e.uuid, e]) ?? []),
+    [initialData]
+  );
 
-  const addEmployee = () => {
-    setEmployees([...employees, { full_name: "", email: "", country_code: "+91", phone_number: "", preview: "" }]);
+  const buildOwnerEntry = (): EmployeeWithPreview => ({
+    ...(profile?.user?.uuid ? { user_id: profile.user.uuid } : {}),
+    is_owner: true,
+    full_name: profile?.user?.full_name ?? "",
+    email: profile?.user?.email ?? "",
+    country_code: profile?.user?.country_code ?? "+91",
+    phone_number: profile?.user?.phone_number ?? "",
+    preview: "",
+  });
+
+  const toggleSelfEmployee = (checked: boolean) => {
+    setSelfEmployeeLocal(checked);
+    setSelfEmployee(checked);
+    if (checked) {
+      setEmployees((prev) =>
+        prev.some((e) => e.is_owner) ? prev : [buildOwnerEntry(), ...prev]
+      );
+    } else {
+      setEmployees((prev) => prev.filter((e) => !e.is_owner));
+    }
   };
+
+  const addEmployee = () => setEmployees((prev) => [...prev, EMPTY_EMPLOYEE()]);
 
   const removeEmployee = (index: number) => {
-    const updated = employees.filter((_, i) => i !== index);
-    setEmployees(updated);
-    const newErrors = { ...errors };
-    delete newErrors[index];
-    setErrors(newErrors);
+    setEmployees((prev) => prev.filter((_, i) => i !== index));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[index];
+      return Object.fromEntries(
+        Object.entries(next).map(([k, v]) => [
+          Number(k) > index ? Number(k) - 1 : Number(k),
+          v,
+        ])
+      );
+    });
   };
 
-  const updateEmployee = (index: number, field: keyof EmployeeData, value: string | File | undefined) => {
-    const updated = [...employees];
-    if (field === "profile_picture" && value instanceof File) {
-      updated[index] = { ...updated[index], [field]: value };
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        updated[index].preview = reader.result as string;
-        setEmployees([...updated]);
-      };
-      reader.readAsDataURL(value);
-    } else {
-      updated[index] = { ...updated[index], [field]: value };
-      setEmployees(updated);
-    }
-
-    if (errors[index]) {
-      const newErrors = { ...errors };
-      if (newErrors[index][field as keyof typeof newErrors[number]]) {
-        delete newErrors[index][field as keyof typeof newErrors[number]];
-        setErrors(newErrors);
+  const updateEmployee = (
+    index: number,
+    field: keyof EmployeeData,
+    value: string | File | undefined
+  ) => {
+    setEmployees((prev) => {
+      const updated = [...prev];
+      if (field === "profile_picture" && value instanceof File) {
+        updated[index] = { ...updated[index], [field]: value };
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setEmployees((cur) => {
+            const next = [...cur];
+            next[index] = { ...next[index], preview: reader.result as string };
+            return next;
+          });
+        };
+        reader.readAsDataURL(value);
+      } else {
+        updated[index] = { ...updated[index], [field]: value };
       }
-    }
+      return updated;
+    });
+
+    setErrors((prev) => {
+      if (!prev[index]?.[field as keyof (typeof prev)[number]]) return prev;
+      const next = { ...prev, [index]: { ...prev[index] } };
+      delete next[index][field as keyof (typeof next)[number]];
+      return next;
+    });
   };
 
   const validateEmployees = (): boolean => {
@@ -75,41 +126,38 @@ export default function BusinessEmployees({
     let isValid = true;
 
     employees.forEach((emp, index) => {
-      const empErrors: { full_name?: string; email?: string; phone_number?: string; profile_picture?: string } = {};
+      const errs: (typeof errors)[number] = {};
 
-      if (!emp.full_name || !emp.full_name.trim()) {
-        empErrors.full_name = t("enterEmployeeName");
+      if (!emp.full_name?.trim()) {
+        errs.full_name = t("enterEmployeeName");
         isValid = false;
       }
 
       if (emp.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emp.email)) {
-        empErrors.email = t("emailInvalid");
+        errs.email = t("emailInvalid");
         isValid = false;
       }
 
-      if (emp.phone_number && emp.phone_number.trim()) {
+      if (!emp.is_owner && emp.phone_number?.trim()) {
         const digits = emp.phone_number.replace(/\D/g, "");
         if (digits.length !== 10 || !/^[6789]/.test(digits)) {
-          empErrors.phone_number = t("invalidPhoneFormat") || "Invalid phone number";
+          errs.phone_number = t("invalidPhoneFormat") || "Invalid phone number";
           isValid = false;
         }
       }
 
       if (emp.profile_picture) {
         const validTypes = ["image/jpeg", "image/jpg", "image/png"];
-        const maxSize = 5 * 1024 * 1024;
         if (!validTypes.includes(emp.profile_picture.type)) {
-          empErrors.profile_picture = t("invalidImageType");
+          errs.profile_picture = t("invalidImageType");
           isValid = false;
-        } else if (emp.profile_picture.size > maxSize) {
-          empErrors.profile_picture = t("imageTooLarge");
+        } else if (emp.profile_picture.size > 5 * 1024 * 1024) {
+          errs.profile_picture = t("imageTooLarge");
           isValid = false;
         }
       }
 
-      if (Object.keys(empErrors).length > 0) {
-        newErrors[index] = empErrors;
-      }
+      if (Object.keys(errs).length) newErrors[index] = errs;
     });
 
     setErrors(newErrors);
@@ -118,72 +166,73 @@ export default function BusinessEmployees({
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (validateEmployees()) {
-      if (businessId) {
-        setLoading(true);
-        try {
-          const newEmployees: EmployeeData[] = [];
-          const modifiedEmployees: EmployeeData[] = [];
-          const unchangedEmployees: EmployeeData[] = [];
+    if (!validateEmployees()) return;
 
-          employees.forEach((emp) => {
-            const { preview, ...empData } = emp;
+    if (!businessId) {
+      onNext({ employees: employees.map(({ preview, ...emp }) => emp) });
+      return;
+    }
 
-            if (!empData.uuid) {
-              newEmployees.push(empData);
-            } else {
-              const original = empData.uuid ? initialMap.get(empData.uuid) : undefined;
-              const isModified = original && (
-                original.full_name !== empData.full_name ||
-                original.email !== empData.email ||
-                (empData.country_code ?? "") !== (original.country_code ?? "") ||
-                (empData.phone_number ?? "") !== (original.phone_number ?? "") ||
-                empData.profile_picture !== original.profile_picture
-              );
-              if (isModified) {
-                modifiedEmployees.push(empData);
-              } else {
-                unchangedEmployees.push(empData);
-              }
-            }
-          });
+    setLoading(true);
+    try {
+      const newEmployees: EmployeeData[] = [];
+      const modifiedEmployees: EmployeeData[] = [];
+      const unchangedEmployees: EmployeeData[] = [];
 
-          const apiCalls: Promise<EmployeeData[]>[] = [];
-
-          if (modifiedEmployees.length > 0) {
-            const updatePromises = modifiedEmployees.map(emp =>
-              employeeService.updateEmployee(emp.uuid!, emp)
-            );
-            apiCalls.push(Promise.all(updatePromises));
+      employees.forEach((emp) => {
+        const { preview, ...empData } = emp;
+        if (!empData.uuid) {
+          newEmployees.push(empData);
+        } else {
+          const original = initialMap.get(empData.uuid);
+          const modified =
+            original &&
+            (original.full_name !== empData.full_name ||
+              original.email !== empData.email ||
+              (original.country_code ?? "") !== (empData.country_code ?? "") ||
+              (original.phone_number ?? "") !== (empData.phone_number ?? "") ||
+              empData.profile_picture !== original.profile_picture);
+          if (modified) {
+            modifiedEmployees.push(empData);
+          } else {
+            unchangedEmployees.push(empData);
           }
-
-          if (newEmployees.length > 0) {
-            apiCalls.push(employeeService.createEmployees(businessId, newEmployees));
-          }
-          const results = await Promise.all(apiCalls);
-
-          const updatedAndCreated = results.flat();
-          const finalEmployees = [...unchangedEmployees, ...updatedAndCreated];
-
-          onNext({ employees: finalEmployees });
-        } catch (error) {
-          console.error("Error saving employees:", error);
-          toast.error("Failed to save employees. Please try again.");
-        } finally {
-          setLoading(false);
         }
-      } else {
-        onNext({ employees: employees.map(({ preview, ...emp }) => emp) });
-      }
+      });
+
+      const [createdResults, updatedResults] = await Promise.all([
+        newEmployees.length
+          ? employeeService.createEmployees(businessId, newEmployees)
+          : Promise.resolve([] as EmployeeData[]),
+        modifiedEmployees.length
+          ? Promise.all(
+              modifiedEmployees.map((emp) =>
+                employeeService.updateEmployee(emp.uuid!, emp)
+              )
+            )
+          : Promise.resolve([] as EmployeeData[]),
+      ]);
+
+      const finalEmployees = [
+        ...unchangedEmployees,
+        ...(updatedResults as EmployeeData[]),
+        ...(createdResults as EmployeeData[]),
+      ];
+
+      onNext({ employees: finalEmployees });
+    } catch (error) {
+      console.error("Error saving employees:", error);
+      toast.error("Failed to save employees. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
-
 
   return (
     <div className="business-employees-page">
       <div className="business-employees-header">
         {onBack && (
-          <button className="back-button" onClick={onBack}>
+          <button type="button" className="back-button" onClick={onBack}>
             ←
           </button>
         )}
@@ -194,107 +243,160 @@ export default function BusinessEmployees({
       </div>
 
       <form className="business-employees-form" onSubmit={handleSubmit}>
+        {/* Self-employee toggle */}
+        <div className="self-employee-toggle-card">
+          <div className="self-employee-toggle-content">
+            <div className="self-employee-toggle-text">
+              <span className="self-employee-toggle-title">
+                I'll personally serve customers
+              </span>
+              <span className="self-employee-toggle-desc">
+                Adds you as an employee so you can manage a queue directly.
+              </span>
+            </div>
+            <label className="toggle-switch" aria-label="Add myself as an employee">
+              <input
+                type="checkbox"
+                checked={selfEmployee}
+                onChange={(e) => toggleSelfEmployee(e.target.checked)}
+              />
+              <span className="toggle-slider" />
+            </label>
+          </div>
+        </div>
+
+        {/* Employee cards */}
         <div className="business-employees-form-fields">
-          {employees.map((employee, index) => (
-            <div key={index} className="employee-card">
-              <div className="employee-card-header">
-                <h3>{t("employee")} {index + 1}</h3>
-                <button
-                  type="button"
-                  className="remove-button"
-                  onClick={() => removeEmployee(index)}
-                >
-                  {t("removeEmployee")}
-                </button>
-              </div>
-
-              <div className="employee-fields">
-                <div className="form-field-wrapper">
-                  <label className="form-label">{t("employeeFullName")} *</label>
-                  <div className={`form-field ${errors[index]?.full_name ? "error" : ""}`}>
-                    <input
-                      type="text"
-                      placeholder={t("enterEmployeeName")}
-                      value={employee.full_name}
-                      onChange={(e) => updateEmployee(index, "full_name", e.target.value)}
-                      maxLength={100}
-                    />
-                    {errors[index]?.full_name && (
-                      <div className="error-text">{errors[index]?.full_name}</div>
+          {employees.map((employee, index) => {
+            const isOwner = !!employee.is_owner;
+            return (
+              <div key={index} className={`employee-card${isOwner ? " employee-card--owner" : ""}`}>
+                <div className="employee-card-header">
+                  <h3>
+                    {isOwner ? (
+                      <>
+                        <span className="owner-badge">Owner</span>
+                        &nbsp;You
+                      </>
+                    ) : (
+                      `${t("employee")} ${employees.filter((e) => !e.is_owner).indexOf(employee) + 1}`
                     )}
-                  </div>
+                  </h3>
+                  {!isOwner && (
+                    <button
+                      type="button"
+                      className="remove-button"
+                      onClick={() => removeEmployee(index)}
+                    >
+                      {t("removeEmployee")}
+                    </button>
+                  )}
                 </div>
 
-                <div className="form-field-wrapper">
-                  <label className="form-label">{t("employeeEmail")}</label>
-                  <div className={`form-field ${errors[index]?.email ? "error" : ""}`}>
-                    <input
-                      type="email"
-                      placeholder={t("enterEmployeeEmail")}
-                      value={employee.email || ""}
-                      onChange={(e) => updateEmployee(index, "email", e.target.value)}
-                    />
-                    {errors[index]?.email && (
-                      <div className="error-text">{errors[index]?.email}</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="form-field-wrapper form-field-row">
-                  <div className="form-field-half">
-                    <label className="form-label">{t("countryCode") || "Country code"}</label>
-                    <div className="form-field">
+                <div className="employee-fields">
+                  {/* Full name */}
+                  <div className="form-field-wrapper">
+                    <label className="form-label">{t("employeeFullName")} *</label>
+                    <div className={`form-field ${errors[index]?.full_name ? "error" : ""}`}>
                       <input
                         type="text"
-                        placeholder="+91"
-                        value={employee.country_code ?? "+91"}
-                        onChange={(e) => updateEmployee(index, "country_code", e.target.value)}
-                        maxLength={5}
+                        placeholder={t("enterEmployeeName")}
+                        value={employee.full_name}
+                        onChange={(e) => updateEmployee(index, "full_name", e.target.value)}
+                        maxLength={100}
+                        readOnly={isOwner}
                       />
-                    </div>
-                  </div>
-                  <div className="form-field-half">
-                    <label className="form-label">{t("phoneNumber")}</label>
-                    <div className={`form-field ${errors[index]?.phone_number ? "error" : ""}`}>
-                      <input
-                        type="tel"
-                        placeholder={t("enterPhoneNumber") || "10-digit number"}
-                        value={employee.phone_number ?? ""}
-                        onChange={(e) => updateEmployee(index, "phone_number", e.target.value.replace(/\D/g, "").slice(0, 10))}
-                        maxLength={10}
-                      />
-                      {errors[index]?.phone_number && (
-                        <div className="error-text">{errors[index]?.phone_number}</div>
+                      {errors[index]?.full_name && (
+                        <div className="error-text">{errors[index].full_name}</div>
                       )}
                     </div>
                   </div>
-                </div>
 
-                <div className="form-field-wrapper">
-                  <label className="form-label">{t("employeePicture")}</label>
-                  <div className="form-field">
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/jpg,image/png"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) updateEmployee(index, "profile_picture", file);
-                      }}
-                      className="file-input"
-                    />
-                    {errors[index]?.profile_picture && (
-                      <div className="error-text">{errors[index]?.profile_picture}</div>
-                    )}
-                    {employee.preview && (
-                      <div className="image-preview">
-                        <img src={employee.preview} alt="Preview" />
-                      </div>
-                    )}
+                  {/* Email */}
+                  <div className="form-field-wrapper">
+                    <label className="form-label">{t("employeeEmail")}</label>
+                    <div className={`form-field ${errors[index]?.email ? "error" : ""}`}>
+                      <input
+                        type="email"
+                        placeholder={t("enterEmployeeEmail")}
+                        value={employee.email ?? ""}
+                        onChange={(e) => updateEmployee(index, "email", e.target.value)}
+                        readOnly={isOwner}
+                      />
+                      {errors[index]?.email && (
+                        <div className="error-text">{errors[index].email}</div>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Phone */}
+                  <div className="form-field-wrapper form-field-row">
+                    <div className="form-field-half">
+                      <label className="form-label">{t("countryCode") || "Country code"}</label>
+                      <div className="form-field">
+                        <input
+                          type="text"
+                          placeholder="+91"
+                          value={employee.country_code ?? "+91"}
+                          onChange={(e) => updateEmployee(index, "country_code", e.target.value)}
+                          maxLength={5}
+                          readOnly={isOwner}
+                        />
+                      </div>
+                    </div>
+                    <div className="form-field-half">
+                      <label className="form-label">{t("phoneNumber")}</label>
+                      <div className={`form-field ${errors[index]?.phone_number ? "error" : ""}`}>
+                        <input
+                          type="tel"
+                          placeholder={t("enterPhoneNumber") || "10-digit number"}
+                          value={employee.phone_number ?? ""}
+                          onChange={(e) =>
+                            updateEmployee(
+                              index,
+                              "phone_number",
+                              e.target.value.replace(/\D/g, "").slice(0, 10)
+                            )
+                          }
+                          maxLength={10}
+                          readOnly={isOwner}
+                        />
+                        {errors[index]?.phone_number && (
+                          <div className="error-text">{errors[index].phone_number}</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Profile picture — not shown for owner card */}
+                  {!isOwner && (
+                    <div className="form-field-wrapper">
+                      <label className="form-label">{t("employeePicture")}</label>
+                      <div className="form-field">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png"
+                          className="file-input"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) updateEmployee(index, "profile_picture", file);
+                          }}
+                        />
+                        {errors[index]?.profile_picture && (
+                          <div className="error-text">{errors[index].profile_picture}</div>
+                        )}
+                        {employee.preview && (
+                          <div className="image-preview">
+                            <img src={employee.preview} alt="Preview" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           <button
             type="button"

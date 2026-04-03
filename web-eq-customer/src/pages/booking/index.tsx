@@ -4,9 +4,9 @@ import { useTranslation } from "react-i18next";
 import { useBookingStore, type QueueOptionData, type QueueServiceInfo, type SlotData, type SlotsListResponse } from "../../store/booking.store";
 import { useAuthStore } from "../../store/auth.store";
 import { useQueueWebSocket } from "../../hooks/useQueueWebSocket";
-import { BookingService } from "../../services/booking/booking.service";
-import { BusinessService, type BusinessServiceData } from "../../services/business/business.service";
-import { getNext7Days, getToday } from "../../utils/booking.utils";
+import { BookingService, type UpcomingAppointmentItem } from "../../services/booking/booking.service";
+import { BusinessService, type BusinessServiceData, type BusinessScheduleInfo } from "../../services/business/business.service";
+import { getNext7Days, getToday, isBusinessClosedOnDate } from "../../utils/booking.utils";
 import { isDateInPast, formatDateDisplay, formatDurationMinutes, formatTimeToDisplay } from "../../utils/util";
 import { HttpStatus } from "../../utils/constants";
 import { saveBookingReturnState, getBookingReturnState, clearBookingReturnState } from "../../utils/bookingReturnState";
@@ -113,6 +113,19 @@ export default function BookingPage() {
     setBookingConfirmation,
   } = useBookingStore();
 
+  const [toastMsg, setToastMsg] = useState("");
+  const [toastVisible, setToastVisible] = useState(false);
+
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 3500);
+  }, []);
+
+  const [businessSchedule, setBusinessSchedule] = useState<BusinessScheduleInfo | null>(null);
+  const [scheduleLoaded, setScheduleLoaded] = useState(false);
+  const [upcomingAppointments, setUpcomingAppointments] = useState<UpcomingAppointmentItem[]>([]);
+
   const [selectedServices, setSelectedServices] = useState<BusinessServiceData[]>(initialSelectedServicesData);
   const [bookingInProgress, setBookingInProgress] = useState(false);
   const [queueOptions, setQueueOptions] = useState<QueueOptionData[]>([]);
@@ -135,15 +148,98 @@ export default function BookingPage() {
 
   const selectableDates = useMemo(() => getNext7Days(), []);
 
+  /**
+   * Set of "YYYY-MM-DD|HH:MM" keys for every known appointment time the customer
+   * already holds. Covers both FIXED/APPROXIMATE (scheduled_start) and QUEUE
+   * (estimated_appointment_time). Used to disable conflicting slots in the picker.
+   */
+  const relevantAppointments = useMemo(
+    () =>
+      rescheduleQueueUserId
+        ? upcomingAppointments.filter((a) => a.queue_user_id !== rescheduleQueueUserId)
+        : upcomingAppointments,
+    [upcomingAppointments, rescheduleQueueUserId]
+  );
+
+  const conflictedTimesSet = useMemo(() => {
+    const set = new Set<string>();
+    relevantAppointments.forEach((apt) => {
+      const timeKey = apt.scheduled_start ?? apt.estimated_appointment_time;
+      if (timeKey) set.add(`${apt.queue_date}|${timeKey}`);
+    });
+    return set;
+  }, [relevantAppointments]);
+
+  /** Returns the conflicting appointment for a given date + slot_start, or undefined. */
+  const getConflictForSlot = useCallback(
+    (date: string, slotStart: string): UpcomingAppointmentItem | undefined =>
+      relevantAppointments.find((apt) => {
+        const timeKey = apt.scheduled_start ?? apt.estimated_appointment_time;
+        return apt.queue_date === date && timeKey === slotStart;
+      }),
+    [relevantAppointments]
+  );
+
+  /**
+   * For QUEUE (walk-in) mode: check if the selected queue's estimated appointment
+   * time matches any existing upcoming appointment on the selected date.
+   * Shown as an inline warning — the backend is the hard enforcement.
+   */
+  const queueTimeConflict = useMemo((): UpcomingAppointmentItem | null => {
+    if (!selectedQueueOption || !selectedDate) return null;
+    const estTime = selectedQueueOption.estimated_appointment_time;
+    if (!estTime) return null;
+    // Parse "HH:MM AM/PM" → "HH:MM" for comparison (backend stores/returns 24h HH:MM)
+    // estimated_appointment_time may come as "09:17 AM" (12h) — normalise to "HH:MM" 24h
+    let normTime = estTime;
+    const ampm = /(\d{1,2}):(\d{2})\s*(AM|PM)/i.exec(estTime);
+    if (ampm) {
+      let h = parseInt(ampm[1], 10);
+      const m = ampm[2];
+      const period = ampm[3].toUpperCase();
+      if (period === "AM" && h === 12) h = 0;
+      if (period === "PM" && h !== 12) h += 12;
+      normTime = `${String(h).padStart(2, "0")}:${m}`;
+    }
+    return (
+      relevantAppointments.find((apt) => {
+        if (apt.queue_date !== selectedDate) return false;
+        const timeKey = apt.scheduled_start ?? apt.estimated_appointment_time;
+        return timeKey === normTime;
+      }) ?? null
+    );
+  }, [selectedQueueOption, selectedDate, relevantAppointments]);
+
+  // Fetch business schedule once — used to disable closed dates in the date strip.
   useEffect(() => {
     if (!businessId) return;
+    const svc = new BusinessService();
+    svc.getBusinessDetails(businessId)
+      .then((d) => setBusinessSchedule(d.schedule))
+      .catch(() => {}) // graceful fallback: schedule stays null → no dates disabled
+      .finally(() => setScheduleLoaded(true));
+  }, [businessId]);
+
+  // Fetch upcoming active appointments once — used to detect and surface time conflicts
+  // proactively in the slot picker before the user attempts to submit.
+  useEffect(() => {
+    const svc = new BookingService();
+    svc.getUpcomingAppointments().then(setUpcomingAppointments);
+  }, []);
+
+  // Auto-select initial date after schedule has loaded so we can skip closed days.
+  useEffect(() => {
+    if (!businessId || !scheduleLoaded) return;
     if (selectedDate != null) return;
     if (rescheduleInitialDate && !isDateInPast(rescheduleInitialDate)) {
       setSelectedDate(rescheduleInitialDate);
     } else {
-      setSelectedDate(getToday());
+      const firstOpen = selectableDates.find(
+        (d) => !isDateInPast(d) && !isBusinessClosedOnDate(d, businessSchedule)
+      );
+      setSelectedDate(firstOpen ?? getToday());
     }
-  }, [businessId, selectedDate, rescheduleInitialDate, setSelectedDate]);
+  }, [businessId, scheduleLoaded, selectedDate, rescheduleInitialDate, businessSchedule, selectableDates, setSelectedDate]);
 
   useEffect(() => {
     const loadServices = async () => {
@@ -294,7 +390,7 @@ export default function BookingPage() {
       );
 
   const handleDateSelect = (date: string) => {
-    if (isDateInPast(date)) return;
+    if (isDateInPast(date) || isBusinessClosedOnDate(date, businessSchedule)) return;
     setSelectedDate(date);
     setSelectedQueue(null);
     setSelectedQueueOption(null);
@@ -413,19 +509,19 @@ export default function BookingPage() {
     try {
       const bookingService = new BookingService();
 
-      // ── Reschedule mode: update existing appointment ──────────────────────
+      // Reschedule mode: update existing appointment
       if (isReschedule && rescheduleQueueUserId) {
         await bookingService.rescheduleAppointment(rescheduleQueueUserId, {
           queue_id: queueId,
           queue_date: selectedDate,
           service_ids: finalServiceIds,
         });
-        alert(t("bk.rescheduled"));
+        showToast(t("bk.rescheduled"));
         navigate("/profile?tab=appointments");
         return;
       }
 
-      // ── New booking mode ──────────────────────────────────────────────────
+      // New booking mode
       const result = await bookingService.createBooking({
         business_id: businessId,
         queue_id: queueId,
@@ -439,7 +535,7 @@ export default function BookingPage() {
         setBookingConfirmation(result);
         return;
       }
-      alert(t("bookingConfirmed"));
+      showToast(t("bookingConfirmed"));
       navigate("/");
     } catch (err: any) {
       console.error(isReschedule ? "Reschedule failed:" : "Booking failed:", err);
@@ -447,9 +543,8 @@ export default function BookingPage() {
         err.response?.data?.detail ||
         (isReschedule ? t("bk.rescheduleFailed") : t("bookingFailed"));
       setError(errorMsg);
-      if (err.response?.status === HttpStatus.UNAUTHORIZED) {
-        alert(t("pleaseLogin"));
-        navigate("/send-otp", {
+      if (err.response?.status === HttpStatus.UNAUTHORIZED) { 
+          navigate("/send-otp", {
           state: {
             returnTo: `/business/${businessId}/book`,
             selectedServices: initialSelectedServices,
@@ -474,15 +569,16 @@ export default function BookingPage() {
   const needsSlot = (appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && queueSupportsScheduled;
   const canConfirm =
     (selectedQueueOption !== null || selectedQueue !== null) &&
-    (!needsSlot || (needsSlot && selectedSlot !== null));
+    (!needsSlot || (needsSlot && selectedSlot !== null)) &&
+    !queueTimeConflict;
   const displayQueue = selectedQueueOption ?? selectedQueue;
   const alreadyInQueueData = bookingConfirmation?.already_in_queue ? bookingConfirmation : null;
 
-  // ——— Main booking flow ———
+  // Main booking flow
   return (
     <div className="bk-page">
 
-      {/* ── Left panel ─────────────────────────────────────────────────── */}
+      {/* Left panel */}
       <div className="bk-left">
 
         {/* Step progress */}
@@ -531,7 +627,7 @@ export default function BookingPage() {
           )}
         </header>
 
-        {/* ── Section 1: Date ─────────────────────────────────────────── */}
+        {/* Section 1: Date */}
         <section className="bk-section">
           <div className="bk-section-head">
             <div>
@@ -541,7 +637,9 @@ export default function BookingPage() {
           </div>
           <div className="bk-date-strip" role="group" aria-label="Select date">
             {selectableDates.map((date) => {
-              const disabled = isDateInPast(date);
+              const isPast = isDateInPast(date);
+              const isClosed = isBusinessClosedOnDate(date, businessSchedule);
+              const disabled = isPast || isClosed;
               const d = new Date(date + "T00:00:00");
               const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
               const monNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -550,22 +648,24 @@ export default function BookingPage() {
                 <button
                   key={date}
                   type="button"
-                  className={`bk-date-btn${selectedDate === date ? " bk-date-btn--active" : ""}${disabled ? " bk-date-btn--unavailable" : ""}`}
+                  className={`bk-date-btn${selectedDate === date ? " bk-date-btn--active" : ""}${isPast ? " bk-date-btn--unavailable" : ""}${isClosed ? " bk-date-btn--closed" : ""}`}
                   onClick={() => handleDateSelect(date)}
                   disabled={disabled}
                   aria-pressed={selectedDate === date}
+                  aria-label={`${isToday ? t("today") : dayNames[d.getDay()]} ${d.getDate()} ${monNames[d.getMonth()]}${isClosed ? ` — ${t("bd.closed")}` : ""}`}
                 >
                   {isToday && <span className="bk-date-now-tag">{t("bk.now")}</span>}
                   <span className="bk-date-day">{isToday ? t("today") : dayNames[d.getDay()]}</span>
                   <span className="bk-date-num">{d.getDate()}</span>
                   <span className="bk-date-mon">{monNames[d.getMonth()]}</span>
+                  {isClosed && <span className="bk-date-closed-tag">{t("bd.closed")}</span>}
                 </button>
               );
             })}
           </div>
         </section>
 
-        {/* ── Section 2: Services ──────────────────────────────────────── */}
+        {/* Section 2: Services */}
         <section className="bk-section">
           <div className="bk-section-head">
             <div>
@@ -661,7 +761,7 @@ export default function BookingPage() {
           )}
         </section>
 
-        {/* ── Section 3: Queue selection ───────────────────────────────── */}
+        {/* Section 3: Queue selection */}
         {canProceedToSlots && (
           <section className="bk-section">
             <div className="bk-section-head">
@@ -729,6 +829,18 @@ export default function BookingPage() {
               </div>
             )}
 
+            {queueTimeConflict && (
+              <div className="bk-conflict-banner" role="alert">
+                <span className="bk-conflict-banner__icon">⚠️</span>
+                <span className="bk-conflict-banner__msg">
+                  {t("bk.timeConflict", {
+                    time: selectedQueueOption?.estimated_appointment_time ?? "",
+                    business: queueTimeConflict.business_name,
+                  })}
+                </span>
+              </div>
+            )}
+
             {wsConnectedState && !previewLoading && queueOptions.length > 0 && (
               <div className="bk-refresh-row">
                 <button type="button" className="bk-refresh-btn" onClick={fetchBookingPreview}>
@@ -740,7 +852,7 @@ export default function BookingPage() {
           </section>
         )}
 
-        {/* ── Appointment mode (FIXED / APPROXIMATE / HYBRID) ──────────── */}
+        {/* Appointment mode (FIXED / APPROXIMATE / HYBRID) */}
         {selectedQueueOption && queueSupportsScheduled && (
           <section className="bk-section">
             <div className="bk-section-head">
@@ -792,7 +904,7 @@ export default function BookingPage() {
 
       </div>{/* /bk-left */}
 
-      {/* ── Right panel ─────────────────────────────────────────────────── */}
+      {/* Right panel */}
       <div className="bk-right">
         <div className="bk-summary-title">{t("bk.summary")}</div>
 
@@ -879,7 +991,7 @@ export default function BookingPage() {
         </div>
       </div>{/* /bk-right */}
 
-      {/* ── Slot picker modal ────────────────────────────────────────────── */}
+      {/* Slot picker modal */}
       {slotPickerOpen && (appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && (
         <div className="bk-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bk-slot-picker-title" onClick={(e) => { if (e.target === e.currentTarget) setSlotPickerOpen(false); }}>
           <div className="bk-slot-picker-modal">
@@ -913,14 +1025,31 @@ export default function BookingPage() {
                 </div>
               ) : (
                 <div className="bk-slot-picker-grid" role="group" aria-label="Available time slots">
-                  {timeSlots.slots.filter(s => s.available).map((slot) => (
-                    <button key={slot.uuid} type="button" className={`bk-slot-picker-item${selectedSlot?.uuid === slot.uuid ? " bk-slot-picker-item--selected" : ""}`} onClick={() => { setSelectedSlot(slot); setSlotPickerOpen(false); }} aria-pressed={selectedSlot?.uuid === slot.uuid}>
-                      <span className="bk-slot-start">{formatTimeToDisplay(slot.slot_start)}</span>
-                      <span className="bk-slot-dash">–</span>
-                      <span className="bk-slot-end">{formatTimeToDisplay(slot.slot_end)}</span>
-                      {slot.remaining > 0 && slot.remaining <= 3 && (slot.capacity ?? 0) > 1 && <span className="bk-slot-scarcity">{t("bk.slotLeft", { count: slot.remaining })}</span>}
-                    </button>
-                  ))}
+                  {timeSlots.slots.filter(s => s.available).map((slot) => {
+                    const conflictApt = getConflictForSlot(selectedDate ?? "", slot.slot_start);
+                    const isConflicted = !!conflictApt || conflictedTimesSet.has(`${selectedDate}|${slot.slot_start}`);
+                    const isSelected = selectedSlot?.uuid === slot.uuid;
+                    return (
+                      <button
+                        key={slot.uuid}
+                        type="button"
+                        disabled={isConflicted}
+                        aria-pressed={isSelected}
+                        title={isConflicted ? `Already booked at ${formatTimeToDisplay(slot.slot_start)} — ${conflictApt?.business_name ?? "another appointment"}` : undefined}
+                        className={`bk-slot-picker-item${isSelected ? " bk-slot-picker-item--selected" : ""}${isConflicted ? " bk-slot-picker-item--conflicted" : ""}`}
+                        onClick={() => { if (!isConflicted) { setSelectedSlot(slot); setSlotPickerOpen(false); } }}
+                      >
+                        <span className="bk-slot-start">{formatTimeToDisplay(slot.slot_start)}</span>
+                        <span className="bk-slot-dash">–</span>
+                        <span className="bk-slot-end">{formatTimeToDisplay(slot.slot_end)}</span>
+                        {isConflicted
+                          ? <span className="bk-slot-conflict-tag">{t("bk.alreadyBooked")}</span>
+                          : slot.remaining > 0 && slot.remaining <= 3 && (slot.capacity ?? 0) > 1
+                            ? <span className="bk-slot-scarcity">{t("bk.slotLeft", { count: slot.remaining })}</span>
+                            : null}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -928,7 +1057,13 @@ export default function BookingPage() {
         </div>
       )}
 
-      {/* ── Already in queue modal ───────────────────────────────────────── */}
+      {/* Toast */}
+      <div className={`bk-toast${toastVisible ? " bk-toast--show" : ""}`} role="status" aria-live="polite">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        {toastMsg}
+      </div>
+
+      {/* Already in queue modal */}
       {alreadyInQueueData && (
         <div className="bk-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bk-already-title" onClick={() => setBookingConfirmation(null)}>
           <div className="bk-modal-content" onClick={(e) => e.stopPropagation()}>

@@ -57,7 +57,7 @@ class HttpClient {
   }
 
   private handleRequestError(error: any): Promise<any> {
-    console.error("Request error:", error);
+    if (import.meta.env.DEV) console.error("Request error:", error);
     return Promise.reject(error);
   }
 
@@ -66,21 +66,13 @@ class HttpClient {
   }
 
   private handleError(error: any): never {
-    console.log("Request error:", error);
-    if (axios.isAxiosError(error)) {
+    if (import.meta.env.DEV && axios.isAxiosError(error)) {
       const e = error as AxiosError;
       console.error("Axios Error Details:", {
         message: e.message,
-        name: e.name,
         code: e.code,
-        config: e.config,
-        request: e.request,
         response: e.response,
       });
-      // Handle 401 Unauthorized or Network Errors
-      if (e.response?.status === 401 || e.code === "ERR_NETWORK") {
-        console.warn("Unauthorized or Network Error");         
-      }
     }
     throw error;
   }

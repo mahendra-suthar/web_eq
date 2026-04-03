@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AddressData, DaySchedule } from '../../utils/businessRegistrationStore';
 import { ProfileService, UnifiedProfileResponse } from '../../services/profile/profile.service';
@@ -8,6 +8,7 @@ import { OTPService } from '../../services/otp/otp.service';
 import { QueueService, QueueDetailData } from '../../services/queue/queue.service';
 import { backendDowToUiDow, emailRegex, formatDurationMinutes, getQueueStatusLabel, uiDowToBackendDow } from '../../utils/utils';
 import { Tabs } from '../../components/tabs/Tabs';
+import LocationEditor from '../../components/location-editor';
 import './employee-profile.scss';
 
 interface UserProfileData {
@@ -236,31 +237,6 @@ const EmployeeProfile = () => {
         }
     };
 
-    const handleSaveLocation = async () => {
-        if (!locationData.street_1?.trim() || !locationData.city?.trim() || !locationData.state?.trim() || !locationData.postal_code?.trim()) {
-            setSaveError(t("enterBusinessAddress"));
-            return;
-        }
-        if (!employeeId) return;
-        setSaving(true);
-        setSaveError("");
-        try {
-            await profileService.updateAddress("EMPLOYEE", employeeId, {
-                ...locationData,
-                street_1: locationData.street_1,
-                city: locationData.city,
-                state: locationData.state,
-                postal_code: locationData.postal_code,
-            });
-            await fetchProfile();
-            setEditingTab(null);
-        } catch (err: any) {
-            setSaveError(err?.response?.data?.detail?.message || err?.message || t("failedToLoadEmployees"));
-        } finally {
-            setSaving(false);
-        }
-    };
-
     const handleSaveSchedule = async () => {
         if (!scheduleData.isAlwaysOpen && scheduleData.schedule.every(d => !d.is_open)) {
             setSaveError(t("selectAtLeastOneDay"));
@@ -456,71 +432,12 @@ const EmployeeProfile = () => {
 
                     {activeTab === 'location' && (
                         <div className="profile-section">
-                            <div className="section-header section-header-actions">
-                                <h2 className="section-title">{t("location")}</h2>
-                                {canEdit && (
-                                    !isEditing ? (
-                                        <button type="button" className="btn btn-primary" onClick={() => setEditingTab('location')}>{t("editProfile")}</button>
-                                    ) : (
-                                        <div className="section-actions">
-                                            <button type="button" className="btn btn-secondary" onClick={handleCancelEdit} disabled={saving}>{t("cancel")}</button>
-                                            <button type="button" className="btn btn-primary" onClick={handleSaveLocation} disabled={saving}>
-                                                {saving ? t("saving") : t("saveChanges")}
-                                            </button>
-                                        </div>
-                                    )
-                                )}
-                            </div>
-                            <div className="section-content">
-                                <div className="info-grid">
-                                    {[
-                                        { key: 'unit_number', label: t("unitNumber"), placeholder: t("enterUnitNumber") },
-                                        { key: 'building', label: t("building"), placeholder: t("enterBuilding") },
-                                        { key: 'floor', label: t("floor"), placeholder: t("enterFloor") },
-                                    ].map(({ key, label, placeholder }) => (
-                                        <div key={key} className="info-field">
-                                            <label className="info-label">{label}</label>
-                                            {isEditing ? (
-                                                <input type="text" className="info-input" value={(locationData as any)[key] || ""}
-                                                    onChange={e => setLocationData(prev => ({ ...prev, [key]: e.target.value }))} placeholder={placeholder} />
-                                            ) : (
-                                                <div className="info-value">{(locationData as any)[key] || t("notAvailable")}</div>
-                                            )}
-                                        </div>
-                                    ))}
-                                    {[
-                                        { key: 'street_1', label: t("street1"), placeholder: t("enterStreet1"), fullWidth: true },
-                                        { key: 'street_2', label: t("street2"), placeholder: t("enterStreet2"), fullWidth: true },
-                                    ].map(({ key, label, placeholder, fullWidth }) => (
-                                        <div key={key} className={`info-field ${fullWidth ? 'full-width' : ''}`}>
-                                            <label className="info-label">{label}</label>
-                                            {isEditing ? (
-                                                <input type="text" className="info-input" value={(locationData as any)[key] || ""}
-                                                    onChange={e => setLocationData(prev => ({ ...prev, [key]: e.target.value }))} placeholder={placeholder} />
-                                            ) : (
-                                                <div className="info-value">{(locationData as any)[key] || t("notAvailable")}</div>
-                                            )}
-                                        </div>
-                                    ))}
-                                    {[
-                                        { key: 'city', label: t("city"), placeholder: t("enterCity") },
-                                        { key: 'district', label: t("district"), placeholder: t("enterDistrict") },
-                                        { key: 'state', label: t("state"), placeholder: t("state") },
-                                        { key: 'postal_code', label: t("postalCode"), placeholder: t("postalCode") },
-                                        { key: 'country', label: t("country"), placeholder: t("country") },
-                                    ].map(({ key, label, placeholder }) => (
-                                        <div key={key} className="info-field">
-                                            <label className="info-label">{label}</label>
-                                            {isEditing ? (
-                                                <input type="text" className="info-input" value={(locationData as any)[key] || ""}
-                                                    onChange={e => setLocationData(prev => ({ ...prev, [key]: e.target.value }))} placeholder={placeholder} />
-                                            ) : (
-                                                <div className="info-value">{(locationData as any)[key] || t("notAvailable")}</div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                            <LocationEditor
+                                entityType="EMPLOYEE"
+                                entityId={employeeId}
+                                initialAddress={locationData}
+                                onSaved={fetchProfile}
+                            />
                         </div>
                     )}
 

@@ -1,0 +1,174 @@
+@use "../../variables.scss" as *;
+
+// ─── Review Modal (shared) ────────────────────────────────────────────────────
+
+.rv-modal {
+  width: 100%;
+  max-width: 440px;
+}
+
+.rv-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 28px 0;
+}
+
+.rv-modal-title {
+  font-family: 'Fraunces', serif !important;
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  color: $ink-dark;
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+
+.rv-modal-subtitle {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13px !important;
+  color: $muted-green;
+  padding: 4px 28px 0;
+  margin: 0;
+}
+
+.rv-modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--foam);
+  border: 1px solid $border-subtle;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: $muted-green;
+  transition: all 0.2s;
+  flex-shrink: 0;
+
+  &:hover { background: rgba($forest, 0.08); color: $ink-dark; }
+}
+
+.rv-modal-body {
+  padding: 20px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.rv-modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rv-modal-label {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: $ink-dark;
+}
+
+// ─── Star picker ──────────────────────────────────────────────────────────────
+
+.rv-star-picker {
+  display: flex;
+  gap: 4px;
+}
+
+.rv-star-btn {
+  font-size: 34px;
+  line-height: 1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba($forest, 0.15);
+  transition: color 0.15s, transform 0.12s;
+  padding: 0 2px;
+
+  &.active { color: $gold; }
+  &:hover  { transform: scale(1.15); }
+  &:focus-visible { outline: 2px solid $jade; border-radius: 4px; }
+}
+
+.rv-star-hint {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 12px !important;
+  color: $muted-green;
+  min-height: 16px;
+}
+
+// ─── Textarea ─────────────────────────────────────────────────────────────────
+
+.rv-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid $border-subtle;
+  border-radius: 12px;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 300 !important;
+  color: $ink-dark;
+  background: #fff;
+  resize: vertical;
+  min-height: 100px;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+
+  &::placeholder { color: $muted-green; }
+  &:focus {
+    outline: none;
+    border-color: $jade;
+    box-shadow: 0 0 0 3px rgba($jade, 0.1);
+  }
+}
+
+.rv-char-count {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 11.5px !important;
+  color: $muted-green;
+  text-align: right;
+  margin-top: -6px;
+}
+
+// ─── Error ────────────────────────────────────────────────────────────────────
+
+.rv-error {
+  padding: 10px 14px;
+  background: rgba($color-error, 0.06);
+  border: 1px solid rgba($color-error, 0.2);
+  border-radius: 10px;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13px !important;
+  color: $color-error;
+}
+
+// ─── Submit button ────────────────────────────────────────────────────────────
+
+.rv-submit-btn {
+  width: 100%;
+  padding: 14px;
+  background: $forest;
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: 0 4px 18px rgba($forest, 0.28);
+
+  &:hover:not(:disabled) {
+    background: $jade;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba($forest, 0.32);
+  }
+
+  &:disabled {
+    background: var(--foam);
+    color: $muted-green;
+    box-shadow: none;
+    cursor: default;
+    transform: none;
+  }
+}

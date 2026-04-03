@@ -35,7 +35,6 @@ from app.core.constants import (
 )
 from app.core.utils import (
     build_live_queue_users_raw,
-    format_time_12h,
     today_app_date,
     current_time_app_tz,
     format_date_iso,
@@ -43,6 +42,7 @@ from app.core.utils import (
 )
 from app.services.booking_calculation_service import BookingCalculationService
 from app.services.slot_generation_service import SlotGenerationService
+from app.services.user_service import UserService
 from app.core.constants import (
     BOOKING_MODE_FIXED,
     BOOKING_MODE_APPROXIMATE,
@@ -375,6 +375,19 @@ class QueueController:
 
             calc_service = BookingCalculationService(self.db)
 
+            # Walk-in: staff is adding a customer manually — resolve or create guest user
+            is_walk_in = bool(data.recipient_phone and data.recipient_country_code)
+            if is_walk_in:
+                user_service = UserService(self.db)
+                guest = user_service.find_or_create_guest_user(
+                    phone_number=data.recipient_phone,
+                    country_code=data.recipient_country_code,
+                    full_name=data.recipient_name,
+                )
+                booking_user_id = guest.uuid
+            else:
+                booking_user_id = user_id
+
             business = self.business_service.get_business_by_id(data.business_id)
             if not business:
                 raise HTTPException(status_code=404, detail="Business not found")
@@ -455,9 +468,9 @@ class QueueController:
                 if not queue_services:
                     queue_services = all_queue_services
 
-            if data.queue_date == today_app_date():
+            if data.queue_date == today_app_date() and not is_walk_in:
                 existing_booking = self.get_existing_booking(
-                    user_id=user_id,
+                    user_id=booking_user_id,
                     queue_id=queue_id,
                     queue_date=data.queue_date,
                     business_id=data.business_id,
@@ -473,6 +486,20 @@ class QueueController:
             scheduled_start = None
             scheduled_end = None
 
+            if appointment_type == "QUEUE" and metrics.get("appointment_time") and not is_walk_in:
+                preliminary_service_time = sum((qs.avg_service_time or 5) for qs in queue_services)
+                queue_time_conflict = self.queue_service.get_queue_booking_at_estimated_time(
+                    user_id=booking_user_id,
+                    queue_date=data.queue_date,
+                    appointment_time_str=metrics["appointment_time"],
+                    tolerance_minutes=max(preliminary_service_time, 15),
+                )
+                if queue_time_conflict:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="You already have an appointment around this time. Please choose a different date or time.",
+                    )
+
             if appointment_type in ("FIXED", "APPROXIMATE") and slot_id:
                 slot = self.queue_service.get_slot_by_id(slot_id)
                 if not slot:
@@ -481,6 +508,17 @@ class QueueController:
                     raise HTTPException(status_code=400, detail="Slot does not match selected queue or date")
                 if slot.is_blocked:
                     raise HTTPException(status_code=409, detail="Slot is not available")
+                if not is_walk_in:
+                    conflict = self.queue_service.get_booking_at_time(
+                        user_id=booking_user_id,
+                        queue_date=data.queue_date,
+                        slot_start=slot.slot_start,
+                    )
+                    if conflict:
+                        raise HTTPException(
+                            status_code=409,
+                            detail="You already have an appointment at this time. Please choose a different time slot.",
+                        )
                 reserved = self.queue_service.reserve_slot_atomic(slot_id)
                 if not reserved:
                     raise HTTPException(status_code=409, detail="Slot is full")
@@ -503,7 +541,7 @@ class QueueController:
             )
 
             queue_user = self.queue_service.create_booking(
-                user_id=user_id,
+                user_id=booking_user_id,
                 queue_id=queue_id,
                 queue_date=data.queue_date,
                 token_number=token_number,
@@ -523,7 +561,7 @@ class QueueController:
                 await queue_manager.add_to_queue(
                     db=self.db,
                     queue_id=str(queue_id),
-                    user_id=str(user_id),
+                    user_id=str(booking_user_id),
                     date_str=date_str,
                     token_number=token_number,
                     total_service_time=total_service_time,
@@ -889,23 +927,10 @@ class QueueController:
                         service_names.append(qs.service.name)
             service_summary = " · ".join(service_names) if service_names else None
 
-            appointment_time_12h = None
-            appointment_time_str = metrics.get("appointment_time")
-            if appointment_time_str:
-                try:
-                    parts = appointment_time_str.split(":")
-                    if len(parts) >= 2:
-                        h, m = int(parts[0]), int(parts[1])
-                        appointment_time_12h = format_time_12h(
-                            datetime.combine(today_app_date(), time(h, m))
-                        )
-                except Exception:
-                    pass
-
             items.append(
                 CustomerTodayAppointmentResponse.from_queue_user_and_metrics(
                     qu, queue, business_id, business_name,
-                    metrics, service_summary, appointment_time_12h,
+                    metrics, service_summary, metrics.get("appointment_time"),
                     queue_service_uuids=qs_uuids,
                 )
             )

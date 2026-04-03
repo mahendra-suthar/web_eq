@@ -1,7 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useLayoutContext } from "../../../../layouts/general-layout";
 import Button from "../../../../components/button";
-import { BusinessService, Category } from "../../../../services/business/business.service";
+import {
+  BusinessService,
+  Category,
+  SubcategoryMinimal,
+} from "../../../../services/business/business.service";
 import { emailRegex } from "../../../../utils/utils";
 import { useUserStore } from "../../../../utils/userStore";
 import "./business-basic-info.scss";
@@ -13,6 +17,7 @@ interface BusinessBasicInfoProps {
     business_email: string;
     about_business?: string;
     category_id: string;
+    subcategory_ids: string[];
     profile_picture?: File;
   }) => void;
   onBack?: () => void;
@@ -32,12 +37,17 @@ export default function BusinessBasicInfo({
   const [businessName, setBusinessName] = useState<string>(initialData?.business_name || "");
   const [businessEmail, setBusinessEmail] = useState<string>(initialData?.business_email || "");
   const [aboutBusiness, setAboutBusiness] = useState<string>(initialData?.about_business || "");
-  const [categoryId, setCategoryId] = useState<string>(initialData?.category_id || "");
+  const [selectedSubcategoryIds, setSelectedSubcategoryIds] = useState<string[]>(
+    initialData?.category_id ? [initialData.category_id] : []
+  );
+  const [parentCategoryId, setParentCategoryId] = useState<string>("");
   const [profilePicture, setProfilePicture] = useState<File | undefined>(initialData?.profile_picture);
   const [profilePicturePreview, setProfilePicturePreview] = useState<string>("");
 
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<SubcategoryMinimal[]>([]);
   const [loadingCategories, setLoadingCategories] = useState<boolean>(false);
+  const [loadingSubcategories, setLoadingSubcategories] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [errors, setErrors] = useState<{
@@ -57,20 +67,63 @@ export default function BusinessBasicInfo({
     category_id: false,
   });
 
+  const parentCategories = useMemo(
+    () => allCategories.filter((c) => !c.parent_category_id),
+    [allCategories]
+  );
+
   useEffect(() => {
     const fetchCategories = async () => {
       setLoadingCategories(true);
       try {
         const cats = await businessService.getCategories();
-        setCategories(cats);
-      } catch (error) {
-        console.error("Failed to fetch categories:", error);
+        setAllCategories(cats);
+      } catch (err) {
+        console.error("Failed to fetch categories:", err);
       } finally {
         setLoadingCategories(false);
       }
     };
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    if (!initialData?.category_id || allCategories.length === 0) return;
+    const cat = allCategories.find((c) => c.uuid === initialData.category_id);
+    if (!cat) return;
+    if (cat.parent_category_id) {
+      setParentCategoryId(cat.parent_category_id);
+      setSelectedSubcategoryIds([cat.uuid]);
+    } else {
+      setParentCategoryId(cat.uuid);
+      setSelectedSubcategoryIds([]);
+    }
+  }, [allCategories, initialData?.category_id]);
+
+  useEffect(() => {
+    if (!parentCategoryId) {
+      setSubcategories([]);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      setLoadingSubcategories(true);
+      try {
+        const subs = await businessService.getSubcategories(parentCategoryId);
+        if (!cancelled) setSubcategories(subs);
+      } catch (err) {
+        console.error("Failed to fetch subcategories:", err);
+        if (!cancelled) setSubcategories([]);
+      } finally {
+        if (!cancelled) setLoadingSubcategories(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [parentCategoryId]);
 
   const validateField = (field: string, value: any): boolean => {
     const newErrors = { ...errors };
@@ -97,8 +150,8 @@ export default function BusinessBasicInfo({
         break;
 
       case "category_id":
-        if (!value) {
-          newErrors.category_id = t("selectCategory");
+        if (!value || (Array.isArray(value) && value.length === 0)) {
+          newErrors.category_id = t("selectSubcategory");
         } else {
           delete newErrors.category_id;
         }
@@ -131,8 +184,16 @@ export default function BusinessBasicInfo({
         ? businessName
         : field === "business_email"
         ? businessEmail
-        : categoryId;
+        : selectedSubcategoryIds;
     validateField(field, value);
+  };
+
+  const toggleSubcategory = (uuid: string) => {
+    setSelectedSubcategoryIds((prev) => {
+      const next = prev.includes(uuid) ? prev.filter((id) => id !== uuid) : [...prev, uuid];
+      if (touched.category_id) validateField("category_id", next);
+      return next;
+    });
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,18 +213,24 @@ export default function BusinessBasicInfo({
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
 
-    // Mark all fields as touched
     setTouched({
       business_name: true,
       business_email: true,
       category_id: true,
     });
 
-    // Validate all fields
+    if (!parentCategoryId) {
+      setErrors((prev) => ({
+        ...prev,
+        category_id: t("selectParentCategory"),
+      }));
+      return;
+    }
+
     const isValid =
       validateField("business_name", businessName) &&
       validateField("business_email", businessEmail) &&
-      validateField("category_id", categoryId) &&
+      validateField("category_id", selectedSubcategoryIds) &&
       (!profilePicture || validateField("profile_picture", profilePicture));
 
     if (!isValid) {
@@ -185,7 +252,7 @@ export default function BusinessBasicInfo({
         name: businessName.trim(),
         email: businessEmail.trim().toLowerCase() || undefined,
         about_business: aboutBusiness.trim() || undefined,
-        category_id: categoryId,
+        category_id: selectedSubcategoryIds[0],
         profile_picture: profilePictureUrl,
         owner_id: userInfo.uuid,
         phone_number: userInfo.phone_number,
@@ -193,16 +260,17 @@ export default function BusinessBasicInfo({
       });
 
       onNext({
-        business_id: businessData.uuid, // Pass business_id to parent
+        business_id: businessData.uuid,
         business_name: businessData.name,
         business_email: businessData.email || "",
         about_business: businessData.about_business || undefined,
         category_id: businessData.category_id,
-        profile_picture: profilePicture, // Keep file reference for potential future upload
+        subcategory_ids: selectedSubcategoryIds,
+        profile_picture: profilePicture,
       });
     } catch (err: any) {
       let errorMessage = t("businessRegistrationFailed");
-      
+
       if (err?.errorCode === "BUSINESS_ALREADY_EXISTS") {
         errorMessage = t("businessAlreadyRegistered");
       } else if (err?.errorCode === "OWNER_NOT_FOUND") {
@@ -214,7 +282,7 @@ export default function BusinessBasicInfo({
       } else if (err?.code === "ERR_NETWORK" || !err?.response) {
         errorMessage = t("networkError");
       }
-      
+
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -237,7 +305,6 @@ export default function BusinessBasicInfo({
 
       <form className="business-basic-info-form" onSubmit={handleSubmit}>
         <div className="business-basic-info-form-fields">
-          {/* Business Name */}
           <div className="form-field-wrapper">
             <label className="form-label">{t("businessName")} *</label>
             <div className={`form-field ${touched.business_name && errors.business_name ? "error" : ""}`}>
@@ -260,7 +327,6 @@ export default function BusinessBasicInfo({
             </div>
           </div>
 
-          {/* Business Email */}
           <div className="form-field-wrapper">
             <label className="form-label">{t("businessEmail")} *</label>
             <div className={`form-field ${touched.business_email && errors.business_email ? "error" : ""}`}>
@@ -282,7 +348,6 @@ export default function BusinessBasicInfo({
             </div>
           </div>
 
-          {/* About Business */}
           <div className="form-field-wrapper">
             <label className="form-label">{t("aboutBusiness")}</label>
             <div className="form-field">
@@ -296,35 +361,70 @@ export default function BusinessBasicInfo({
             </div>
           </div>
 
-          {/* Category */}
+          {/* Main category (root) */}
           <div className="form-field-wrapper">
-            <label className="form-label">{t("category")} *</label>
-            <div className={`form-field ${touched.category_id && errors.category_id ? "error" : ""}`}>
+            <label className="form-label">{t("parentCategory")} *</label>
+            <div className={`form-field ${touched.category_id && errors.category_id && !parentCategoryId ? "error" : ""}`}>
               <select
-                value={categoryId}
+                value={parentCategoryId}
                 onChange={(e) => {
-                  setCategoryId(e.target.value);
+                  const v = e.target.value;
+                  setParentCategoryId(v);
+                  setSelectedSubcategoryIds([]);
                   if (touched.category_id) {
-                    validateField("category_id", e.target.value);
+                    validateField("category_id", "");
                   }
                 }}
-                onBlur={() => handleBlur("category_id")}
                 disabled={loadingCategories}
               >
-                <option value="">{loadingCategories ? t("loading") : t("selectCategory")}</option>
-                {categories.map((category) => (
-                  <option key={category.uuid} value={category.uuid}>
-                    {category.name}
+                <option value="">{loadingCategories ? t("loading") : t("selectParentCategory")}</option>
+                {parentCategories.map((c) => (
+                  <option key={c.uuid} value={c.uuid}>
+                    {c.name}
                   </option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          {/* Subcategory multi-select chips — GET /category/subcategories?parent_uuid= */}
+          <div className="form-field-wrapper">
+            <label className="form-label">{t("subcategory")} *</label>
+            <div
+              className={`subcat-chips-wrapper${touched.category_id && errors.category_id ? " error" : ""}`}
+              onBlur={() => handleBlur("category_id")}
+              tabIndex={-1}
+            >
+              {!parentCategoryId ? (
+                <p className="subcat-placeholder">{t("selectParentCategory")}</p>
+              ) : loadingSubcategories ? (
+                <p className="subcat-placeholder">{t("loading")}</p>
+              ) : subcategories.length === 0 ? (
+                <p className="subcat-placeholder">{t("selectSubcategory")}</p>
+              ) : (
+                <div className="subcat-chips">
+                  {subcategories.map((s) => {
+                    const isSelected = selectedSubcategoryIds.includes(s.uuid);
+                    return (
+                      <button
+                        key={s.uuid}
+                        type="button"
+                        className={`subcat-chip${isSelected ? " subcat-chip--selected" : ""}`}
+                        onClick={() => toggleSubcategory(s.uuid)}
+                      >
+                        {s.name}
+                        {isSelected && <span className="subcat-chip__check">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               {touched.category_id && errors.category_id && (
                 <div className="error-text">{errors.category_id}</div>
               )}
             </div>
           </div>
 
-          {/* Profile Picture */}
           <div className="form-field-wrapper">
             <label className="form-label">{t("businessProfilePicture")}</label>
             <div className="form-field">

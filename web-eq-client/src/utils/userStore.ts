@@ -61,6 +61,9 @@ export const useUserStore = create(
         if (profile.profile_type === ProfileType.EMPLOYEE && profile.employee?.uuid) {
           return profile.employee.uuid;
         }
+        if (profile.profile_type === ProfileType.BUSINESS && profile.employee?.uuid) {
+          return profile.employee.uuid;
+        }
         return null;
       },
 

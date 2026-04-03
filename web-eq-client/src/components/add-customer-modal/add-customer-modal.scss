@@ -1,0 +1,259 @@
+// ─── Add Customer Modal ───────────────────────────────────────────────────────
+
+.acm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.acm-modal {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+// ─── Header ──────────────────────────────────────────────────────────────────
+
+.acm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  flex-shrink: 0;
+}
+
+.acm-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.acm-close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color 0.15s;
+
+  &:hover {
+    color: #1e293b;
+  }
+}
+
+// ─── Body ─────────────────────────────────────────────────────────────────────
+
+.acm-body {
+  padding: 20px 24px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+// ─── Field layout ─────────────────────────────────────────────────────────────
+
+.acm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.acm-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.acm-optional {
+  font-weight: 400;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.acm-hint {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+// ─── Inputs ───────────────────────────────────────────────────────────────────
+
+.acm-input,
+.acm-select,
+.acm-textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1e293b;
+  background: #f8fafc;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+  outline: none;
+
+  &:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+    background: #fff;
+  }
+
+  &--error {
+    border-color: #ef4444;
+
+    &:focus {
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+    }
+  }
+}
+
+.acm-input--code {
+  width: 72px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.acm-phone-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.acm-input-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.acm-textarea {
+  resize: vertical;
+  min-height: 56px;
+}
+
+// ─── Services checklist ───────────────────────────────────────────────────────
+
+.acm-services {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+
+  &--error {
+    border-color: #ef4444;
+  }
+}
+
+.acm-service-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #1e293b;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.1s;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background: #f8fafc;
+  }
+
+  input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #667eea;
+    flex-shrink: 0;
+  }
+}
+
+.acm-service-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.acm-service-meta {
+  font-size: 12px;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+// ─── Error messages ───────────────────────────────────────────────────────────
+
+.acm-error {
+  font-size: 12px;
+  color: #ef4444;
+}
+
+.acm-submit-error {
+  padding: 10px 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #dc2626;
+}
+
+// ─── Actions ─────────────────────────────────────────────────────────────────
+
+.acm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.acm-btn {
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  border: none;
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  &--cancel {
+    background: #f1f5f9;
+    color: #475569;
+
+    &:hover:not(:disabled) {
+      background: #e2e8f0;
+    }
+  }
+
+  &--submit {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+
+    &:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+  }
+}

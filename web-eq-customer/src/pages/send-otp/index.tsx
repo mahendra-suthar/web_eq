@@ -21,7 +21,6 @@ export default function SendOTPPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ── Booking return state ─────────────────────────────────────────────────
   const {
     returnTo,
     selectedServices,
@@ -66,7 +65,6 @@ export default function SendOTPPage() {
     }
   }, [returnTo, selectedServices, selectedServicesData, businessName, rescheduleQueueUserId, rescheduleInitialDate]);
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPhone(e.target.value.replace(/\D/g, "").slice(0, PHONE_NUMBER_LENGTH));
     if (error) setError("");
@@ -217,27 +215,11 @@ export default function SendOTPPage() {
             </button>
           </form>
 
-          <div className="auth-or">{t("auth.orContinueWith")}</div>
-
-          <button
-            className="auth-alt-btn"
-            type="button"
-            onClick={() => alert("Google sign-in coming soon")}
-          >
-            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-              <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.7 33 29.3 36 24 36a12 12 0 110-24c3.1 0 5.8 1.1 7.9 3l5.7-5.7A19.9 19.9 0 0024 4 20 20 0 1044 24c0-1.4-.1-2.7-.4-4z"/>
-              <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8A12 12 0 0124 12c3.1 0 5.8 1.1 7.9 3l5.7-5.7A19.9 19.9 0 0024 4c-7.9 0-14.7 4.4-18.4 10.7z"/>
-              <path fill="#4CAF50" d="M24 44c5.2 0 9.8-1.8 13.4-4.7l-6.2-5.2A12 12 0 0124 36a12 12 0 01-11.3-8H6.3A20 20 0 0024 44z"/>
-              <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.5-2.5 4.6-4.5 6.1l6.2 5.2C40.9 36 44 30.4 44 24c0-1.4-.1-2.7-.4-4z"/>
-            </svg>
-            {t("auth.continueGoogle")}
-          </button>
-
           <p className="auth-terms">
             {t("auth.termsPrefix")}{" "}
-            <a href="#">{t("auth.termsService")}</a>
+            <a href="/terms">{t("auth.termsService")}</a>
             {" "}{t("auth.termsAnd")}{" "}
-            <a href="#">{t("auth.termsPrivacy")}</a>
+            <a href="/privacy">{t("auth.termsPrivacy")}</a>
           </p>
 
         </div>

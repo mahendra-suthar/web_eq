@@ -98,7 +98,7 @@ export class BusinessService extends HttpClient {
       const url = `/business/get_businesses${queryString ? `?${queryString}` : ''}`;
       return await this.get<BusinessListItem[]>(url);
     } catch (error: any) {
-      console.error("Failed to fetch businesses:", error);
+      if (import.meta.env.DEV) console.error("Failed to fetch businesses:", error);
       throw error;
     }
   }
@@ -107,7 +107,7 @@ export class BusinessService extends HttpClient {
     try {
       return await this.get<BusinessDetailData>(`/business/get_business_details/${businessId}`);
     } catch (error: any) {
-      console.error("Failed to fetch business details:", error);
+      if (import.meta.env.DEV) console.error("Failed to fetch business details:", error);
       throw error;
     }
   }
@@ -116,7 +116,7 @@ export class BusinessService extends HttpClient {
     try {
       return await this.get<BusinessServiceData[]>(`/business/get_business_services/${businessId}`);
     } catch (error: any) {
-      console.error("Failed to fetch business services:", error);
+      if (import.meta.env.DEV) console.error("Failed to fetch business services:", error);
       throw error;
     }
   }

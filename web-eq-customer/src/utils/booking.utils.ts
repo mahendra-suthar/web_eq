@@ -78,3 +78,24 @@ export const formatDateFull = (dateStr: string): string =>
     day: "numeric",
     year: "numeric",
   });
+
+/**
+ * Returns true when the business is closed on the given date.
+ *
+ * DB stores day_of_week in JS convention (0=Sun, 1=Mon … 6=Sat) — same as
+ * Date.prototype.getDay() — so we compare directly without any conversion.
+ *
+ * If no schedule is provided (still loading / fetch failed) we return false so
+ * the caller never blocks date selection on missing data.
+ */
+export const isBusinessClosedOnDate = (
+  dateStr: string,
+  schedule: { is_always_open: boolean; schedules: { day_of_week: number; is_open: boolean }[] } | null
+): boolean => {
+  if (!schedule) return false;
+  if (schedule.is_always_open) return false;
+  const jsDay = new Date(dateStr + "T00:00:00").getDay(); // 0=Sun…6=Sat
+  const dayEntry = schedule.schedules.find((s) => s.day_of_week === jsDay);
+  // No entry for this day → treat as closed
+  return !dayEntry?.is_open;
+};

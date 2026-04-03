@@ -21,6 +21,22 @@ export interface BookingCreateInput {
   slot_id?: string;
 }
 
+/**
+ * Lightweight appointment item returned by GET /customer/appointments/upcoming.
+ * Used exclusively for proactive time-conflict detection on the booking page.
+ */
+export interface UpcomingAppointmentItem {
+  queue_user_id: string;
+  queue_date: string;                       // YYYY-MM-DD
+  scheduled_start: string | null;           // HH:MM — set for FIXED / APPROXIMATE
+  scheduled_end: string | null;
+  estimated_appointment_time: string | null; // HH:MM — set for QUEUE bookings
+  appointment_type: string;                 // "QUEUE" | "FIXED" | "APPROXIMATE"
+  business_id: string;
+  business_name: string;
+  queue_name: string;
+}
+
 export interface RescheduleInput {
   queue_id: string;
   queue_date: string; // YYYY-MM-DD
@@ -50,7 +66,7 @@ export class BookingService extends HttpClient {
       const url = `/queue/booking-preview?${params.toString()}`;
       return await this.post<BookingPreviewData>(url, {});
     } catch (error: any) {
-      console.error('Failed to fetch booking preview:', error);
+      if (import.meta.env.DEV) console.error('Failed to fetch booking preview:', error);
       throw error;
     }
   }
@@ -67,7 +83,7 @@ export class BookingService extends HttpClient {
       const url = `/queue/slots?${params.toString()}`;
       return await this.get<SlotsListResponse>(url);
     } catch (error: any) {
-      console.error('Failed to fetch queue slots:', error);
+      if (import.meta.env.DEV) console.error('Failed to fetch queue slots:', error);
       throw error;
     }
   }
@@ -94,7 +110,7 @@ export class BookingService extends HttpClient {
       const url = `/queue/available_slots/${businessId}?${params.toString()}`;
       return await this.get<AvailableSlotData[]>(url);
     } catch (error: any) {
-      console.error('Failed to fetch available slots:', error);
+      if (import.meta.env.DEV) console.error('Failed to fetch available slots:', error);
       throw error;
     }
   }
@@ -107,7 +123,7 @@ export class BookingService extends HttpClient {
     try {
       return await this.post<BookingData>('/queue/book', input);
     } catch (error: any) {
-      console.error('Failed to create booking:', error);
+      if (import.meta.env.DEV) console.error('Failed to create booking:', error);
       throw error;
     }
   }
@@ -124,7 +140,7 @@ export class BookingService extends HttpClient {
     try {
       await this.patch<unknown>(`/customer/appointments/${queueUserId}`, input);
     } catch (error: any) {
-      console.error('Failed to reschedule appointment:', error);
+      if (import.meta.env.DEV) console.error('Failed to reschedule appointment:', error);
       throw error;
     }
   }
@@ -136,8 +152,24 @@ export class BookingService extends HttpClient {
     try {
       return await this.get<BookingData[]>('/queue/my_bookings');
     } catch (error: any) {
-      console.error('Failed to fetch bookings:', error);
+      if (import.meta.env.DEV) console.error('Failed to fetch bookings:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Fetch upcoming active appointments for proactive time-conflict detection.
+   * Returns an empty array on failure so the booking flow is never blocked by a fetch error.
+   */
+  async getUpcomingAppointments(): Promise<UpcomingAppointmentItem[]> {
+    try {
+      const res = await this.get<{ items: UpcomingAppointmentItem[] }>(
+        '/customer/appointments/upcoming'
+      );
+      return res?.items ?? [];
+    } catch (error: any) {
+      if (import.meta.env.DEV) console.error('Failed to fetch upcoming appointments:', error);
+      return []; // graceful fallback — never block the booking page
     }
   }
 }

@@ -1,42 +1,26 @@
-from sqlalchemy.orm import Session
-from typing import List, Dict
+from typing import List, Optional
 from uuid import UUID
 
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+
 from app.services.category_service import CategoryService
-from app.schemas.category import CategoryData, CategoryWithServicesData
+from app.schemas.category import CategoryData, CategoryTreeNode, SubcategoryMinimal
+from app.utils.category_tree import build_category_tree
 
 
 class CategoryController:
     def __init__(self, db: Session):
         self.service = CategoryService(db)
-    
+
     def get_all_categories(self) -> List[CategoryData]:
         categories = self.service.get_all_categories()
         return [CategoryData.from_category(cat) for cat in categories]
-    
-    def get_categories_with_services(self) -> List[CategoryWithServicesData]:
-        rows = self.service.get_categories_with_services()
 
-        data: Dict[UUID, Dict] = {}
+    def get_categories_tree(self, parent_uuid: Optional[UUID] = None) -> List[CategoryTreeNode]:
+        rows = self.service.get_categories_tree_rows(parent_uuid)
+        return build_category_tree(rows, parent_uuid)
 
-        for category, service_uuid, service_name in rows:
-            if category.uuid not in data:
-                data[category.uuid] = {
-                    "category": category,
-                    "services": []
-                }
-
-            if service_uuid and service_name:
-                data[category.uuid]["services"].append({
-                    "id": str(service_uuid),
-                    "name": str(service_name)
-                })
-
-        return [
-            CategoryWithServicesData.from_category_with_services(
-                item["category"],
-                item["services"]
-            )
-            for item in data.values()
-        ]
-
+    def get_subcategories_minimal(self, parent_uuid: Optional[UUID] = None) -> List[SubcategoryMinimal]:
+        rows = self.service.get_subcategories_minimal(parent_uuid)
+        return [SubcategoryMinimal(uuid=str(r.uuid), name=str(r.name)) for r in rows]

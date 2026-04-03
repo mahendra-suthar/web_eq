@@ -36,9 +36,6 @@ const Sidebar = () => {
                         <NavLink to={item.path} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                             <div className="nav-item-icon">{item.icon}</div>
                             <span>{item.label}</span>
-                            {item.label === 'All Users' && (
-                                <span className="nav-item-badge">1,234</span>
-                            )}
                         </NavLink>
                     </React.Fragment>
                 ))}

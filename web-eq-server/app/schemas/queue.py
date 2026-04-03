@@ -339,9 +339,11 @@ class BookingCreateInput(BaseModel):
     queue_date: date
     service_ids: List[UUID]  # QueueService UUIDs
     notes: Optional[str] = None
-    # Multi-mode: QUEUE (default walk-in), FIXED, APPROXIMATE
     appointment_type: Optional[str] = "QUEUE"
     slot_id: Optional[UUID] = None  # Required for FIXED/APPROXIMATE
+    recipient_phone: Optional[str] = None
+    recipient_country_code: Optional[str] = None
+    recipient_name: Optional[str] = None
 
 
 class SlotData(BaseModel):

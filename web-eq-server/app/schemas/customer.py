@@ -151,3 +151,48 @@ class CustomerAppointmentListResponse(BaseModel):
     items: List[CustomerAppointmentListItem]
     total: int
     has_more: bool
+
+
+class CustomerUpcomingAppointmentItem(BaseModel):
+    """Lightweight appointment item used for client-side time-conflict detection on the booking page.
+    Only returns fields needed to identify a time slot — avoids heavy relation loading.
+    """
+    queue_user_id: str
+    queue_date: date
+    scheduled_start: Optional[str] = None
+    scheduled_end: Optional[str] = None
+    estimated_appointment_time: Optional[str] = None
+    appointment_type: str = "QUEUE"
+    business_id: str
+    business_name: str
+    queue_name: str
+
+    @classmethod
+    def from_orm_row(
+        cls,
+        queue_user,
+        queue,
+        business,
+    ) -> "CustomerUpcomingAppointmentItem":
+        st = getattr(queue_user, "scheduled_start", None)
+        se = getattr(queue_user, "scheduled_end", None)
+        estimated_appt_time: Optional[str] = None
+        if st is None:
+            enqueue_dt = getattr(queue_user, "estimated_enqueue_time", None)
+            if enqueue_dt is not None:
+                estimated_appt_time = enqueue_dt.strftime("%H:%M")
+        return cls(
+            queue_user_id=str(queue_user.uuid),
+            queue_date=queue_user.queue_date,
+            scheduled_start=st.strftime("%H:%M") if st else None,
+            scheduled_end=se.strftime("%H:%M") if se else None,
+            estimated_appointment_time=estimated_appt_time,
+            appointment_type=getattr(queue_user, "appointment_type", None) or "QUEUE",
+            business_id=str(queue.merchant_id) if queue else "",
+            business_name=business.name if business else "",
+            queue_name=queue.name if queue else "",
+        )
+
+
+class CustomerUpcomingAppointmentsResponse(BaseModel):
+    items: List[CustomerUpcomingAppointmentItem]

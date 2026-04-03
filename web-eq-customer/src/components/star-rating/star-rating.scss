@@ -1,0 +1,18 @@
+@use "../../variables.scss" as *;
+
+.sr-stars {
+  display: inline-flex;
+  gap: 1px;
+
+  &--sm .sr-star { font-size: 14px; }
+  &--md .sr-star { font-size: 18px; }
+  &--lg .sr-star { font-size: 24px; }
+}
+
+.sr-star {
+  line-height: 1;
+
+  &--full  { color: $gold; }
+  &--half  { color: $gold; opacity: 0.6; }
+  &--empty { color: rgba($forest, 0.15); }
+}

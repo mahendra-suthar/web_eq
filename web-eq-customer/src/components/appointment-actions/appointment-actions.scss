@@ -42,24 +42,35 @@
   }
 }
 
-// ─── Modal overlay ───
-.appt-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
+.appt-actions__btn--review {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  z-index: 1100;
-  padding: 20px;
-  animation: appt-modal-fade 0.2s ease-out;
+  gap: 5px;
+  color: $gold;
+  background: rgba($gold, 0.08);
+  border-color: rgba($gold, 0.35);
+
+  &:hover {
+    background: $gold;
+    color: #fff;
+    border-color: $gold;
+  }
 }
 
-@keyframes appt-modal-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+.appt-actions__reviewed {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: $jade;
+  background: rgba($jade, 0.08);
+  border-radius: 6px;
+  border: 1px solid rgba($jade, 0.25);
 }
 
+// ─── Modal content ───
 .appt-modal {
   background: #fff;
   border-radius: 16px;
