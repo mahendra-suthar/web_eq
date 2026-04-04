@@ -6,6 +6,7 @@ import { useBusinessRegistrationStore } from '../../utils/businessRegistrationSt
 import { useUserStore } from '../../utils/userStore';
 import { getInitials, getAvatarBackground } from '../../utils/utils';
 import Pagination from '../../components/pagination';
+import PageToolbar from '../../components/page-toolbar';
 import { RouterConstant } from '../../routers/index';
 import "./employees.scss";
 
@@ -112,37 +113,37 @@ const Employees = () => {
     return (
         <div className="employees-page">
             <div className="content-card">
-                <div className="card-header">
-                    <h2 className="card-title">{t("employeeManagement")}</h2>
-                    <div className="card-actions">
-                        <button className="btn btn-secondary" disabled={loading || employees.length === 0}>
-                            {t("export")}
-                        </button>
-                        <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={() =>
-                                navigate(`${RouterConstant.ROUTERS_PATH.EMPLOYEES}/new`, {
-                                    state: resolvedBusinessId ? { businessId: resolvedBusinessId } : undefined,
-                                })
-                            }
-                            disabled={loading || !resolvedBusinessId}
-                        >
-                            {t("addEmployee")}
-                        </button>
-                    </div>
-                </div>
-
-                <div className="filter-bar">
-                    <input
-                        type="text"
-                        className="filter-input"
-                        placeholder={t("searchEmployees")}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        disabled={loading}
-                    />
-                </div>
+                <PageToolbar
+                    filters={
+                        <input
+                            type="text"
+                            className="filter-input"
+                            placeholder={t("searchEmployees")}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            disabled={loading}
+                        />
+                    }
+                    actions={
+                        <>
+                            <button className="btn btn-secondary" disabled={loading || employees.length === 0}>
+                                {t("export")}
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() =>
+                                    navigate(`${RouterConstant.ROUTERS_PATH.EMPLOYEES}/new`, {
+                                        state: resolvedBusinessId ? { businessId: resolvedBusinessId } : undefined,
+                                    })
+                                }
+                                disabled={loading || !resolvedBusinessId}
+                            >
+                                {t("addEmployee")}
+                            </button>
+                        </>
+                    }
+                />
 
                 {error && (
                     <div className="error-message" style={{ padding: "1rem", color: "red", marginBottom: "1rem" }}>

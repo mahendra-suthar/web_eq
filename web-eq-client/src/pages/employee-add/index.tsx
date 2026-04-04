@@ -125,7 +125,6 @@ const EmployeeAdd = () => {
         <div className="employee-add-page">
             <div className="content-card">
                 <div className="card-header section-header-actions">
-                    <h2 className="card-title">{t("addEmployee") || "Add employee"}</h2>
                     <button type="button" className="btn btn-secondary" onClick={handleCancel}>
                         {t("backToEmployees") || "Back to employees"}
                     </button>

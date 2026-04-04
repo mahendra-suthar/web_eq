@@ -11,11 +11,16 @@ function isOnAuthPage(path: string): boolean {
 
 export function AuthFailureHandler() {
   const resetUser = useUserStore((s) => s.resetUser);
+  const isAuthenticated = useUserStore((s) => s.isAuthenticated);
   const redirectingRef = useRef(false);
 
   useEffect(() => {
     const handleUnauthorized = () => {
       if (redirectingRef.current) return;
+
+      // Only redirect if the user currently believes they are logged in.
+      if (!isAuthenticated()) return;
+
       const path = window.location.pathname || "";
       if (isOnAuthPage(path)) return;
 
@@ -29,7 +34,7 @@ export function AuthFailureHandler() {
       window.removeEventListener("auth:unauthorized", handleUnauthorized);
       redirectingRef.current = false;
     };
-  }, [resetUser]);
+  }, [resetUser, isAuthenticated]);
 
   return null;
 }

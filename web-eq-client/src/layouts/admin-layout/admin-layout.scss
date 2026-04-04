@@ -212,6 +212,7 @@
     .top-bar-actions {
         display: flex;
         gap: 10px;
+        margin-left: auto;
         align-items: center;
     }
 
@@ -497,6 +498,47 @@
         color: #94a3b8;
     }
 
+    /* Page Toolbar — unified search/filter + action row */
+    .page-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+
+        .toolbar-filters {
+            display: flex;
+            gap: 10px;
+            flex: 1;
+            flex-wrap: wrap;
+            align-items: center;
+            min-width: 0;
+        }
+
+        .toolbar-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-shrink: 0;
+            margin-left: auto;
+        }
+
+        @media (max-width: 768px) {
+            flex-direction: column;
+            align-items: stretch;
+
+            .toolbar-filters {
+                width: 100%;
+            }
+
+            .toolbar-actions {
+                width: 100%;
+                margin-left: 0;
+                justify-content: flex-end;
+            }
+        }
+    }
+
     /* Filter Bar */
     .filter-bar {
         display: flex;
@@ -522,6 +564,13 @@
     .filter-input {
         flex: 1;
         min-width: 200px;
+    }
+
+    .filter-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: #64748b;
+        white-space: nowrap;
     }
 
     /* Pagination */

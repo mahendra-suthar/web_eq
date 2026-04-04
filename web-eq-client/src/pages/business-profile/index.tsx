@@ -281,10 +281,6 @@ const BusinessProfile = () => {
     return (
         <div className="business-profile-page">
             <div className="content-card">
-                <div className="card-header">
-                    <h2 className="card-title">{t("businessProfile")}</h2>
-                </div>
-
                 <Tabs
                     tabs={[
                         { id: 'overview', label: t("basicInformation") },

@@ -113,12 +113,6 @@ const Topbar = () => {
     return (
         <div className="top-bar">
             <h1 className="page-title">{pageTitle}</h1>
-
-            <div className="global-search">
-                <span className="search-icon">🔍</span>
-                <input type="text" className="global-search-input" placeholder="Search users, organizations..." />
-            </div>
-
             <div className="top-bar-actions">
                 <NotificationBell />
                 <div className="settings-dropdown-container" ref={dropdownRef}>

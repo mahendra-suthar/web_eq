@@ -4,9 +4,10 @@ import { useTranslation } from "react-i18next";
 import { QueueService, QueueData } from "../../services/queue/queue.service";
 import { ProfileService } from "../../services/profile/profile.service";
 import { useUserStore } from "../../utils/userStore";
-import { ProfileType } from "../../utils/constants";
+import { ProfileType, QueueStatus } from "../../utils/constants";
 import { RouterConstant } from "../../routers";
 import { getQueueStatusLabel, getQueueStatusBadgeClass } from "../../utils/utils";
+import PageToolbar from "../../components/page-toolbar";
 import "./queues.scss";
 
 const Queues = () => {
@@ -15,12 +16,11 @@ const Queues = () => {
     const queueService = useMemo(() => new QueueService(), []);
     const profileService = useMemo(() => new ProfileService(), []);
     const { profile, setProfile, getBusinessId } = useUserStore();
-
     const [queues, setQueues] = useState<QueueData[]>([]);
+    const [statusFilter, setStatusFilter] = useState<string>("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [loadingProfile, setLoadingProfile] = useState(false);
-
     const businessId = getBusinessId() || "";
 
     useEffect(() => {
@@ -82,9 +82,21 @@ const Queues = () => {
     return (
         <div className="queues-page">
             <div className="content-card">
-                <div className="card-header">
-                    <h2 className="card-title">{t("queues") || "Queues"}</h2>
-                    <div className="card-actions">
+                <PageToolbar
+                    filters={
+                        <select
+                            className="filter-select"
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            disabled={loading}
+                        >
+                            <option value="">{t("allStatuses") || "All statuses"}</option>
+                            <option value={String(QueueStatus.REGISTERED)}>{t("registered") || "Registered"}</option>
+                            <option value={String(QueueStatus.RUNNING)}>{t("running") || "Running"}</option>
+                            <option value={String(QueueStatus.STOPPED)}>{t("stopped") || "Stopped"}</option>
+                        </select>
+                    }
+                    actions={
                         <button
                             type="button"
                             className="btn btn-primary"
@@ -97,8 +109,8 @@ const Queues = () => {
                         >
                             {t("addQueue") || "Add queue"}
                         </button>
-                    </div>
-                </div>
+                    }
+                />
 
                 {error && (
                     <div className="error-message" style={{ padding: "1rem", marginBottom: "1rem" }}>
@@ -128,7 +140,7 @@ const Queues = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {queues.map((q) => {
+                                {queues.filter((q) => statusFilter === "" || String(q.status) === statusFilter).map((q) => {
                                     const statusLabel = getQueueStatusLabel(q.status, t);
                                     const statusBadgeClass = getQueueStatusBadgeClass(q.status);
                                     const createdLabel =

@@ -298,10 +298,6 @@ const EmployeeProfile = () => {
     return (
         <div className="employee-profile-page">
             <div className="content-card">
-                <div className="card-header">
-                    <h2 className="card-title">{t("employeeProfile")}</h2>
-                </div>
-
                 <Tabs
                     tabs={[
                         { id: 'overview', label: t("basicInformation") },
