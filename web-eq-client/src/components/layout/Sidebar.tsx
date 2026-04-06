@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { useAllowedNavItems } from '../../hooks/usePermission';
 import { useUserStore } from '../../utils/userStore';
 import { ProfileType } from '../../utils/constants';
+import eqLogo from '../../assets/images/eq_logo.jpg';
 
 const Sidebar = () => {
     const allowedItems = useAllowedNavItems();
@@ -20,9 +21,9 @@ const Sidebar = () => {
     return (
         <div className="sidebar">
             <div className="logo">
-                <div className="logo-icon">🛡️</div>
+                <img src={eqLogo} alt="EQ" className="logo-img" />
                 <div className="logo-text">
-                    <div className="logo-title">GNOSTIC</div>
+                    <div className="logo-title">EaseQueue</div>
                     <div className="logo-subtitle">Admin Panel</div>
                 </div>
             </div>

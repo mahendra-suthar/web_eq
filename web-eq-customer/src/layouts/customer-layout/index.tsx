@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/auth.store";
@@ -6,7 +6,10 @@ import { AuthService } from "../../services/auth/auth.service";
 import { useNotificationStore } from "../../store/notification.store";
 import ProfileDropdown from "../../components/profile-dropdown";
 import NotificationBell from "../../components/notification/NotificationBell";
+import Navbar from "../../components/Navbar";
 import { useNotificationWS } from "../../hooks/useNotificationWS";
+import eqLogo from "../../assets/eq_logo.jpg";
+import { EXTERNAL_LINKS } from "../../config/links";
 import "../../components/notification/notification.scss";
 import "./layout.scss";
 
@@ -14,7 +17,6 @@ export default function CustomerLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
-  const [scrolled, setScrolled] = useState(false);
   const { userInfo, isAuthenticated, resetUser, token, profileType } = useAuthStore();
 
   useEffect(() => {
@@ -26,12 +28,6 @@ export default function CustomerLayout() {
 
   useNotificationWS(userInfo?.uuid ?? null, token);
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
   const handleLogout = async () => {
     await new AuthService().logout();
     resetUser();
@@ -39,10 +35,7 @@ export default function CustomerLayout() {
     navigate("/");
   };
 
-  const handleNavLink = (
-    e: React.MouseEvent<HTMLAnchorElement>,
-    href: string
-  ) => {
+  const handleFooterLink = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     if (!href.startsWith("#") && !href.startsWith("/#")) return;
     e.preventDefault();
     const hash = href.includes("#") ? href.split("#")[1] : "";
@@ -51,98 +44,57 @@ export default function CustomerLayout() {
       document.getElementById(hash)?.scrollIntoView({ behavior: "smooth" });
     } else {
       navigate("/");
-      setTimeout(() => {
-        document.getElementById(hash)?.scrollIntoView({ behavior: "smooth" });
-      }, 300);
+      setTimeout(() => document.getElementById(hash)?.scrollIntoView({ behavior: "smooth" }), 300);
     }
   };
-
-  const NAV_LINKS = [
-    { key: "nav.explore", label: t("nav.explore"), href: "/#categories" },
-    { key: "nav.howItWorks", label: t("nav.howItWorks"), href: "/#how-it-works" },
-    { key: "nav.forBusiness", label: t("nav.forBusiness"), href: "/for-business" },
-  ];
 
   const FOOTER_COLS = [
     {
       heading: t("footer.product"),
       links: [
-        { label: t("footer.linkExplore"), href: "/#categories" },
-        { label: t("footer.linkCategories"), href: "/#categories" },
-        { label: t("footer.linkHowItWorks"), href: "/#how-it-works" },
+        { label: t("footer.linkExplore"),    href: "/#categories",   external: false },
+        { label: t("footer.linkHowItWorks"), href: "/#how-it-works", external: false },
       ],
     },
     {
       heading: t("footer.business"),
       links: [
-        { label: t("footer.linkListBusiness"), href: "/for-business" },
-        { label: t("footer.linkDashboard"), href: "/for-business" },
+        { label: t("footer.linkListBusiness"), href: EXTERNAL_LINKS.adminPanel, external: true },
+        { label: t("footer.linkDashboard"),    href: EXTERNAL_LINKS.adminPanel, external: true },
       ],
     },
     {
       heading: t("footer.company"),
       links: [
-        { label: t("footer.linkAbout"), href: "/about" },
-        { label: t("footer.linkBlog"), href: "/blog" },
-        { label: t("footer.linkContact"), href: "/contact" },
+        { label: t("footer.linkContact"), href: EXTERNAL_LINKS.contact, external: true },
       ],
     },
   ];
 
   return (
     <div className="customer-layout">
-      <nav className={`cl-nav${scrolled ? " cl-nav--scrolled" : ""}`}>
-        <div className="cl-nav-inner">
-          <button
-            className="cl-nav-logo"
-            onClick={() => navigate("/")}
-            aria-label={t("nav.logoAriaLabel")}
-          >
-            EQ<span className="cl-nav-logo-dot">.</span>
-          </button>
-
-          <div className="cl-nav-right">
-            <ul className="cl-nav-links" role="list">
-              {NAV_LINKS.map((link) => (
-                <li key={link.key}>
-                  <a
-                    href={link.href}
-                    className="cl-nav-link"
-                    onClick={(e) => handleNavLink(e, link.href)}
-                  >
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-
-            {isAuthenticated() ? (
-              <>
-                <NotificationBell />
-                <ProfileDropdown
-                  userName={userInfo?.full_name ?? undefined}
-                  onLogout={handleLogout}
-                />
-              </>
-            ) : (
-              <>
-                <button
-                  className="cl-btn-ghost"
-                  onClick={() => navigate("/send-otp")}
-                >
-                  {t("nav.signIn")}
-                </button>
-                <button
-                  className="cl-btn-primary"
-                  onClick={() => navigate("/send-otp")}
-                >
-                  {t("nav.getStarted")}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
+      <Navbar
+        right={
+          isAuthenticated() ? (
+            <>
+              <NotificationBell />
+              <ProfileDropdown
+                userName={userInfo?.full_name ?? undefined}
+                onLogout={handleLogout}
+              />
+            </>
+          ) : (
+            <>
+              <button className="cl-btn-ghost" onClick={() => navigate("/send-otp")}>
+                {t("nav.signIn")}
+              </button>
+              <button className="cl-btn-primary" onClick={() => navigate("/send-otp")}>
+                {t("nav.getStarted")}
+              </button>
+            </>
+          )
+        }
+      />
 
       <main className="cl-main">
         <Outlet />
@@ -157,7 +109,10 @@ export default function CustomerLayout() {
                 onClick={() => navigate("/")}
                 aria-label={t("nav.footerLogoAriaLabel")}
               >
-                EQ<span className="cl-footer-logo-dot">.</span>
+                <span className="cl-footer-logo-bubble">
+                  <img src={eqLogo} alt="" className="cl-footer-logo-img" aria-hidden="true" />
+                </span>
+                <span className="cl-footer-logo-text">EaseQueue</span>
               </button>
               <p className="cl-footer-brand-desc">{t("footer.tagline")}</p>
             </div>
@@ -168,13 +123,15 @@ export default function CustomerLayout() {
                 <ul role="list">
                   {col.links.map((link) => (
                     <li key={link.label}>
-                      <a
-                        href={link.href}
-                        className="cl-footer-link"
-                        onClick={(e) => handleNavLink(e, link.href)}
-                      >
-                        {link.label}
-                      </a>
+                      {link.external ? (
+                        <a href={link.href} className="cl-footer-link" target="_blank" rel="noopener noreferrer">
+                          {link.label}
+                        </a>
+                      ) : (
+                        <a href={link.href} className="cl-footer-link" onClick={(e) => handleFooterLink(e, link.href)}>
+                          {link.label}
+                        </a>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -185,8 +142,8 @@ export default function CustomerLayout() {
           <div className="cl-footer-bottom">
             <span>{t("footer.copyright", { year: new Date().getFullYear() })}</span>
             <div className="cl-footer-bottom-links">
-              <a href="/privacy" className="cl-footer-link">{t("footer.linkPrivacy")}</a>
-              <a href="/terms" className="cl-footer-link">{t("footer.linkTerms")}</a>
+              <a href={EXTERNAL_LINKS.privacy} className="cl-footer-link" target="_blank" rel="noopener noreferrer">{t("footer.linkPrivacy")}</a>
+              <a href={EXTERNAL_LINKS.terms} className="cl-footer-link" target="_blank" rel="noopener noreferrer">{t("footer.linkTerms")}</a>
             </div>
           </div>
         </div>

@@ -179,13 +179,13 @@
     "forBusiness": "For Business",
     "signIn": "Sign in",
     "getStarted": "Get started →",
-    "logoAriaLabel": "EQ — Go to homepage",
-    "footerLogoAriaLabel": "EQ homepage"
+    "logoAriaLabel": "EaseQueue — Go to homepage",
+    "footerLogoAriaLabel": "EaseQueue homepage"
   },
 
   "footer": {
     "tagline": "Book smarter. Wait less. Discover local businesses and lock in your slot in minutes — no back-and-forth required.",
-    "copyright": "© {{year}} EQ — Book appointments quickly.",
+    "copyright": "© {{year}} EaseQueue — Book appointments quickly.",
     "product": "Product",
     "business": "Business",
     "company": "Company",

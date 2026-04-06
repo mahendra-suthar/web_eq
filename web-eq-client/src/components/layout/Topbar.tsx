@@ -105,11 +105,6 @@ const Topbar = () => {
         setShowDropdown(false);
     };
 
-    const handleSettings = () => {
-        console.log("Settings clicked");
-        setShowDropdown(false);
-    };
-
     return (
         <div className="top-bar">
             <h1 className="page-title">{pageTitle}</h1>
@@ -127,10 +122,6 @@ const Topbar = () => {
                             <button className="dropdown-item" onClick={handleProfileClick}>
                                 <span className="dropdown-icon">👤</span>
                                 <span>{t("profile")}</span>
-                            </button>
-                            <button className="dropdown-item" onClick={handleSettings}>
-                                <span className="dropdown-icon">⚙️</span>
-                                <span>{t("settings")}</span>
                             </button>
                             <div className="dropdown-divider"></div>
                             <button className="dropdown-item logout-item" onClick={handleLogout}>

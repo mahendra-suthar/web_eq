@@ -39,22 +39,32 @@
 
 // Logo
 .cl-nav-logo {
-  font-family: 'Fraunces', serif !important;
-  font-size: 26px !important;
-  font-weight: 700 !important;
-  color: $forest;
-  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: none;
   border: none;
   padding: 0;
   cursor: pointer;
-  line-height: 1;
   flex-shrink: 0;
+  text-decoration: none;
 }
 
-.cl-nav-logo-dot {
-  color: $jade;
-  font-style: italic;
+.cl-nav-logo-img {
+  height: 32px;
+  width: 32px;
+  object-fit: contain;
+  display: block;
+  mix-blend-mode: multiply;
+}
+
+.cl-nav-logo-text {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: $forest;
+  letter-spacing: -0.5px;
+  line-height: 1;
 }
 
 // Nav links
@@ -175,11 +185,9 @@
 }
 
 .cl-footer-logo {
-  font-family: 'Fraunces', serif !important;
-  font-size: 26px !important;
-  font-weight: 700 !important;
-  color: #fff;
-  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   background: none;
   border: none;
   padding: 0;
@@ -188,9 +196,31 @@
   width: fit-content;
 }
 
-.cl-footer-logo-dot {
-  color: $jade;
-  font-style: italic;
+.cl-footer-logo-bubble {
+  width: 36px;
+  height: 36px;
+  background: #fff;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cl-footer-logo-img {
+  height: 26px;
+  width: 26px;
+  object-fit: contain;
+  display: block;
+}
+
+.cl-footer-logo-text {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+  line-height: 1;
 }
 
 .cl-footer-brand-desc {

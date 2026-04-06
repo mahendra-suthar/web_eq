@@ -217,24 +217,14 @@ export default function SendOTPPage() {
 
           <p className="auth-terms">
             {t("auth.termsPrefix")}{" "}
-            <a href="/terms">{t("auth.termsService")}</a>
+            <a href="https://www.easequeue.com/terms_and_conditions" target="_blank" rel="noopener noreferrer">{t("auth.termsService")}</a>
             {" "}{t("auth.termsAnd")}{" "}
-            <a href="/privacy">{t("auth.termsPrivacy")}</a>
+            <a href="https://www.easequeue.com/privacy_policy" target="_blank" rel="noopener noreferrer">{t("auth.termsPrivacy")}</a>
           </p>
 
         </div>
       </div>
 
-      {/* ── Social proof ── */}
-      <div className="auth-social-proof">
-        <div className="auth-proof-avatars" aria-hidden="true">
-          <div className="auth-proof-avatar auth-proof-avatar--a">A</div>
-          <div className="auth-proof-avatar auth-proof-avatar--b">R</div>
-          <div className="auth-proof-avatar auth-proof-avatar--c">P</div>
-        </div>
-        <span className="auth-stars" aria-hidden="true">★★★★★</span>
-        <span>{t("auth.socialProof")}</span>
-      </div>
 
     </div>
   );

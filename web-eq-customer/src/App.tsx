@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import CustomerLayout from "./layouts/customer-layout";
 import AuthLayout from "./layouts/auth-layout";
 import { AuthFailureHandler } from "./components/AuthFailureHandler";
+import ScrollToTop from "./components/ScrollToTop";
 import { GuestOnlyRoute } from "./components/GuestOnlyRoute";
 import LandingPage from "./pages/landing";
 import BusinessListPage from "./pages/business-list";
@@ -15,6 +16,7 @@ import SearchPage from "./pages/search";
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <AuthFailureHandler />
       <Routes>
         <Route element={<CustomerLayout />}>

@@ -36,32 +36,12 @@
   to   { transform: translate(20px, -30px) scale(1.06); }
 }
 
-// ── Navigation ────────────────────────────────────────────────────────────────
-.al-nav {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 48px; height: 64px;
-  background: rgba(253, 250, 245, 0.85); backdrop-filter: blur(20px);
-  border-bottom: 1px solid $border-subtle;
-}
-.al-nav-logo {
-  font-family: "Fraunces", serif; font-size: 22px; font-weight: 700;
-  color: $forest; letter-spacing: -0.5px;
-  background: none; border: none; cursor: pointer; padding: 0;
-}
-.al-nav-logo-dot { color: $jade; }
-.al-nav-links {
-  display: flex; gap: 28px; list-style: none; margin: 0; padding: 0;
-  a {
-    font-size: 13.5px; color: $muted-green; text-decoration: none; font-weight: 500;
-    transition: color 0.2s;
-    &:hover { color: $forest; }
-  }
-}
+// ── "Back to home" button (rendered inside shared Navbar's right slot) ────────
 .al-nav-home {
   font-size: 13.5px; font-weight: 600; color: $forest;
   background: none; border: none; cursor: pointer; transition: opacity 0.2s;
   font-family: "DM Sans", "Noto Sans Hebrew", sans-serif;
+  white-space: nowrap;
   &:hover { opacity: 0.7; }
 }
 
@@ -70,7 +50,7 @@
   position: relative; z-index: 1;
   min-height: 100vh;
   display: flex; align-items: center; justify-content: center;
-  padding: 80px 24px 48px;
+  padding: 40px 24px 48px;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
