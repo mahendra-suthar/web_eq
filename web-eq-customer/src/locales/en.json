@@ -180,7 +180,9 @@
     "signIn": "Sign in",
     "getStarted": "Get started →",
     "logoAriaLabel": "EaseQueue — Go to homepage",
-    "footerLogoAriaLabel": "EaseQueue homepage"
+    "footerLogoAriaLabel": "EaseQueue homepage",
+    "account": "Account",
+    "notifications": "Notifications"
   },
 
   "footer": {

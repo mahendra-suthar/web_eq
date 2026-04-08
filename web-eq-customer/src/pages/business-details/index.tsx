@@ -522,6 +522,65 @@ export default function BusinessDetailsPage() {
             )}
           </div>
 
+          {/* Mobile-only booking card — shown below services when a service is selected */}
+          {selectedServices.length > 0 && (
+            <div className="bdp-mobile-booking">
+              <div className="bdp-mobile-booking-card">
+                <div className="bdp-mobile-booking-header">
+                  <div className="bdp-mobile-booking-title">{t("bd.bookSlotTitle")}</div>
+                  <div className="bdp-mobile-booking-sub">{t("bd.bookSlotSub")}</div>
+                </div>
+                <div className="bdp-mobile-booking-body">
+                  <div className="bdp-service-preview">
+                    <div className="bdp-preview-label">
+                      {t("bd.servicesSelected", { count: selectedServicesData.length })}
+                    </div>
+                    {selectedServicesData.map((s) => {
+                      const p = s.price ?? s.price_min ?? s.price_max;
+                      return (
+                        <div key={s.uuid} className="bdp-preview-row">
+                          <span className="bdp-preview-name">{s.name}</span>
+                          {p != null && <span className="bdp-preview-price">₹{p}</span>}
+                        </div>
+                      );
+                    })}
+                    {selectedServicesData.length > 1 && (
+                      <div className="bdp-preview-total">
+                        Total:{" "}
+                        {hasPriceRange
+                          ? `₹${totalPriceMin} – ₹${totalPriceMax}`
+                          : `₹${totalPriceMin}`}
+                      </div>
+                    )}
+                  </div>
+                  <button className="bdp-book-main-btn" onClick={handleContinue}>
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                    {t("bd.bookAppointment")}
+                  </button>
+                  {!isOpen && (
+                    <div className="bdp-booking-note">
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <p>
+                        {t("bd.businessClosedNote")}
+                        {todaySchedule?.opening_time &&
+                          ` ${t("bd.opensAt", { time: todaySchedule.opening_time })}`}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Opening Hours */}
           {(business.schedule?.schedules?.length || business.schedule?.is_always_open) && (
             <div className="bdp-section-card" id="bdp-hours">

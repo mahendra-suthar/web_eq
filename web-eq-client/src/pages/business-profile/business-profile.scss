@@ -1,13 +1,14 @@
 @use "../../variables.scss" as *;
 
-.business-profile-page {
-    display: block;
-}
+$teal-700: #00695C;
+$teal-800: #00574B;
+$teal-100: #E0F2F1;
+$teal-200: #B2DFDB;
+$teal-500: #009688;
 
-// Tabs (shared Tabs component) spacing below card header
-.business-profile-page .tabs-container {
-    margin-top: 20px;
-}
+.business-profile-page { display: block; }
+
+.business-profile-page .tabs-container { margin-top: 20px; }
 
 .business-profile-page .tab-icon-svg {
     width: 20px;
@@ -34,7 +35,8 @@
     background: white;
     border-radius: 12px;
     padding: 24px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    border: 1px solid #f1f5f9;
 
     .section-header {
         margin-bottom: 24px;
@@ -42,10 +44,11 @@
         border-bottom: 1px solid #e2e8f0;
 
         .section-title {
-            font-size: 20px;
-            font-weight: 600;
+            font-size: 18px;
+            font-weight: 700;
             color: #1e293b;
             margin: 0;
+            letter-spacing: -0.2px;
         }
 
         &.section-header-actions {
@@ -67,24 +70,18 @@
         color: #64748b;
         font-style: italic;
     }
-
-    .section-content {
-        // Content styles
-    }
 }
 
-// Basic Information: Owner and Business blocks
+// Info blocks
 .info-block {
     padding: 20px;
-    border-radius: 12px;
-    margin-bottom: 24px;
+    border-radius: 10px;
+    margin-bottom: 20px;
 
-    &:last-of-type {
-        margin-bottom: 0;
-    }
+    &:last-of-type { margin-bottom: 0; }
 
     .info-block-title {
-        font-size: 16px;
+        font-size: 15px;
         font-weight: 600;
         color: #475569;
         margin: 0 0 16px 0;
@@ -94,8 +91,8 @@
 }
 
 .owner-block {
-    background: #f8fafc;
-    border-left: 4px solid #667eea;
+    background: #f0faf8;
+    border-left: 4px solid $teal-700;
 }
 
 .business-block {
@@ -104,8 +101,9 @@
 }
 
 .business-profile-employees-cta {
-    background: #f0f9ff;
-    border-left: 4px solid #0ea5e9;
+    background: #f0faf8;
+    border-left: 4px solid $teal-500;
+
     .business-profile-employees-hint {
         margin: 0 0 12px 0;
         font-size: 14px;
@@ -113,18 +111,15 @@
     }
 }
 
-// Basic Info Layout with Profile Picture
+// Profile picture layout
 .basic-info-layout {
     display: flex;
     gap: 32px;
     align-items: flex-start;
 
-    .profile-picture-container {
-        flex-shrink: 0;
-    }
+    .profile-picture-container { flex-shrink: 0; }
 }
 
-// Profile Picture Section
 .profile-picture-section {
     display: flex;
     justify-content: center;
@@ -134,18 +129,16 @@
 
 .profile-picture-wrapper {
     position: relative;
-    width: 200px;
-    height: 200px;
+    width: 180px;
+    height: 180px;
     border-radius: 12px;
     overflow: hidden;
-    border: 3px solid #e2e8f0;
+    border: 2px solid #e2e8f0;
     background: #f8fafc;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: border-color 0.2s;
 
-    &:hover {
-        border-color: #667eea;
-    }
+    &:hover { border-color: $teal-700; }
 
     .profile-picture {
         width: 100%;
@@ -160,27 +153,24 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, $teal-800 0%, $teal-500 100%);
         color: white;
 
         .placeholder-icon {
-            font-size: 64px;
+            font-size: 56px;
             margin-bottom: 8px;
         }
 
         .placeholder-text {
-            font-size: 14px;
-            opacity: 0.9;
+            font-size: 13px;
+            opacity: 0.85;
         }
     }
 
     .picture-overlay {
         position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
+        inset: 0;
+        background: rgba(0,0,0,0.5);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -189,7 +179,7 @@
 
         .btn-upload-label {
             background: white;
-            color: #667eea;
+            color: $teal-700;
             border: none;
             padding: 10px 20px;
             border-radius: 8px;
@@ -197,69 +187,61 @@
             cursor: pointer;
             transition: all 0.2s;
             display: inline-block;
+            font-size: 14px;
 
-            &:hover {
-                background: #f8fafc;
-                transform: scale(1.05);
-            }
+            &:hover { background: $teal-100; }
 
-            .file-input {
-                display: none;
-            }
+            .file-input { display: none; }
         }
     }
 
-    &:hover .picture-overlay {
-        opacity: 1;
-    }
+    &:hover .picture-overlay { opacity: 1; }
 }
 
-// Info Grid
+// Info grid
 .info-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 24px;
+    gap: 20px;
     flex: 1;
 
     .info-field {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 6px;
 
-        &.full-width {
-            grid-column: 1 / -1;
-        }
+        &.full-width { grid-column: 1 / -1; }
 
         .info-label {
-            font-size: 14px;
-            font-weight: 600;
-            color: #64748b;
+            font-size: 11px;
+            font-weight: 700;
+            color: #94a3b8;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.6px;
         }
 
         .info-value {
-            font-size: 16px;
+            font-size: 15px;
             color: #1e293b;
-            padding: 12px 0;
+            padding: 10px 0;
             min-height: 24px;
             line-height: 1.5;
         }
 
         .info-input {
-            padding: 12px 16px;
+            padding: 10px 14px;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
-            font-size: 16px;
+            font-size: 15px;
             color: #1e293b;
             background: white;
-            transition: all 0.2s;
+            transition: border-color 0.15s, box-shadow 0.15s;
             font-family: inherit;
 
             &:focus {
                 outline: none;
-                border-color: #667eea;
-                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+                border-color: $teal-700;
+                box-shadow: 0 0 0 3px rgba(0,105,92,0.1);
             }
 
             &:disabled {
@@ -270,61 +252,49 @@
 
             &.error {
                 border-color: #ef4444;
-                
                 &:focus {
                     border-color: #ef4444;
-                    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+                    box-shadow: 0 0 0 3px rgba(239,68,68,0.1);
                 }
             }
 
-            &[type="time"] {
-                padding: 8px 12px;
-            }
+            &[type="time"] { padding: 8px 12px; }
         }
 
         .error-text {
             color: #ef4444;
-            font-size: 14px;
-            margin-top: 4px;
+            font-size: 13px;
+            margin-top: 2px;
         }
 
-        textarea.info-input {
-            resize: vertical;
-            font-family: inherit;
-        }
-
-        select.info-input {
-            cursor: pointer;
-        }
+        textarea.info-input { resize: vertical; font-family: inherit; }
+        select.info-input { cursor: pointer; }
     }
 }
 
-// Schedule Section
+// Schedule
 .schedule-header {
-    margin-bottom: 24px;
-    padding: 16px;
+    margin-bottom: 20px;
+    padding: 14px 16px;
     background: #f8fafc;
     border-radius: 8px;
+    border: 1px solid #e2e8f0;
 
     .schedule-toggle-label {
         display: flex;
         align-items: center;
         gap: 12px;
         cursor: pointer;
-        font-size: 16px;
+        font-size: 15px;
         font-weight: 600;
         color: #1e293b;
 
         input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             cursor: pointer;
-            accent-color: #667eea;
-
-            &:disabled {
-                cursor: not-allowed;
-                opacity: 0.5;
-            }
+            accent-color: $teal-700;
+            &:disabled { cursor: not-allowed; opacity: 0.5; }
         }
     }
 }
@@ -332,21 +302,20 @@
 .schedule-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
 }
 
 .schedule-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px;
+    padding: 14px 16px;
     background: #f8fafc;
     border-radius: 8px;
-    transition: all 0.2s;
+    border: 1px solid #f1f5f9;
+    transition: background 0.15s;
 
-    &:hover {
-        background: #f1f5f9;
-    }
+    &:hover { background: #f1f5f9; }
 
     .schedule-day {
         flex: 1;
@@ -357,20 +326,16 @@
             align-items: center;
             gap: 12px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 500;
             color: #1e293b;
 
             input[type="checkbox"] {
-                width: 18px;
-                height: 18px;
+                width: 17px;
+                height: 17px;
                 cursor: pointer;
-                accent-color: #667eea;
-
-                &:disabled {
-                    cursor: not-allowed;
-                    opacity: 0.5;
-                }
+                accent-color: $teal-700;
+                &:disabled { cursor: not-allowed; opacity: 0.5; }
             }
         }
     }
@@ -378,63 +343,55 @@
     .schedule-times {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
 
         .time-input {
-            padding: 8px 12px;
+            padding: 7px 10px;
             border: 1px solid #e2e8f0;
             border-radius: 6px;
             font-size: 14px;
             background: white;
             color: #1e293b;
+            font-family: inherit;
 
             &:focus {
                 outline: none;
-                border-color: #667eea;
-                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+                border-color: $teal-700;
+                box-shadow: 0 0 0 3px rgba(0,105,92,0.1);
             }
 
-            &:disabled {
-                background: #f8fafc;
-                cursor: not-allowed;
-                color: #64748b;
-            }
+            &:disabled { background: #f8fafc; cursor: not-allowed; color: #64748b; }
         }
 
-        .time-separator {
-            color: #64748b;
-            font-weight: 600;
-        }
+        .time-separator { color: #94a3b8; font-weight: 600; font-size: 13px; }
     }
 }
 
 // Buttons
 .btn {
-    padding: 10px 20px;
+    padding: 9px 18px;
     border-radius: 8px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     border: none;
-    transition: all 0.2s;
+    transition: all 0.18s;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 6px;
     font-family: inherit;
 
     &.btn-primary {
-        background: #667eea;
+        background: $teal-700;
         color: white;
 
         &:hover:not(:disabled) {
-            background: #5568d3;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            background: $teal-800;
+            box-shadow: 0 4px 12px rgba(0,105,92,0.25);
         }
 
-        &:active:not(:disabled) {
-            transform: translateY(0);
-        }
+        &:active:not(:disabled) { transform: translateY(0); }
     }
 
     &.btn-secondary {
@@ -443,20 +400,17 @@
         border: 1px solid #e2e8f0;
 
         &:hover:not(:disabled) {
-            background: #f8fafc;
-            border-color: #cbd5e1;
+            background: $teal-100;
+            color: $teal-700;
+            border-color: $teal-200;
         }
     }
 
-    &:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
-// Responsive Design
+// Responsive
 @media (max-width: 768px) {
-
     .basic-info-layout {
         flex-direction: column;
         align-items: center;
@@ -479,14 +433,8 @@
         align-items: flex-start;
         gap: 12px;
 
-        .schedule-times {
-            width: 100%;
-            justify-content: space-between;
-        }
+        .schedule-times { width: 100%; justify-content: space-between; }
     }
 
-    .profile-picture-wrapper {
-        width: 150px;
-        height: 150px;
-    }
+    .profile-picture-wrapper { width: 140px; height: 140px; }
 }

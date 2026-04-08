@@ -120,12 +120,35 @@ const Queues = () => {
 
                 <div className="data-table-container">
                     {loadingProfile || loading ? (
-                        <div className="loading-state" style={{ padding: "2rem", textAlign: "center" }}>
-                            {t("loading")}
-                        </div>
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>{t("queueName") || "Queue name"}</th>
+                                    <th>{t("status") || "Status"}</th>
+                                    <th>{t("isCounter") || "Is counter"}</th>
+                                    <th>{t("queueLimit") || "Limit"}</th>
+                                    <th>{t("createdAt") || "Created at"}</th>
+                                    <th>{t("actions") || "Actions"}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                    <tr key={i} className="skeleton-row">
+                                        <td><div className="skeleton-cell skeleton-cell--wide" /></td>
+                                        <td><div className="skeleton-cell skeleton-cell--short" /></td>
+                                        <td><div className="skeleton-cell skeleton-cell--short" /></td>
+                                        <td><div className="skeleton-cell skeleton-cell--short" /></td>
+                                        <td><div className="skeleton-cell skeleton-cell--med" /></td>
+                                        <td><div className="skeleton-cell skeleton-cell--short" /></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     ) : queues.length === 0 ? (
-                        <div className="empty-state" style={{ padding: "2rem", textAlign: "center" }}>
-                            {t("noQueuesFound") || "No queues found for this business."}
+                        <div className="empty-state">
+                            <div className="empty-state-icon">🗂️</div>
+                            <div className="empty-state-title">{t("noQueuesFound") || "No queues found"}</div>
+                            <div className="empty-state-sub">Create your first queue to get started.</div>
                         </div>
                     ) : (
                         <table className="data-table">

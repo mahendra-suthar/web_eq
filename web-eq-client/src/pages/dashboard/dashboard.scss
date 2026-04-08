@@ -117,7 +117,7 @@
   color: white;
   font-weight: 700;
 
-  &.blue   { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+  &.blue   { background: linear-gradient(135deg, #00695C 0%, #009688 100%); }
   &.green  { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
   &.orange { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
   &.red    { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
@@ -161,7 +161,7 @@
   transition: box-shadow 0.2s, border-color 0.2s;
 
   &:hover {
-    box-shadow: 0 4px 14px rgba(102, 126, 234, 0.12);
+    box-shadow: 0 4px 14px rgba(0, 105, 92, 0.12);
     border-color: #c7d2fe;
   }
 }
@@ -358,14 +358,14 @@
 .inline-retry {
   background: none;
   border: none;
-  color: #667eea;
+  color: #00695C;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   padding: 0;
   text-decoration: underline;
 
-  &:hover { color: #5568d3; }
+  &:hover { color: #00574B; }
 }
 
 // ─── Employee queue header ────────────────────────────────────────────────────

@@ -109,8 +109,8 @@
   outline: none;
 
   &:focus {
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+    border-color: #00695C;
+    box-shadow: 0 0 0 3px rgba(0, 105, 92, 0.12);
     background: #fff;
   }
 
@@ -182,7 +182,7 @@
     width: 16px;
     height: 16px;
     cursor: pointer;
-    accent-color: #667eea;
+    accent-color: #00695C;
     flex-shrink: 0;
   }
 }
@@ -249,7 +249,7 @@
   }
 
   &--submit {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #00695C 0%, #009688 100%);
     color: white;
 
     &:hover:not(:disabled) {

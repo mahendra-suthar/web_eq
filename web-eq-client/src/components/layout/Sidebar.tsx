@@ -3,9 +3,14 @@ import { NavLink } from 'react-router-dom';
 import { useAllowedNavItems } from '../../hooks/usePermission';
 import { useUserStore } from '../../utils/userStore';
 import { ProfileType } from '../../utils/constants';
-import eqLogo from '../../assets/images/eq_logo.jpg';
+import eqLogo from '../../assets/images/white_transparent_logo.png';
 
-const Sidebar = () => {
+interface SidebarProps {
+    isOpen?: boolean;
+    onClose?: () => void;
+}
+
+const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
     const allowedItems = useAllowedNavItems();
     const profile = useUserStore((s) => s.profile);
     const profileType = useUserStore((s) => s.getProfileType());
@@ -19,7 +24,7 @@ const Sidebar = () => {
     }));
 
     return (
-        <div className="sidebar">
+        <div className={`sidebar${isOpen ? ' sidebar--open' : ''}`}>
             <div className="logo">
                 <img src={eqLogo} alt="EQ" className="logo-img" />
                 <div className="logo-text">
@@ -34,7 +39,7 @@ const Sidebar = () => {
                         {item.showSection && item.sectionTitle && (
                             <div className="nav-section-title">{item.sectionTitle}</div>
                         )}
-                        <NavLink to={item.path} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                        <NavLink to={item.path} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={onClose}>
                             <div className="nav-item-icon">{item.icon}</div>
                             <span>{item.label}</span>
                         </NavLink>

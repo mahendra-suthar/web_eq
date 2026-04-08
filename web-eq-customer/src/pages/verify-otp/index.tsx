@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import eqLogo from "../../assets/transparent_logo.png";
 import { AuthService } from "../../services/auth/auth.service";
 import { useAuthStore } from "../../store/auth.store";
 import {
@@ -204,7 +205,7 @@ export default function VerifyOTPPage() {
     <>
       <div className="auth-band-deco auth-band-deco-1" aria-hidden="true" />
       <div className="auth-band-deco auth-band-deco-2" aria-hidden="true" />
-      <span className="auth-band-logo">EQ<span>.</span></span>
+          <img src={eqLogo} alt="EaseQueue" className="auth-band-logo-img" aria-hidden="true" />
     </>
   );
 
@@ -218,11 +219,6 @@ export default function VerifyOTPPage() {
               {t("auth.successText")} <em>{t("auth.successAccent")}</em>
             </div>
             <div className="auth-band-sub">{t("auth.signedInSuccess")}</div>
-            <div className="auth-step-dots" aria-label="Step 3 of 3 — complete">
-              <div className="auth-step-dot" />
-              <div className="auth-step-dot" />
-              <div className="auth-step-dot auth-step-dot--active" />
-            </div>
           </div>
           <div className="auth-body auth-panel auth-panel--center">
             <div className="auth-success-icon" aria-hidden="true">✓</div>
@@ -253,11 +249,6 @@ export default function VerifyOTPPage() {
             {t("auth.otpText")} <em>{t("auth.otpAccent")}</em>
           </div>
           <div className="auth-band-sub">{t("auth.checkSms", { n: OTP_LENGTH })}</div>
-          <div className="auth-step-dots" aria-label="Step 2 of 3">
-            <div className="auth-step-dot" />
-            <div className="auth-step-dot auth-step-dot--active" />
-            <div className="auth-step-dot" />
-          </div>
         </div>
 
         {/* Body */}

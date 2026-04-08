@@ -7,8 +7,15 @@ import { useNotificationStore } from "../../store/notification.store";
 import ProfileDropdown from "../../components/profile-dropdown";
 import NotificationBell from "../../components/notification/NotificationBell";
 import Navbar from "../../components/Navbar";
+
+function getInitials(name: string | null | undefined): string {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return (parts[0]?.[0] ?? "?").toUpperCase();
+}
 import { useNotificationWS } from "../../hooks/useNotificationWS";
-import eqLogo from "../../assets/eq_logo.jpg";
+import eqLogoWhite from "../../assets/white_transparent_logo.png";
 import { EXTERNAL_LINKS } from "../../config/links";
 import "../../components/notification/notification.scss";
 import "./layout.scss";
@@ -18,6 +25,7 @@ export default function CustomerLayout() {
   const location = useLocation();
   const { t } = useTranslation();
   const { userInfo, isAuthenticated, resetUser, token, profileType } = useAuthStore();
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
 
   useEffect(() => {
     if (isAuthenticated() && profileType && profileType !== "CUSTOMER") {
@@ -94,6 +102,38 @@ export default function CustomerLayout() {
             </>
           )
         }
+        mobileRight={
+          isAuthenticated() ? (
+            <div className="cl-mobile-user-section">
+              <div className="cl-mobile-user-header">
+                <span className="cl-mobile-user-avatar">{getInitials(userInfo?.full_name)}</span>
+                <span className="cl-mobile-user-name">{userInfo?.full_name || t("nav.account")}</span>
+              </div>
+              <button
+                className="cl-mobile-notif-btn"
+                onClick={() => useNotificationStore.getState().togglePanel()}
+              >
+                <span className="cl-mobile-notif-icon">🔔</span>
+                <span>{t("nav.notifications")}</span>
+                {unreadCount > 0 && (
+                  <span className="cl-mobile-notif-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
+                )}
+              </button>
+              <a className="cl-mobile-link" href="/profile?tab=profile" onClick={(e) => { e.preventDefault(); navigate("/profile?tab=profile"); }}>
+                {t("profile.navProfile")}
+              </a>
+              <a className="cl-mobile-link" href="/profile?tab=appointments" onClick={(e) => { e.preventDefault(); navigate("/profile?tab=appointments"); }}>
+                {t("profile.navAppointments")}
+              </a>
+              <a className="cl-mobile-link" href="/profile?tab=settings" onClick={(e) => { e.preventDefault(); navigate("/profile?tab=settings"); }}>
+                {t("profile.navSettings")}
+              </a>
+              <button className="cl-mobile-signout-btn" onClick={handleLogout}>
+                {t("profile.navSignOut")}
+              </button>
+            </div>
+          ) : undefined
+        }
       />
 
       <main className="cl-main">
@@ -109,9 +149,7 @@ export default function CustomerLayout() {
                 onClick={() => navigate("/")}
                 aria-label={t("nav.footerLogoAriaLabel")}
               >
-                <span className="cl-footer-logo-bubble">
-                  <img src={eqLogo} alt="" className="cl-footer-logo-img" aria-hidden="true" />
-                </span>
+                <img src={eqLogoWhite} alt="" className="cl-footer-logo-img" aria-hidden="true" />
                 <span className="cl-footer-logo-text">EaseQueue</span>
               </button>
               <p className="cl-footer-brand-desc">{t("footer.tagline")}</p>

@@ -195,13 +195,41 @@ const AllUsers = () => {
                 {params.hasContext && (
                     <>
                         <div className="data-table-container">
-                            {loadingProfile ? (
-                                <div className="loading-state">{t('loading')}</div>
-                            ) : loading ? (
-                                <div className="loading-state">{t('loading')}</div>
+                            {loadingProfile || loading ? (
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>{t('user')}</th>
+                                            <th>{t('email')}</th>
+                                            <th>{t('phoneNumber')}</th>
+                                            <th>{t('totalAppointments')}</th>
+                                            <th>{t('lastVisit')}</th>
+                                            <th>{t('actions')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {Array.from({ length: 5 }).map((_, i) => (
+                                            <tr key={i} className="skeleton-row">
+                                                <td>
+                                                    <div className="skeleton-user-cell">
+                                                        <div className="skeleton-cell skeleton-cell--avatar" />
+                                                        <div className="skeleton-cell skeleton-cell--med" />
+                                                    </div>
+                                                </td>
+                                                <td><div className="skeleton-cell skeleton-cell--wide" /></td>
+                                                <td><div className="skeleton-cell skeleton-cell--med" /></td>
+                                                <td><div className="skeleton-cell skeleton-cell--short" /></td>
+                                                <td><div className="skeleton-cell skeleton-cell--med" /></td>
+                                                <td><div className="skeleton-cell skeleton-cell--short" /></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             ) : items.length === 0 ? (
                                 <div className="empty-state">
-                                    {t('noQueueUsersFound') || 'No users with appointments found.'}
+                                    <div className="empty-state-icon">🧑‍🤝‍🧑</div>
+                                    <div className="empty-state-title">{t('noQueueUsersFound') || 'No users found'}</div>
+                                    <div className="empty-state-sub">Users with appointments will appear here.</div>
                                 </div>
                             ) : (
                                 <table className="data-table">

@@ -153,15 +153,40 @@ const Employees = () => {
 
                 <div className="data-table-container">
                     {loading ? (
-                        <div className="loading-state" style={{ padding: "2rem", textAlign: "center" }}>
-                            {t("loadingEmployees")}
-                        </div>
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>{t("employee")}</th>
+                                    <th>{t("email")}</th>
+                                    <th>{t("phoneNumber")}</th>
+                                    <th>{t("isVerified")}</th>
+                                    <th>{t("actions")}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                    <tr key={i} className="skeleton-row">
+                                        <td>
+                                            <div className="skeleton-user-cell">
+                                                <div className="skeleton-cell skeleton-cell--avatar" />
+                                                <div className="skeleton-cell skeleton-cell--med" />
+                                            </div>
+                                        </td>
+                                        <td><div className="skeleton-cell skeleton-cell--wide" /></td>
+                                        <td><div className="skeleton-cell skeleton-cell--med" /></td>
+                                        <td><div className="skeleton-cell skeleton-cell--short" /></td>
+                                        <td><div className="skeleton-cell skeleton-cell--short" /></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     ) : employees.length === 0 ? (
-                        <div className="empty-state" style={{ padding: "2rem", textAlign: "center" }}>
-                            {debouncedSearch 
-                                ? t("noEmployeesFoundSearch")
-                                : t("noEmployeesFound")
-                            }
+                        <div className="empty-state">
+                            <div className="empty-state-icon">👥</div>
+                            <div className="empty-state-title">
+                                {debouncedSearch ? t("noEmployeesFoundSearch") : t("noEmployeesFound")}
+                            </div>
+                            <div className="empty-state-sub">Add your first employee to get started.</div>
                         </div>
                     ) : (
                     <table className="data-table">
