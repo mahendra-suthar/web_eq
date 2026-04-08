@@ -13,17 +13,21 @@ class AuthService:
     def __init__(self, db: Session):
         self.db = db
 
-    async def set_auth_cookie(self, response: Response, token: str, client_type: str = "web") -> None:
-        """Set authentication cookie for web clients"""
+    async def set_auth_cookie(
+        self, response: Response, token: str, client_type: str = "web", user_type: Optional[str] = None,
+    ) -> None:
         if client_type != "web":
             return
 
+        user_type_upper = (user_type or "").upper()
+        cookie_name = "customer_access_token" if user_type_upper == "CUSTOMER" else "access_token"
+
         response.set_cookie(
-            key="access_token",
+            key=cookie_name,
             value=token,
             httponly=True,
-            secure=True,
-            samesite="None",
+            secure=ISSECURE,
+            samesite=SAMESITE,
             path="/",
             max_age=60 * 60 * 24,
         )
@@ -43,7 +47,7 @@ class AuthService:
         token_data = {"sub": str(user.uuid), "user_type": user_type_upper, "client_type": client_type}
         access_token = create_access_token(token_data, expires_delta)
 
-        await self.set_auth_cookie(response, access_token, client_type)
+        await self.set_auth_cookie(response, access_token, client_type, user_type)
 
         RequestContext.set_user(user)
         RequestContext.set_user_type(user_type_upper)

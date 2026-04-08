@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { QueueService, QueueUserData } from '../../services/queue/queue.service';
+import { QueueService, QueueUserData, QueueData } from '../../services/queue/queue.service';
 import { ProfileService } from '../../services/profile/profile.service';
 import { useUserStore } from '../../utils/userStore';
 import { getInitials, getAvatarBackground } from '../../utils/utils';
 import { QueueUserStatus, DEFAULT_PAGE_LIMIT, DEFAULT_PAGE, DEFAULT_DEBOUNCE_DELAY_MS, ProfileType } from '../../utils/constants';
 import Pagination from '../../components/pagination';
+import PageToolbar from '../../components/page-toolbar';
 import "./queue-users.scss";
 
 const QueueUsers = () => {
@@ -17,6 +18,7 @@ const QueueUsers = () => {
     const { profile, setProfile, getBusinessId, getEmployeeId } = useUserStore();
     
     const [queueUsers, setQueueUsers] = useState<QueueUserData[]>([]);
+    const [queues, setQueues] = useState<QueueData[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string>("");
     const [searchTerm, setSearchTerm] = useState<string>("");
@@ -24,20 +26,13 @@ const QueueUsers = () => {
     const [totalPages, setTotalPages] = useState<number>(1);
     const [limit] = useState<number>(DEFAULT_PAGE_LIMIT);
     const [debouncedSearch, setDebouncedSearch] = useState<string>("");
-    
+
     const businessId = getBusinessId() || "";
-    const defaultEmployeeId = getEmployeeId() || "";
+    const employeeId = getEmployeeId() || "";
+    const isEmployee = !!employeeId;
     const [queueId, setQueueId] = useState<string>("");
-    const [employeeId, setEmployeeId] = useState<string>(defaultEmployeeId);
     const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
     
-    useEffect(() => {
-        if (defaultEmployeeId) {
-            setEmployeeId(defaultEmployeeId);
-        }
-    }, [defaultEmployeeId]);
-    
-    const isEmployee = !!defaultEmployeeId;
 
     useEffect(() => {
         const fetchProfileIfNeeded = async () => {
@@ -65,6 +60,11 @@ const QueueUsers = () => {
 
         fetchProfileIfNeeded();
     }, [profile, profileService, setProfile, t]);
+
+    useEffect(() => {
+        if (loadingProfile || !businessId) return;
+        queueService.getQueues(businessId).then(setQueues).catch(() => {});
+    }, [businessId, loadingProfile, queueService]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -158,52 +158,41 @@ const QueueUsers = () => {
     return (
         <div className="queue-users-page">
             <div className="content-card">
-                <div className="card-header">
-                    <h2 className="card-title">{t("queueUsers")}</h2>
-                    <div className="card-actions">
+                <PageToolbar
+                    filters={
+                        <>
+                            <input
+                                type="text"
+                                className="filter-input"
+                                placeholder={t("searchQueueUsers") || "Search by name, email, phone, or token..."}
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                disabled={loading}
+                            />
+                            {!isEmployee && (
+                                <select
+                                    className="filter-select"
+                                    value={queueId}
+                                    onChange={(e) => {
+                                        setQueueId(e.target.value);
+                                        setCurrentPage(DEFAULT_PAGE);
+                                    }}
+                                    disabled={loading}
+                                >
+                                    <option value="">{t("allQueues") || "All queues"}</option>
+                                    {queues.map((q) => (
+                                        <option key={q.uuid} value={q.uuid}>{q.name}</option>
+                                    ))}
+                                </select>
+                            )}
+                        </>
+                    }
+                    actions={
                         <button className="btn btn-secondary" disabled={loading || queueUsers.length === 0}>
                             {t("export")}
                         </button>
-                    </div>
-                </div>
-
-                <div className="filter-bar">
-                    <div className="filter-row">
-                        <input
-                            type="text"
-                            className="filter-input"
-                            placeholder={t("searchQueueUsers") || "Search by name, email, phone, or token..."}
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            disabled={loading}
-                        />
-                    </div>
-                    <div className="filter-row">
-                        <input
-                            type="text"
-                            className="filter-input"
-                            placeholder={t("queueId") || "Queue ID (optional)"}
-                            value={queueId}
-                                onChange={(e) => {
-                                    setQueueId(e.target.value);
-                                    setCurrentPage(DEFAULT_PAGE);
-                                }}
-                            disabled={loading}
-                        />
-                        <input
-                            type="text"
-                            className="filter-input"
-                            placeholder={t("employeeId") || "Employee ID (optional)"}
-                            value={employeeId}
-                            onChange={(e) => {
-                                setEmployeeId(e.target.value);
-                                setCurrentPage(DEFAULT_PAGE);
-                            }}
-                            disabled={loading || isEmployee}
-                            title={isEmployee ? "Employee ID is auto-set for employees" : ""}
-                        />
-                    </div>
-                </div>
+                    }
+                />
 
                 {error && (
                     <div className="error-message" style={{ padding: "1rem", color: "red", marginBottom: "1rem" }}>

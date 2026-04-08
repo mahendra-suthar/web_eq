@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import eqLogo from "../../assets/transparent_logo.png";
 import { AuthService } from "../../services/auth/auth.service";
 import {
   PHONE_NUMBER_LENGTH,
@@ -10,6 +11,7 @@ import {
   ProfileType,
 } from "../../utils/constants";
 import { saveBookingReturnState, getBookingReturnState } from "../../utils/bookingReturnState";
+import { EXTERNAL_LINKS } from "../../config/links";
 import "./send-otp.scss";
 
 export default function SendOTPPage() {
@@ -123,22 +125,6 @@ export default function SendOTPPage() {
   return (
     <div className="auth-wrap">
 
-      {/* ── Trust strip ── */}
-      <div className="auth-trust" aria-label="Trust indicators">
-        <div className="auth-trust-item">
-          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          {t("auth.trustSecure")}
-        </div>
-        <div className="auth-trust-item">
-          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-          {t("auth.trustNoPassword")}
-        </div>
-        <div className="auth-trust-item">
-          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          {t("auth.trustFast")}
-        </div>
-      </div>
-
       {/* ── Card ── */}
       <div className="auth-card">
 
@@ -146,16 +132,11 @@ export default function SendOTPPage() {
         <div className="auth-band">
           <div className="auth-band-deco auth-band-deco-1" aria-hidden="true" />
           <div className="auth-band-deco auth-band-deco-2" aria-hidden="true" />
-          <span className="auth-band-logo">EQ<span>.</span></span>
+          <img src={eqLogo} alt="EaseQueue" className="auth-band-logo-img" aria-hidden="true" />
           <div className="auth-band-title">
             {t("auth.welcomeText")} <em>{t("auth.welcomeAccent")}</em>
           </div>
           <div className="auth-band-sub">{t("auth.signInManage")}</div>
-          <div className="auth-step-dots" aria-label="Step 1 of 3">
-            <div className="auth-step-dot auth-step-dot--active" />
-            <div className="auth-step-dot" />
-            <div className="auth-step-dot" />
-          </div>
         </div>
 
         {/* Body */}
@@ -217,24 +198,14 @@ export default function SendOTPPage() {
 
           <p className="auth-terms">
             {t("auth.termsPrefix")}{" "}
-            <a href="/terms">{t("auth.termsService")}</a>
+            <a href={EXTERNAL_LINKS.terms} target="_blank" rel="noopener noreferrer">{t("auth.termsService")}</a>
             {" "}{t("auth.termsAnd")}{" "}
-            <a href="/privacy">{t("auth.termsPrivacy")}</a>
+            <a href={EXTERNAL_LINKS.privacy} target="_blank" rel="noopener noreferrer">{t("auth.termsPrivacy")}</a>
           </p>
 
         </div>
       </div>
 
-      {/* ── Social proof ── */}
-      <div className="auth-social-proof">
-        <div className="auth-proof-avatars" aria-hidden="true">
-          <div className="auth-proof-avatar auth-proof-avatar--a">A</div>
-          <div className="auth-proof-avatar auth-proof-avatar--b">R</div>
-          <div className="auth-proof-avatar auth-proof-avatar--c">P</div>
-        </div>
-        <span className="auth-stars" aria-hidden="true">★★★★★</span>
-        <span>{t("auth.socialProof")}</span>
-      </div>
 
     </div>
   );

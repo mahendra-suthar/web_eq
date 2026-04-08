@@ -179,9 +179,9 @@
 .bk-reschedule-hint {
   font-family: 'DM Sans', sans-serif !important;
   font-size: 13.5px !important;
-  color: #0369a1;
-  background: #e0f2fe;
-  border-left: 3px solid #0ea5e9;
+  color: #00574B;
+  background: #E0F2F1;
+  border-left: 3px solid #00695C;
   border-radius: 6px;
   padding: 8px 12px;
   margin-top: 12px;
@@ -308,7 +308,7 @@
   bottom: 5px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   color: #919EAB;
   letter-spacing: 0.3px;
@@ -322,7 +322,7 @@
   right: 6px;
   z-index: 2;
   font-family: 'DM Sans', sans-serif !important;
-  font-size: 8px !important;
+  font-size: 10px !important;
   font-weight: 600 !important;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -365,7 +365,7 @@
 
 .bk-date-mon {
   font-family: 'DM Sans', sans-serif !important;
-  font-size: 10.5px !important;
+  font-size: 12px !important;
   color: $muted-green;
   position: relative;
   z-index: 1;
@@ -394,7 +394,7 @@
 
 .bk-st-hcell {
   font-family: 'DM Sans', sans-serif !important;
-  font-size: 10.5px !important;
+  font-size: 12px !important;
   font-weight: 500 !important;
   color: $muted-green;
   text-transform: uppercase;
@@ -575,7 +575,7 @@
   padding: 4px 10px;
   border-radius: $radius-full;
   font-family: 'DM Sans', sans-serif !important;
-  font-size: 10.5px !important;
+  font-size: 12px !important;
   font-weight: 600 !important;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -603,7 +603,7 @@
 
 .bk-q-stat-label {
   font-family: 'DM Sans', sans-serif !important;
-  font-size: 10.5px !important;
+  font-size: 12px !important;
   font-weight: 400 !important;
   color: $muted-green;
   margin-bottom: 4px;
@@ -849,7 +849,6 @@
     border-top: 1px solid $border-subtle;
     padding: 28px 24px;
     max-height: unset;
-    order: -1;
   }
 
   @media (max-width: $breakpoint-sm) { padding: 20px 16px; }

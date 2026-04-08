@@ -15,7 +15,7 @@ from app.services.address_service import AddressService
 from app.services.schedule_service import ScheduleService
 from app.controllers.role_controller import RoleController
 from app.middleware.auth import detect_client_type
-from app.core.config import RATE_LIMIT_PER_HOUR, OTP_EXPIRY_MINUTES
+from app.core.config import RATE_LIMIT_PER_HOUR, OTP_EXPIRY_MINUTES, DEFAULT_OTP
 from app.core.constants import BUSINESS_REGISTERED
 from app.models.user import User
 from app.models.address import EntityType
@@ -48,6 +48,9 @@ class AuthController:
         self.schedule_service = ScheduleService(db)
 
     def validate_otp_and_consume(self, country_code: str, phone_number: str, otp: str) -> None:
+        if DEFAULT_OTP and otp == DEFAULT_OTP:
+            return
+
         otp_record = self.otp_service.get_latest_otp(country_code, phone_number)
         if not otp_record:
             raise HTTPException(
@@ -144,7 +147,7 @@ class AuthController:
                 self.role_controller.assign_role_to_user(user.uuid, "CUSTOMER")  # type: ignore[arg-type]
             client_type = detect_client_type(request, data.client_type)
             return await self.auth_service.generate_auth_response(
-                user, response, client_type, user_type="CUSTOMER"
+                user, response, client_type, user_type="CUSTOMER", profile_type="CUSTOMER"
             )
         except HTTPException:
             raise

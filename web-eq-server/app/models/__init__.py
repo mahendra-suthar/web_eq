@@ -10,6 +10,7 @@ from app.models.service import Service
 from app.models.queue import Queue, QueueUser, QueueService, QueueUserService, AppointmentSlot
 from app.models.role import Role, UserRoles
 from app.models.review import Review
+from app.models.notification import Notification
 
 __all__ = [
     "BaseModel",
@@ -30,6 +31,7 @@ __all__ = [
     "AppointmentSlot",
     "Role",
     "UserRoles",
-    "Review"
+    "Review",
+    "Notification",
 ]
 

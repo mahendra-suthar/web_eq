@@ -338,7 +338,6 @@ const EmployeeDetail = () => {
         <div className="employee-detail-page">
             <div className="content-card">
                 <div className="card-header section-header-actions">
-                    <h2 className="card-title">{t("employeeDetail")}</h2>
                     <button type="button" className="btn btn-secondary" onClick={() => navigate(RouterConstant.ROUTERS_PATH.EMPLOYEES)}>
                         {t("backToEmployees")}
                     </button>

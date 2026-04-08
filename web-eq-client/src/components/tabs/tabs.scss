@@ -46,14 +46,15 @@
   }
 
   &:hover {
-    color: #64748b;
+    color: #00695C;
   }
 
   &.tabs-tab--active {
-    color: #1e293b;
+    color: #00695C;
+    font-weight: 600;
 
     &::after {
-      background: #1e293b;
+      background: #00695C;
     }
   }
 }

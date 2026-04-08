@@ -13,10 +13,16 @@ interface PrivateRouteProps {
  */
 export function PrivateRoute({ children }: PrivateRouteProps) {
   const location = useLocation();
-  const { isAuthenticated, canAccessDashboard, nextStep } = useUserStore();
+  const { isAuthenticated, canAccessDashboard, nextStep, getProfileType, resetUser } = useUserStore();
 
   if (!isAuthenticated()) {
     return <Navigate to={ROUTERS_PATH.SENDOTP} state={{ from: location }} replace />;
+  }
+
+  const profileType = getProfileType();
+  if (profileType === "CUSTOMER") {
+    resetUser();
+    return <Navigate to={ROUTERS_PATH.SENDOTP} replace />;
   }
 
   if (!canAccessDashboard()) {

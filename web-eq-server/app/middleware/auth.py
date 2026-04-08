@@ -32,14 +32,23 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 def extract_token(request: Request) -> Optional[str]:
-    token = request.cookies.get("access_token")
-    if token:
-        return token
-    
+    # Authorization header takes priority — explicitly sent by the client app,
+    # so it correctly identifies the caller even when multiple apps share the
+    # same domain (e.g. localhost in development) and cookies would collide.
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         return auth_header.split(" ", 1)[1]
-    
+
+    # Cookie fallback — browser sends these automatically (httpOnly, SameSite=None)
+    token = request.cookies.get("access_token")
+    if token:
+        return token
+
+    # Customer cookie (separate name to prevent session collision on same domain)
+    token = request.cookies.get("customer_access_token")
+    if token:
+        return token
+
     return None
 
 

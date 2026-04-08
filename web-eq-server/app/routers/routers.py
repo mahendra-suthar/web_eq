@@ -11,6 +11,7 @@ from app.routers.service import service_router
 from app.routers.user import user_router, users_router, users_router
 from app.routers.review import review_router
 from app.routers.customer import customer_router
+from app.routers.notification import notification_router
 from app.routers.websocket import router as websocket_router
 
 routers = APIRouter()
@@ -27,5 +28,6 @@ routers.include_router(user_router, prefix="/user", tags=["User"])
 routers.include_router(users_router, prefix="/users", tags=["Users"])
 routers.include_router(review_router, prefix="/review", tags=["Review"])
 routers.include_router(customer_router, prefix="/customer", tags=["Customer"])
+routers.include_router(notification_router, prefix="/notification", tags=["Notifications"])
 routers.include_router(websocket_router, tags=["WebSocket"])
 

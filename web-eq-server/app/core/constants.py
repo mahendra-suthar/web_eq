@@ -1,23 +1,33 @@
 from datetime import time as _time
 
 UNPROTECTED_ROUTE_PATHS = [
-    "/healthz",  # Render / load balancer health checks – no auth
+    "/healthz",                           # Render / load balancer health checks
+    # ── Auth ─────────────────────────────────────────────────────────────────
     "/api/auth/send-otp",
     "/api/auth/verify-otp",
     "/api/auth/verify-otp-customer",
     "/api/auth/business-verify-otp",
-    "/api/category/",  # public category reads (get_categories, tree)
-    "/api/service/get_services/",  # global services by category (business list filters, anonymous)
+    "/api/auth/logout",                   # Cookie clear — must work even when session is expired
+    # ── Public catalogue reads ────────────────────────────────────────────────
+    "/api/category/",                     # get_categories, tree
+    "/api/service/get_services",          # services by category (no trailing slash)
+    "/api/service/get_all_services",
+    "/api/service/get_services_by_business/",
     "/api/business/get_businesses",
-    "/api/business/get_business_details/",  # Allow all business detail and service endpoints
-    "/api/business/get_business_services/",  # Allow all business detail and service endpoints
-    "/api/queue/available_slots/",  # Public slot viewing
-    "/api/review/business/",  # Public review viewing
+    "/api/business/get_business_details/",
+    "/api/business/get_business_services/",
+    "/api/review/get_business_reviews/",         # per-business review list
+    "/api/review/get_business_review_summary/", # per-business rating summary
+    "/api/review/featured",                     # landing page featured reviews
+    "/api/queue/available_slots/",        # public slot viewing
+    # ── Docs ─────────────────────────────────────────────────────────────────
     "/api/docs",
     "/api/openapi.json",
     "/api/redoc",
-    "/api/ws/booking/",  # WebSocket – auth handled in handler
-    "/api/ws/live/",     # WebSocket – auth handled in handler
+    # ── WebSockets (auth handled inside each handler) ─────────────────────────
+    "/api/ws/booking/",
+    "/api/ws/live/",
+    "/api/ws/notifications/",
 ]
 
 # Mobile User-Agent patterns for client type detection
@@ -87,3 +97,10 @@ BOOKING_MODE_HYBRID = "HYBRID"
 APPOINTMENT_TYPE_QUEUE = "QUEUE"
 APPOINTMENT_TYPE_FIXED = "FIXED"
 APPOINTMENT_TYPE_APPROXIMATE = "APPROXIMATE"
+
+# Notification event type constants
+NOTIF_BOOKING_CONFIRMED = "BOOKING_CONFIRMED"
+NOTIF_NEW_CUSTOMER      = "NEW_CUSTOMER"
+NOTIF_IN_SERVICE        = "IN_SERVICE"
+NOTIF_CALLED_NEXT       = "CALLED_NEXT"
+NOTIF_SERVICE_COMPLETED = "SERVICE_COMPLETED"

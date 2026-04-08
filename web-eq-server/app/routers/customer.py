@@ -19,7 +19,7 @@ from app.schemas.customer import (
     CustomerUpcomingAppointmentsResponse,
 )
 from app.schemas.queue import CustomerTodayAppointmentsResponse
-from app.middleware.permissions import get_current_user
+from app.middleware.permissions import require_roles
 from app.models.user import User
 from app.core.constants import (
     CUSTOMER_APPOINTMENTS_DEFAULT_LIMIT,
@@ -36,7 +36,7 @@ customer_router = APIRouter()
 )
 async def get_profile(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(["CUSTOMER"])),
 ):
     controller = CustomerController(db)
     return controller.get_profile(current_user)
@@ -50,7 +50,7 @@ async def get_profile(
 async def update_profile(
     data: CustomerProfileUpdateInput,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(["CUSTOMER"])),
 ):
     controller = CustomerController(db)
     return controller.update_profile(current_user, data)
@@ -63,7 +63,7 @@ async def update_profile(
 )
 async def get_today_appointments(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(["CUSTOMER"])),
 ):
     controller = QueueController(db)
     return controller.get_today_appointments(current_user.uuid)
@@ -76,7 +76,7 @@ async def get_today_appointments(
 )
 async def get_appointments(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(["CUSTOMER"])),
     limit: int = Query(CUSTOMER_APPOINTMENTS_DEFAULT_LIMIT, ge=1, le=CUSTOMER_APPOINTMENTS_MAX_LIMIT),
     offset: int = Query(0, ge=0),
 ):
@@ -91,7 +91,7 @@ async def get_appointments(
 )
 async def get_upcoming_appointments(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(["CUSTOMER"])),
 ):
     controller = CustomerController(db)
     return controller.get_upcoming_appointments(current_user.uuid)
@@ -105,7 +105,7 @@ async def get_upcoming_appointments(
 async def get_appointment_by_id(
     queue_user_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(["CUSTOMER"])),
 ):
     controller = CustomerController(db)
     return controller.get_appointment_by_id(current_user.uuid, queue_user_id)
@@ -120,7 +120,7 @@ async def update_appointment(
     queue_user_id: UUID,
     data: AppointmentUpdateInput,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(["CUSTOMER"])),
 ):
     controller = CustomerController(db)
     return await controller.update_appointment(current_user.uuid, queue_user_id, data)
@@ -134,7 +134,7 @@ async def update_appointment(
 async def cancel_appointment(
     queue_user_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(["CUSTOMER"])),
 ):
     controller = CustomerController(db)
     return await controller.cancel_appointment(current_user.uuid, queue_user_id)

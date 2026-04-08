@@ -36,41 +36,27 @@
   to   { transform: translate(20px, -30px) scale(1.06); }
 }
 
-// ── Navigation ────────────────────────────────────────────────────────────────
-.al-nav {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 48px; height: 64px;
-  background: rgba(253, 250, 245, 0.85); backdrop-filter: blur(20px);
-  border-bottom: 1px solid $border-subtle;
-}
-.al-nav-logo {
-  font-family: "Fraunces", serif; font-size: 22px; font-weight: 700;
-  color: $forest; letter-spacing: -0.5px;
-  background: none; border: none; cursor: pointer; padding: 0;
-}
-.al-nav-logo-dot { color: $jade; }
-.al-nav-links {
-  display: flex; gap: 28px; list-style: none; margin: 0; padding: 0;
-  a {
-    font-size: 13.5px; color: $muted-green; text-decoration: none; font-weight: 500;
-    transition: color 0.2s;
-    &:hover { color: $forest; }
-  }
-}
+// ── "Back to home" button (rendered inside shared Navbar's right slot) ────────
 .al-nav-home {
   font-size: 13.5px; font-weight: 600; color: $forest;
   background: none; border: none; cursor: pointer; transition: opacity 0.2s;
   font-family: "DM Sans", "Noto Sans Hebrew", sans-serif;
+  white-space: nowrap;
   &:hover { opacity: 0.7; }
 }
 
 // ── Main content area ─────────────────────────────────────────────────────────
 .al-main {
   position: relative; z-index: 1;
-  min-height: 100vh;
+  min-height: calc(100vh - 64px);
   display: flex; align-items: center; justify-content: center;
-  padding: 80px 24px 48px;
+  padding: 40px 24px 48px;
+
+  @media (max-width: #{$breakpoint-sm}) {
+    min-height: calc(100dvh - 56px);
+    align-items: flex-start;
+    padding: 24px 16px 32px;
+  }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -81,6 +67,8 @@
 .auth-wrap {
   width: 100%; max-width: 460px;
   animation: auth-card-in 0.65s cubic-bezier(0.34, 1.3, 0.64, 1) both;
+
+  @media (max-width: #{$breakpoint-sm}) { max-width: 100%; }
 }
 @keyframes auth-card-in {
   from { opacity: 0; transform: translateY(28px) scale(0.97); }
@@ -105,6 +93,11 @@
   border-radius: 28px;
   box-shadow: 0 24px 80px rgba(14, 74, 53, 0.12), 0 4px 16px rgba(0, 0, 0, 0.04);
   overflow: hidden;
+
+  @media (max-width: #{$breakpoint-sm}) {
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(14, 74, 53, 0.10);
+  }
 }
 
 // ── Card header band ──────────────────────────────────────────────────────────
@@ -123,11 +116,11 @@
   &-1 { width: 220px; height: 220px; top: -80px; right: -60px; }
   &-2 { width: 120px; height: 120px; bottom: -40px; left: 30px; }
 }
-.auth-band-logo {
+.auth-band-logo-img {
   position: relative; z-index: 1;
-  font-family: "Fraunces", serif; font-size: 26px; font-weight: 700;
-  color: white; letter-spacing: -0.5px; margin-bottom: 14px; display: block;
-  span { color: $mint; }
+  height: 72px; width: auto;
+  display: block; margin: 0 auto 14px;
+  filter: brightness(0) invert(1);
 }
 .auth-band-title {
   position: relative; z-index: 1;
@@ -336,8 +329,18 @@
 
 // ── Responsive ────────────────────────────────────────────────────────────────
 @media (max-width: #{$breakpoint-md}) {
-  .al-nav { padding: 0 20px; }
-  .al-nav-links { display: none; }
   .auth-body { padding: 28px 24px 24px; }
   .auth-band { padding: 26px 28px 22px; }
+}
+
+@media (max-width: #{$breakpoint-sm}) {
+  .auth-body { padding: 24px 20px 20px; }
+  .auth-band { padding: 24px 20px 20px; }
+  .auth-band-logo-img { height: 56px; margin-bottom: 10px; }
+  .auth-band-title { font-size: 20px; }
+  .auth-band-sub { font-size: 13px; }
+  .auth-btn-primary { padding: 14px; font-size: 15px; border-radius: 12px; }
+  .auth-card { border-radius: 20px; }
+  .al-orb-1 { width: 280px; height: 280px; }
+  .al-orb-2 { width: 200px; height: 200px; }
 }

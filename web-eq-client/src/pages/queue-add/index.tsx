@@ -165,7 +165,6 @@ const QueueAdd = () => {
         <div className="queue-add-page">
             <div className="content-card">
                 <div className="section-header section-header-actions">
-                    <h2 className="section-title">{t("addQueue") || "Add queue"}</h2>
                     <button type="button" className="btn btn-secondary" onClick={handleCancel}>
                         {t("cancel")}
                     </button>

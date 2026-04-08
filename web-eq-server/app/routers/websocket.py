@@ -16,6 +16,11 @@ from app.db.database import get_db
 from app.services.realtime.queue_manager import queue_manager
 from app.services.realtime.live_queue_manager import live_queue_manager
 from app.services.realtime.customer_appointment_manager import customer_appointment_manager
+from uuid import UUID as _UUID
+
+from app.services.realtime.notification_manager import notification_manager
+from app.services.notification_service import NotificationService
+from app.schemas.notification import NotificationData, NotificationListResponse
 from app.core.config import SECRET_KEY, ALGORITHM
 
 logger = logging.getLogger(__name__)
@@ -24,25 +29,38 @@ router = APIRouter()
 
 
 async def get_user_from_token(websocket: WebSocket):
-    """Extract user_id from JWT token in query params or headers."""
-    # Try query param first
-    token = websocket.query_params.get("token")
+    """
+    Extract user_id from a WebSocket connection.
+
+    Resolution order:
+      1. httpOnly cookie  — browser sends it automatically (SameSite=None; Secure)
+      2. ?token= query param — fallback for native/mobile clients
+      3. Authorization: Bearer header — fallback for programmatic clients
+    """
+    token: str | None = None
+
+    # 1. Cookie — try both names (business/employee and customer)
+    token = websocket.cookies.get("access_token") or websocket.cookies.get("customer_access_token")
+
+    # 2. Query param fallback (used when proxy doesn't forward cookies for WS upgrades)
     if not token:
-        # Try Authorization header
-        auth_header = websocket.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header.split(" ")[1]
-    
+        token = websocket.query_params.get("token")
+
+    # 3. Authorization header fallback
     if not token:
-        # Allow anonymous connections for browsing
-        return None
-    
+        auth_header = websocket.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.split(" ", 1)[1]
+
+    if not token:
+        return None  # Anonymous connection allowed on some endpoints
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_data = payload.get("user", {})
-        return user_data.get("user_id")
+        # All tokens use "sub" for the user UUID (set in auth_service.py)
+        return payload.get("sub")
     except JWTError as e:
-        logger.warning(f"Invalid token in WebSocket connection: {e}")
+        logger.warning("Invalid token in WebSocket connection: %s", e)
         return None
 
 
@@ -157,6 +175,8 @@ async def live_queue_websocket(
       queue_stopped     – after stop
       ping              – keepalive (client should pong or ignore)
     """
+    await websocket.accept()
+
     user_id = await get_user_from_token(websocket)
     if not user_id:
         await websocket.close(code=4001, reason="Authentication required")
@@ -215,3 +235,77 @@ async def live_queue_websocket(
         logger.error(f"Live queue WebSocket error: {e}")
     finally:
         await live_queue_manager.disconnect(queue_id, date, websocket)
+
+
+@router.websocket("/ws/notifications/{user_id}")
+async def notifications_websocket(
+    user_id: str,
+    websocket: WebSocket,
+    db: Session = Depends(get_db),
+):
+    """
+    Per-user notification stream.
+
+    URL: ws(s)://host/api/ws/notifications/{user_id}?token=<jwt>
+
+    Events sent to client:
+      initial_state  — NotificationListResponse on connect (newest 20 + unread_count)
+      notification   — new notification pushed in real time
+      ping           — keepalive (client should pong or ignore)
+    """
+    await websocket.accept()
+
+    token_user_id = await get_user_from_token(websocket)
+    if not token_user_id or token_user_id != user_id:
+        await websocket.close(code=4001, reason="Authentication required")
+        return
+
+    await notification_manager.connect(user_id, websocket)
+
+    # Send initial state on connect
+    try:
+        svc = NotificationService(db)
+        uid = _UUID(user_id)
+        rows, total = svc.get_for_user(uid, limit=20, offset=0)
+        unread = svc.get_unread_count(uid)
+        initial_data = NotificationListResponse(
+            notifications=[NotificationData.from_notification(n) for n in rows],
+            total=total,
+            unread_count=unread,
+            limit=20,
+            offset=0,
+        )
+        await websocket.send_json({
+            "type": "initial_state",
+            "data": initial_data.model_dump(mode="json"),
+            "timestamp": datetime.now().isoformat(),
+        })
+        logger.info("Sent initial_state to user_id=%s: %d notifications, %d unread", user_id, total, unread)
+    except Exception as exc:
+        logger.error("Error sending initial notification state for user_id=%s: %s", user_id, exc, exc_info=True)
+
+    try:
+        while True:
+            try:
+                message = await asyncio.wait_for(
+                    websocket.receive_text(),
+                    timeout=30.0,
+                )
+                try:
+                    data = json.loads(message)
+                    if data.get("type") == "ping":
+                        await websocket.send_json({"type": "pong"})
+                except Exception:
+                    pass
+            except asyncio.TimeoutError:
+                if websocket.client_state == WebSocketState.CONNECTED:
+                    try:
+                        await websocket.send_json({"type": "ping"})
+                    except Exception:
+                        break
+    except WebSocketDisconnect:
+        logger.info("Notification WebSocket disconnected: user_id=%s", user_id)
+    except Exception as e:
+        logger.error("Notification WebSocket error: %s", e)
+    finally:
+        await notification_manager.disconnect(user_id, websocket)

@@ -166,6 +166,18 @@ export function formatReviewDate(dateStr: string | null | undefined): string {
   }
 }
 
+/**
+ * Human-readable relative time (e.g. "3m ago", "2h ago").
+ * Accepts an ISO 8601 datetime string.
+ */
+export function timeAgo(isoString: string): string {
+  const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
 // ============================================================================
 // API error handling
 // ============================================================================

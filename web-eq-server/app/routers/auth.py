@@ -95,3 +95,11 @@ async def get_business_profile(user: User = Depends(get_current_user), db: Sessi
 async def get_employee_profile_route(employee_id: UUID, db: Session = Depends(get_db)):
     controller = AuthController(db)
     return await controller.get_employee_details(employee_id)
+
+@auth_router.post("/logout", status_code=204)
+async def logout(request: Request, response: Response):
+    """Clear the auth cookie for whichever app type is calling (customer or business/employee)."""
+    if request.cookies.get("customer_access_token"):
+        response.delete_cookie(key="customer_access_token", path="/")
+    if request.cookies.get("access_token"):
+        response.delete_cookie(key="access_token", path="/")

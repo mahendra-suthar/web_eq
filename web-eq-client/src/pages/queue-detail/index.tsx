@@ -233,7 +233,6 @@ const QueueDetail = () => {
         <div className="queue-detail-page">
             <div className="content-card">
                 <div className="section-header section-header-actions">
-                    <h2 className="section-title">{t("queueDetails") || "Queue details"}</h2>
                     <div className="header-buttons">
                         {editingQueue ? (
                             <>

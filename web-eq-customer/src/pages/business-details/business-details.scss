@@ -749,10 +749,6 @@
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 .bdp-sidebar {
   align-self: start;
-
-  @media (max-width: $breakpoint-lg) {
-    order: -1; // show sidebar above left col on mobile
-  }
 }
 
 .bdp-booking-sticky {
@@ -761,7 +757,65 @@
 
   @media (max-width: $breakpoint-lg) {
     position: static;
+    display: none; // hidden on mobile — inline card shown instead
   }
+}
+
+// ─── Mobile-only inline booking card (shown after services when selected) ────
+.bdp-mobile-booking {
+  display: none;
+
+  @media (max-width: $breakpoint-lg) {
+    display: block;
+    margin-bottom: 20px;
+  }
+}
+
+.bdp-mobile-booking-card {
+  background: #fff;
+  border: 1px solid $border-subtle;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba($forest, 0.1);
+}
+
+.bdp-mobile-booking-header {
+  background: linear-gradient(135deg, $forest, $jade);
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 80% 0%, rgba(255, 255, 255, 0.1), transparent);
+    pointer-events: none;
+  }
+}
+
+.bdp-mobile-booking-title {
+  font-family: 'Fraunces', serif !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  color: #fff;
+  letter-spacing: -0.4px;
+  position: relative;
+  z-index: 1;
+  margin-bottom: 2px;
+}
+
+.bdp-mobile-booking-sub {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 12.5px !important;
+  font-weight: 300 !important;
+  color: rgba(255, 255, 255, 0.65);
+  position: relative;
+  z-index: 1;
+}
+
+.bdp-mobile-booking-body {
+  padding: 16px 20px;
 }
 
 // Booking card

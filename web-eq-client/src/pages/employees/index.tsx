@@ -6,6 +6,7 @@ import { useBusinessRegistrationStore } from '../../utils/businessRegistrationSt
 import { useUserStore } from '../../utils/userStore';
 import { getInitials, getAvatarBackground } from '../../utils/utils';
 import Pagination from '../../components/pagination';
+import PageToolbar from '../../components/page-toolbar';
 import { RouterConstant } from '../../routers/index';
 import "./employees.scss";
 
@@ -112,37 +113,37 @@ const Employees = () => {
     return (
         <div className="employees-page">
             <div className="content-card">
-                <div className="card-header">
-                    <h2 className="card-title">{t("employeeManagement")}</h2>
-                    <div className="card-actions">
-                        <button className="btn btn-secondary" disabled={loading || employees.length === 0}>
-                            {t("export")}
-                        </button>
-                        <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={() =>
-                                navigate(`${RouterConstant.ROUTERS_PATH.EMPLOYEES}/new`, {
-                                    state: resolvedBusinessId ? { businessId: resolvedBusinessId } : undefined,
-                                })
-                            }
-                            disabled={loading || !resolvedBusinessId}
-                        >
-                            {t("addEmployee")}
-                        </button>
-                    </div>
-                </div>
-
-                <div className="filter-bar">
-                    <input
-                        type="text"
-                        className="filter-input"
-                        placeholder={t("searchEmployees")}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        disabled={loading}
-                    />
-                </div>
+                <PageToolbar
+                    filters={
+                        <input
+                            type="text"
+                            className="filter-input"
+                            placeholder={t("searchEmployees")}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            disabled={loading}
+                        />
+                    }
+                    actions={
+                        <>
+                            <button className="btn btn-secondary" disabled={loading || employees.length === 0}>
+                                {t("export")}
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() =>
+                                    navigate(`${RouterConstant.ROUTERS_PATH.EMPLOYEES}/new`, {
+                                        state: resolvedBusinessId ? { businessId: resolvedBusinessId } : undefined,
+                                    })
+                                }
+                                disabled={loading || !resolvedBusinessId}
+                            >
+                                {t("addEmployee")}
+                            </button>
+                        </>
+                    }
+                />
 
                 {error && (
                     <div className="error-message" style={{ padding: "1rem", color: "red", marginBottom: "1rem" }}>
@@ -152,15 +153,40 @@ const Employees = () => {
 
                 <div className="data-table-container">
                     {loading ? (
-                        <div className="loading-state" style={{ padding: "2rem", textAlign: "center" }}>
-                            {t("loadingEmployees")}
-                        </div>
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>{t("employee")}</th>
+                                    <th>{t("email")}</th>
+                                    <th>{t("phoneNumber")}</th>
+                                    <th>{t("isVerified")}</th>
+                                    <th>{t("actions")}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                    <tr key={i} className="skeleton-row">
+                                        <td>
+                                            <div className="skeleton-user-cell">
+                                                <div className="skeleton-cell skeleton-cell--avatar" />
+                                                <div className="skeleton-cell skeleton-cell--med" />
+                                            </div>
+                                        </td>
+                                        <td><div className="skeleton-cell skeleton-cell--wide" /></td>
+                                        <td><div className="skeleton-cell skeleton-cell--med" /></td>
+                                        <td><div className="skeleton-cell skeleton-cell--short" /></td>
+                                        <td><div className="skeleton-cell skeleton-cell--short" /></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     ) : employees.length === 0 ? (
-                        <div className="empty-state" style={{ padding: "2rem", textAlign: "center" }}>
-                            {debouncedSearch 
-                                ? t("noEmployeesFoundSearch")
-                                : t("noEmployeesFound")
-                            }
+                        <div className="empty-state">
+                            <div className="empty-state-icon">👥</div>
+                            <div className="empty-state-title">
+                                {debouncedSearch ? t("noEmployeesFoundSearch") : t("noEmployeesFound")}
+                            </div>
+                            <div className="empty-state-sub">Add your first employee to get started.</div>
                         </div>
                     ) : (
                     <table className="data-table">

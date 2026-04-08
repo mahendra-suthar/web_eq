@@ -14,8 +14,15 @@ export default defineConfig({
       interval: 1000,
     },
     hmr: {
-      overlay: true
-    }
+      overlay: true,
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8008',
+        changeOrigin: true,
+        ws: true, // proxies WebSocket upgrades too
+      },
+    },
   },
   resolve: {
     alias: {

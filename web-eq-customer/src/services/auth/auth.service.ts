@@ -121,6 +121,18 @@ export class AuthService extends HttpClient {
     }
   }
 
+  async logout(): Promise<void> {
+    try {
+      await this.post("/auth/logout", {});
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const code = error?.code;
+      if (status !== 401 && status !== 403 && code !== "ERR_NETWORK") {
+        console.warn("Logout request failed unexpectedly:", error?.message ?? error);
+      }
+    }
+  }
+
   /**
    * Update customer profile (partial). Requires customer auth.
    */

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import eqLogo from "../../assets/transparent_logo.png";
 import { AuthService } from "../../services/auth/auth.service";
 import { useAuthStore } from "../../store/auth.store";
 import {
@@ -16,13 +17,11 @@ export default function VerifyOTPPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { setUserInfo } = useAuthStore();
-
+  const { setUserInfo, setToken, setProfileType } = useAuthStore();
   const phone = (location.state?.phone as string) || "";
   const phoneNumber = (location.state?.phoneNumber as string) || "";
   const countryCode = (location.state?.countryCode as string) || DEFAULT_COUNTRY_CODE;
 
-  // ── Booking return state ─────────────────────────────────────────────────
   const {
     returnTo,
     selectedServices,
@@ -135,12 +134,11 @@ export default function VerifyOTPPage() {
             : null,
         });
         setUserInfo(toUserData(response.user));
+        setProfileType(response.profile_type ?? "CUSTOMER");
+        if (response.token?.access_token) {
+          setToken(response.token.access_token);
+        }
         setSuccess(true);
-
-        // Enrich with profile in the background (cookie may not be set on same tick)
-        authService.getCustomerProfile()
-          .then((profile) => { if (profile?.user) setUserInfo(toUserData(profile.user)); })
-          .catch(() => {});
 
         setTimeout(() => {
           if (returnTo) {
@@ -186,7 +184,6 @@ export default function VerifyOTPPage() {
     }
   };
 
-  // ── Resend ───────────────────────────────────────────────────────────────
   const handleResend = async () => {
     if (!phoneNumber) return;
     setResendLoading(true);
@@ -204,16 +201,14 @@ export default function VerifyOTPPage() {
     }
   };
 
-  // ── Shared band elements ─────────────────────────────────────────────────
   const BandDeco = () => (
     <>
       <div className="auth-band-deco auth-band-deco-1" aria-hidden="true" />
       <div className="auth-band-deco auth-band-deco-2" aria-hidden="true" />
-      <span className="auth-band-logo">EQ<span>.</span></span>
+          <img src={eqLogo} alt="EaseQueue" className="auth-band-logo-img" aria-hidden="true" />
     </>
   );
 
-  // ── STEP 3: Success ───────────────────────────────────────────────────────
   if (success) {
     return (
       <div className="auth-wrap">
@@ -224,11 +219,6 @@ export default function VerifyOTPPage() {
               {t("auth.successText")} <em>{t("auth.successAccent")}</em>
             </div>
             <div className="auth-band-sub">{t("auth.signedInSuccess")}</div>
-            <div className="auth-step-dots" aria-label="Step 3 of 3 — complete">
-              <div className="auth-step-dot" />
-              <div className="auth-step-dot" />
-              <div className="auth-step-dot auth-step-dot--active" />
-            </div>
           </div>
           <div className="auth-body auth-panel auth-panel--center">
             <div className="auth-success-icon" aria-hidden="true">✓</div>
@@ -247,7 +237,7 @@ export default function VerifyOTPPage() {
     );
   }
 
-  // ── STEP 2: OTP entry ─────────────────────────────────────────────────────
+  // STEP 2: OTP entry
   return (
     <div className="auth-wrap">
       <div className="auth-card">
@@ -259,11 +249,6 @@ export default function VerifyOTPPage() {
             {t("auth.otpText")} <em>{t("auth.otpAccent")}</em>
           </div>
           <div className="auth-band-sub">{t("auth.checkSms", { n: OTP_LENGTH })}</div>
-          <div className="auth-step-dots" aria-label="Step 2 of 3">
-            <div className="auth-step-dot" />
-            <div className="auth-step-dot auth-step-dot--active" />
-            <div className="auth-step-dot" />
-          </div>
         </div>
 
         {/* Body */}

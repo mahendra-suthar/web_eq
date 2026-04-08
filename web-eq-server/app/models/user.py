@@ -29,4 +29,5 @@ class User(Base):
     businesses_owned = relationship("Business", back_populates="owner", lazy="select")
     queue_users = relationship("QueueUser", back_populates="user", lazy="select")
     reviews = relationship("Review", back_populates="user", lazy="select")
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan", lazy="select")
 

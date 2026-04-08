@@ -23,7 +23,7 @@ export default function VerifyOTP() {
   const navigate = useNavigate();
   const location = useLocation();
   const { ROUTERS_PATH } = RouterConstant;
-  const { setProfile, setNextStep } = useUserStore();
+  const { setProfile, setNextStep, setToken } = useUserStore();
 
   const phoneObj: PhoneNumber | undefined = location.state?.phone;
 
@@ -87,6 +87,9 @@ export default function VerifyOTP() {
 
       const nextStepFromBackend = response.next_step ?? null;
       setNextStep(nextStepFromBackend);
+      if (response.token?.access_token) {
+        setToken(response.token.access_token);
+      }
 
       const userAsOwner = {
         uuid: response.user.uuid,

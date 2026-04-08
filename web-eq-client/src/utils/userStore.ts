@@ -6,8 +6,10 @@ import { ProfileType } from "./constants";
 interface UserState {
   profile: UnifiedProfileResponse | null;
   nextStep: string | null;
+  token: string | null;
   setProfile: (profile: UnifiedProfileResponse) => void;
   setNextStep: (step: string | null) => void;
+  setToken: (token: string | null) => void;
   isAuthenticated: () => boolean;
   canAccessDashboard: () => boolean;
   getProfileType: () => ProfileType | null;
@@ -21,10 +23,11 @@ export const useUserStore = create(
     (set, get) => ({
       profile: null,
       nextStep: null,
+      token: null,
 
       setProfile: (profile) => set({ profile }),
-
       setNextStep: (step) => set({ nextStep: step }),
+      setToken: (token) => set({ token }),
 
       isAuthenticated: () => {
         const profile = get().profile;
@@ -70,11 +73,13 @@ export const useUserStore = create(
       resetUser: () => set({
         profile: null,
         nextStep: null,
+        token: null,
       }),
     }),
     {
       name: "web-eq-user",
       storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({ profile: state.profile, nextStep: state.nextStep }) as UserState,
     }
   )
 );

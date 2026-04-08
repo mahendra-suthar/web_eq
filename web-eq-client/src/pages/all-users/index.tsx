@@ -8,6 +8,7 @@ import { useUserStore } from '../../utils/userStore';
 import { getInitials, getAvatarBackground } from '../../utils/utils';
 import { DEFAULT_PAGE, ProfileType } from '../../utils/constants';
 import Pagination from '../../components/common/Pagination';
+import PageToolbar from '../../components/page-toolbar';
 import './all-users.scss';
 
 /** Role-based fetch params: business sees all or filtered by queue; employee sees only their queue. */
@@ -145,51 +146,37 @@ const AllUsers = () => {
         }
     };
 
-    const contextLabel = useMemo(() => {
-        if (isEmployee) return t('showingYourQueue') || 'Showing users from your queue';
-        if (params.queueId) return t('showingSelectedQueue') || 'Showing users from selected queue';
-        return t('showingAllQueues') || 'Showing users from all queues';
-    }, [isEmployee, params.queueId, t]);
 
     return (
         <div className="all-users-page">
             <div className="content-card">
-                <div className="card-header">
-                    <h2 className="card-title">{t('userManagement')}</h2>
-                    <div className="card-actions">
+                <PageToolbar
+                    filters={
+                        profile?.profile_type === ProfileType.BUSINESS && employees.length > 0 ? (
+                            <select
+                                className="filter-select"
+                                value={filterEmployeeId}
+                                onChange={(e) => {
+                                    setFilterEmployeeId(e.target.value);
+                                    setPage(DEFAULT_PAGE);
+                                }}
+                                disabled={loading}
+                            >
+                                <option value="">{t('allQueues') || 'All queues'}</option>
+                                {employees.map((emp) => (
+                                    <option key={emp.uuid} value={emp.uuid}>
+                                        {emp.full_name}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : undefined
+                    }
+                    actions={
                         <button className="btn btn-secondary" disabled>
                             {t('export')}
                         </button>
-                    </div>
-                </div>
-
-                {profile?.profile_type === ProfileType.BUSINESS && employees.length > 0 && (
-                    <div className="filter-bar">
-                        <label className="filter-label">{t('queue')}</label>
-                        <select
-                            className="filter-select"
-                            value={filterEmployeeId}
-                            onChange={(e) => {
-                                setFilterEmployeeId(e.target.value);
-                                setPage(DEFAULT_PAGE);
-                            }}
-                            disabled={loading}
-                        >
-                            <option value="">{t('allQueues') || 'All queues'}</option>
-                            {employees.map((emp) => (
-                                <option key={emp.uuid} value={emp.uuid}>
-                                    {emp.full_name} {emp.queue_id ? `(${t('queue')})` : ''}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-
-                {params.hasContext && (
-                    <p className="all-users-context" role="status">
-                        {contextLabel}
-                    </p>
-                )}
+                    }
+                />
 
                 {error && (
                     <div className="error-message all-users-error">
@@ -208,13 +195,41 @@ const AllUsers = () => {
                 {params.hasContext && (
                     <>
                         <div className="data-table-container">
-                            {loadingProfile ? (
-                                <div className="loading-state">{t('loading')}</div>
-                            ) : loading ? (
-                                <div className="loading-state">{t('loading')}</div>
+                            {loadingProfile || loading ? (
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>{t('user')}</th>
+                                            <th>{t('email')}</th>
+                                            <th>{t('phoneNumber')}</th>
+                                            <th>{t('totalAppointments')}</th>
+                                            <th>{t('lastVisit')}</th>
+                                            <th>{t('actions')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {Array.from({ length: 5 }).map((_, i) => (
+                                            <tr key={i} className="skeleton-row">
+                                                <td>
+                                                    <div className="skeleton-user-cell">
+                                                        <div className="skeleton-cell skeleton-cell--avatar" />
+                                                        <div className="skeleton-cell skeleton-cell--med" />
+                                                    </div>
+                                                </td>
+                                                <td><div className="skeleton-cell skeleton-cell--wide" /></td>
+                                                <td><div className="skeleton-cell skeleton-cell--med" /></td>
+                                                <td><div className="skeleton-cell skeleton-cell--short" /></td>
+                                                <td><div className="skeleton-cell skeleton-cell--med" /></td>
+                                                <td><div className="skeleton-cell skeleton-cell--short" /></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             ) : items.length === 0 ? (
                                 <div className="empty-state">
-                                    {t('noQueueUsersFound') || 'No users with appointments found.'}
+                                    <div className="empty-state-icon">🧑‍🤝‍🧑</div>
+                                    <div className="empty-state-title">{t('noQueueUsersFound') || 'No users found'}</div>
+                                    <div className="empty-state-sub">Users with appointments will appear here.</div>
                                 </div>
                             ) : (
                                 <table className="data-table">
