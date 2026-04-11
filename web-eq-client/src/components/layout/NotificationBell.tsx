@@ -7,7 +7,7 @@ const NotificationBell: React.FC = () => {
 
   return (
     <div className="notif-bell-wrapper">
-      <button className="notification-btn notif-bell" onClick={togglePanel} aria-label="Notifications">
+      <button className="notification-btn notif-bell" onClick={togglePanel} onMouseDown={(e) => e.stopPropagation()} aria-label="Notifications">
         🔔
         {unreadCount > 0 && (
           <span className="notification-badge notif-bell__badge">

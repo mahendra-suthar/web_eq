@@ -388,6 +388,7 @@ export default function LandingPage() {
             ) : (
               <div className={`lp-today-cards${todayAppointments.length === 0 ? " lp-today-cards--empty" : ""}`}>
                 {todayAppointments.map((appt) => {
+                  const isInProgress = appt.status === 2;
                   const isActive = appt.status !== 1;
                   const timeSummary = formatAppointmentTimeSummary(
                     appt.appointment_type,
@@ -396,9 +397,11 @@ export default function LandingPage() {
                     appt.estimated_appointment_time ?? null
                   );
                   const delayMsg = formatDelayMessage(appt.delay_minutes ?? null);
-                  const hasStats = appt.position != null
+                  const hasStats = !isInProgress && (
+                    appt.position != null
                     || (appt.estimated_wait_minutes != null && appt.estimated_wait_minutes > 0)
-                    || !!timeSummary;
+                    || !!timeSummary
+                  );
                   return (
                     <article
                       key={appt.queue_user_id}
@@ -412,8 +415,8 @@ export default function LandingPage() {
                             <span className="lp-today-business">{appt.business_name}</span>
                             <p className="lp-today-queue">{appt.queue_name}</p>
                           </div>
-                          <span className={`lp-today-status lp-today-status--${isActive ? "active" : "waiting"}`}>
-                            {isActive ? t("landing.statusInProgress") : t("landing.statusWaiting")}
+                          <span className={`lp-today-status lp-today-status--${isInProgress ? "serving" : isActive ? "active" : "waiting"}`}>
+                            {isInProgress ? (t("youreBeingServed") || "You're being served") : isActive ? t("landing.statusInProgress") : t("landing.statusWaiting")}
                           </span>
                         </div>
 

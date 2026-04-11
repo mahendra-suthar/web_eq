@@ -6,11 +6,12 @@ import { useNotificationStore } from "../../store/notification.store";
 import { AuthService } from "../../services/auth/auth.service";
 import type { CustomerProfileResponse, CustomerProfileUpdateInput } from "../../services/auth/auth.service";
 import { AppointmentService } from "../../services/appointment/appointment.service";
-import type { CustomerAppointmentListItem } from "../../services/appointment/appointment.service";
+import type { CustomerAppointmentListItem, TodayAppointmentResponse } from "../../services/appointment/appointment.service";
 import AppointmentActions from "../../components/appointment-actions";
+import MyQueueCard from "../../components/my-queue-card";
 import LoadingSpinner from "../../components/loading-spinner";
 import ErrorMessage from "../../components/error-message";
-import { formatAppointmentTimeSummary, formatDelayMessage, getApiErrorMessage } from "../../utils/util";
+import { formatAppointmentTimeSummary, formatDelayMessage, formatTimeToDisplay, formatApptType, getInitials, getApiErrorMessage } from "../../utils/util";
 import "./profile.scss";
 
 type TabId = "profile" | "appointments" | "settings";
@@ -23,15 +24,6 @@ function isValidTab(t: string): t is TabId {
   return VALID_TABS.includes(t as TabId);
 }
 
-function getInitials(name?: string | null, phone?: string): string {
-  if (name && name.trim()) {
-    const parts = name.trim().split(" ").filter(Boolean);
-    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    return parts[0][0].toUpperCase();
-  }
-  if (phone) return phone.slice(-1);
-  return "?";
-}
 
 function parseApptDate(dateStr: string): { day: string; mon: string } {
   try {
@@ -175,7 +167,7 @@ function ProfileInfoSection({ onSaved }: { onSaved: (msg: string) => void }) {
               <div className="ac-form-group ac-form-group--full">
                 <label className="ac-form-label" htmlFor="ac-email">
                   {t("profile.emailAddress")}
-                  {user?.email && (
+                  {user?.email_verify && (
                     <span className="ac-verified-badge">
                       <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
                         <polyline points="20 6 9 17 4 12" />
@@ -274,6 +266,15 @@ function AppointmentsSection() {
   const navigate = useNavigate();
   const { t } = useTranslation();
 
+  // Today's active appointments — shown as live queue cards at the top
+  const [todayAppts, setTodayAppts] = useState<TodayAppointmentResponse[]>([]);
+  useEffect(() => {
+    const svc = new AppointmentService();
+    svc.getTodayAppointments()
+      .then((items) => setTodayAppts(items.filter((a) => a.status === 1 || a.status === 2)))
+      .catch(() => {});
+  }, []);
+
   const STATUS_LABELS = useMemo<Record<number, string>>(() => ({
     1: t("profile.statusWaiting"),
     2: t("profile.statusInProgress"),
@@ -351,6 +352,16 @@ function AppointmentsSection() {
 
   return (
     <>
+      {/* Live queue cards — shown when customer has active appointment today */}
+      {todayAppts.length > 0 && (
+        <div className="ac-today-queue">
+          <div className="ac-today-queue__label">{t("profile.todayQueue") || "Today's Queue"}</div>
+          {todayAppts.map((appt) => (
+            <MyQueueCard key={appt.queue_user_id} appointment={appt} />
+          ))}
+        </div>
+      )}
+
       {/* Stats strip */}
       {!loading && list.length > 0 && (
         <div className="ac-stats-strip">
@@ -417,6 +428,7 @@ function AppointmentsSection() {
               <div className="ac-month-sep">{month}</div>
               {items.map((item) => {
                 const cls = getRichStatusClass(item.status);
+                const isPast = cls === "completed" || cls === "expired" || cls === "cancelled";
                 const { day, mon } = parseApptDate(item.queue_date);
                 const timeSummary = formatAppointmentTimeSummary(
                   item.appointment_type,
@@ -428,6 +440,9 @@ function AppointmentsSection() {
                 const services = item.service_summary
                   ? item.service_summary.split(",").map((s) => s.trim()).filter(Boolean)
                   : [];
+                const servedAt = item.dequeue_time ? formatTimeToDisplay(item.dequeue_time)
+                  : item.enqueue_time ? formatTimeToDisplay(item.enqueue_time) : null;
+                const apptTypeLabel = formatApptType(item.appointment_type);
 
                 return (
                   <div key={item.queue_user_id} className={`ac-appt-card ac-appt-card--${cls}`}>
@@ -478,29 +493,69 @@ function AppointmentsSection() {
                         </div>
                       )}
 
-                      {timeSummary && (
-                        <div className="ac-appt-time-chip">
-                          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-                          </svg>
-                          {timeSummary}
-                        </div>
-                      )}
+                      {/* Appointment type chip — shown for all statuses */}
+                      <div className="ac-appt-type-chip" data-type={item.appointment_type || "QUEUE"}>
+                        {apptTypeLabel}
+                      </div>
 
-                      {item.position != null && (
-                        <div className="ac-appt-queue-chip">
-                          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" />
-                            <line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" />
-                          </svg>
-                          Position #{item.position}
-                        </div>
-                      )}
-
-                      {item.estimated_wait_minutes != null && (
-                        <div className="ac-appt-queue-chip">
-                          ~{item.estimated_wait_minutes} min wait
-                        </div>
+                      {/* Past/Completed/Cancelled/Expired: show actual/scheduled time + served time + cancellation reason */}
+                      {isPast ? (
+                        <>
+                          {timeSummary && (
+                            <div className="ac-appt-time-chip">
+                              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                              </svg>
+                              {timeSummary}
+                            </div>
+                          )}
+                          {cls === "completed" && servedAt && (
+                            <div className="ac-appt-time-chip ac-appt-time-chip--served">
+                              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                              {t("profile.servedAt") || "Served at"} {servedAt}
+                            </div>
+                          )}
+                          {(cls === "cancelled" || cls === "expired") && item.cancellation_reason && (
+                            <div className="ac-appt-cancel-reason">
+                              {item.cancellation_reason}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {timeSummary && (
+                            <div className="ac-appt-time-chip">
+                              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                              </svg>
+                              {timeSummary}
+                            </div>
+                          )}
+                          {item.status === 2 ? (
+                            <div className="ac-appt-queue-chip ac-appt-queue-chip--serving">
+                              🔔 {t("youreBeingServed") || "You're being served"}
+                            </div>
+                          ) : (
+                            <>
+                              {item.position != null && (
+                                <div className="ac-appt-queue-chip">
+                                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" />
+                                    <line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" />
+                                  </svg>
+                                  Position #{item.position}
+                                </div>
+                              )}
+                              {item.estimated_wait_minutes != null && (
+                                <div className="ac-appt-queue-chip">
+                                  ~{item.estimated_wait_minutes} min wait
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </>
                       )}
 
                       <div className="ac-appt-footer-actions">
@@ -540,15 +595,13 @@ function AppointmentsSection() {
 {/* Settings Section */}
 function SettingsSection() {
   const { t } = useTranslation();
-  const [notifications, setNotifications] = useState({
-    bookingConfirmations: true,
-    queueUpdates: true,
-    reminder30: true,
-    promotional: false,
-  });
 
-  const toggle = (key: keyof typeof notifications) =>
-    setNotifications((prev) => ({ ...prev, [key]: !prev[key] }));
+  const notifItems = [
+    { name: t("profile.notifBooking"), desc: t("profile.notifBookingDesc") },
+    { name: t("profile.notifQueue"), desc: t("profile.notifQueueDesc") },
+    { name: t("profile.notifReminder"), desc: t("profile.notifReminderDesc") },
+    { name: t("profile.notifPromo"), desc: t("profile.notifPromoDesc") },
+  ];
 
   return (
     <>
@@ -566,23 +619,14 @@ function SettingsSection() {
           </div>
         </div>
         <div className="ac-card-body">
-          {([
-            { key: "bookingConfirmations", name: t("profile.notifBooking"), desc: t("profile.notifBookingDesc") },
-            { key: "queueUpdates", name: t("profile.notifQueue"), desc: t("profile.notifQueueDesc") },
-            { key: "reminder30", name: t("profile.notifReminder"), desc: t("profile.notifReminderDesc") },
-            { key: "promotional", name: t("profile.notifPromo"), desc: t("profile.notifPromoDesc") },
-          ] as { key: keyof typeof notifications; name: string; desc: string }[]).map(({ key, name, desc }) => (
-            <div key={key} className="ac-setting-row">
+          {notifItems.map(({ name, desc }) => (
+            <div key={name} className="ac-setting-row ac-setting-row--disabled">
               <div className="ac-setting-info">
                 <div className="ac-setting-name">{name}</div>
                 <div className="ac-setting-desc">{desc}</div>
               </div>
-              <label className="ac-toggle">
-                <input
-                  type="checkbox"
-                  checked={notifications[key]}
-                  onChange={() => toggle(key)}
-                />
+              <label className="ac-toggle ac-toggle--disabled">
+                <input type="checkbox" disabled checked={false} onChange={() => {}} />
                 <span className="ac-toggle-slider" />
               </label>
             </div>
@@ -604,34 +648,29 @@ function SettingsSection() {
           </div>
         </div>
         <div className="ac-card-body">
-          <div className="ac-setting-row">
+          <div className="ac-setting-row ac-setting-row--disabled">
             <div className="ac-setting-info">
               <div className="ac-setting-name">{t("profile.prefLanguage")}</div>
               <div className="ac-setting-desc">{t("profile.prefLanguageDesc")}</div>
             </div>
-            <select className="ac-setting-select">
+            <select className="ac-setting-select" disabled>
               <option>English</option>
-              <option>हिन्दी</option>
-              <option>ગુજરાતી</option>
             </select>
           </div>
-          <div className="ac-setting-row">
+          <div className="ac-setting-row ac-setting-row--disabled">
             <div className="ac-setting-info">
               <div className="ac-setting-name">{t("profile.prefLocation")}</div>
               <div className="ac-setting-desc">{t("profile.prefLocationDesc")}</div>
             </div>
-            <select className="ac-setting-select">
+            <select className="ac-setting-select" disabled>
               <option>Ahmedabad</option>
-              <option>Mumbai</option>
-              <option>Bengaluru</option>
-              <option>Delhi</option>
             </select>
           </div>
         </div>
       </div>
 
       {/* Danger zone */}
-      <div className="ac-danger-zone">
+      <div className="ac-danger-zone ac-danger-zone--disabled">
         <div className="ac-danger-title">
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
             <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
@@ -640,7 +679,7 @@ function SettingsSection() {
           {t("profile.dangerZoneTitle")}
         </div>
         <p className="ac-danger-desc">{t("profile.dangerZoneDesc")}</p>
-        <button className="ac-btn-danger">{t("profile.deleteAccount")}</button>
+        <button className="ac-btn-danger" disabled>{t("profile.deleteAccount")}</button>
       </div>
     </>
   );

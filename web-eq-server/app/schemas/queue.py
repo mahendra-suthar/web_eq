@@ -545,27 +545,37 @@ class LiveQueueUserItem(BaseModel):
     position: Optional[int] = None  # 1-indexed, only for waiting users
     estimated_wait_minutes: Optional[int] = None   # for waiting: est. wait; for in_progress: 0
     estimated_appointment_time: Optional[str] = None  # 12h e.g. "4:30 PM" (when expected to be served/done)
+    expected_at_ts: Optional[int] = None          # epoch ms — drift-free client countdown
     appointment_type: Optional[str] = "QUEUE"     # QUEUE, FIXED, APPROXIMATE
     scheduled_start: Optional[str] = None        # time e.g. "10:30"
     scheduled_end: Optional[str] = None
     delay_minutes: Optional[int] = None          # for APPROXIMATE: cascaded delay
 
     @classmethod
-    def from_user_dict(cls, u: Dict[str, Any]) -> "LiveQueueUserItem":
-        """Build from a user dict produced by build_live_queue_users_raw (or equivalent)."""
-        est_wait = (
-            wait_minutes_from_now(u.get("estimated_enqueue_time"))
-            if u.get("status") == QUEUE_USER_REGISTERED
-            else None
-        )
-        est_dt = u.get("estimated_dequeue_time")
-        enq_dt = u.get("estimated_enqueue_time")
-        if u.get("status") == QUEUE_USER_IN_PROGRESS and est_dt:
-            appt_time = format_time_12h(est_dt)
-        elif u.get("status") == QUEUE_USER_REGISTERED and enq_dt:
-            appt_time = format_time_12h(enq_dt)
-        else:
-            appt_time = None
+    def from_user_dict(cls, u: Dict[str, Any], wd: Dict[str, Any] = {}) -> "LiveQueueUserItem":
+        """Build from a user dict produced by build_live_queue_users_raw (or equivalent).
+
+        ``wd`` is the per-user entry from ``calculate_queue_waits``'s ``wait_data`` dict.
+        When provided, dynamic live values take priority over the stale DB-stored estimates.
+        """
+        # Prefer live-calculated values; fall back to DB-stored estimates
+        est_wait: Optional[int] = wd.get("estimated_wait_minutes")
+        appt_time: Optional[str] = wd.get("estimated_appointment_time")
+
+        if est_wait is None:
+            est_wait = (
+                wait_minutes_from_now(u.get("estimated_enqueue_time"))
+                if u.get("status") == QUEUE_USER_REGISTERED
+                else None
+            )
+        if appt_time is None:
+            est_dt = u.get("estimated_dequeue_time")
+            enq_dt = u.get("estimated_enqueue_time")
+            if u.get("status") == QUEUE_USER_IN_PROGRESS and est_dt:
+                appt_time = format_time_12h(est_dt)
+            elif u.get("status") == QUEUE_USER_REGISTERED and enq_dt:
+                appt_time = format_time_12h(enq_dt)
+
         return cls(
             uuid=u["uuid"],
             full_name=u.get("full_name"),
@@ -578,6 +588,7 @@ class LiveQueueUserItem(BaseModel):
             position=u.get("position"),
             estimated_wait_minutes=est_wait,
             estimated_appointment_time=appt_time,
+            expected_at_ts=wd.get("expected_at_ts"),
             appointment_type=u.get("appointment_type") or "QUEUE",
             scheduled_start=u.get("scheduled_start"),
             scheduled_end=u.get("scheduled_end"),
@@ -606,14 +617,17 @@ class LiveQueueData(BaseModel):
         employee_on_leave: bool = False,
     ) -> "LiveQueueData":
         """Build from queue, date, raw user dicts (e.g. from build_live_queue_users_raw), and leave flag."""
+        from app.services.realtime.live_queue_manager import calculate_queue_waits
+
         waiting_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_REGISTERED)
         in_progress_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_IN_PROGRESS)
         completed_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_COMPLETED)
-        current_token: Optional[str] = None
-        for u in users_raw:
-            if u.get("status") == QUEUE_USER_IN_PROGRESS:
-                current_token = u.get("token")
-                break
+
+        # Compute live wait estimates so every broadcast reflects current queue state
+        waits = calculate_queue_waits(users_raw)
+        current_token: Optional[str] = waits["current_token"]
+        wait_data: Dict[str, Any] = waits["wait_data"]
+
         return cls(
             queue_id=str(queue.uuid),
             queue_name=queue.name,
@@ -624,7 +638,10 @@ class LiveQueueData(BaseModel):
             completed_count=completed_count,
             current_token=current_token,
             employee_on_leave=employee_on_leave,
-            users=[LiveQueueUserItem.from_user_dict(u) for u in users_raw],
+            users=[
+                LiveQueueUserItem.from_user_dict(u, wait_data.get(str(u["uuid"]), {}))
+                for u in users_raw
+            ],
         )
 
 
@@ -648,6 +665,8 @@ class CustomerTodayAppointmentResponse(BaseModel):
     scheduled_start: Optional[str] = None  # time e.g. "10:30"
     scheduled_end: Optional[str] = None
     delay_minutes: Optional[int] = None
+    expected_at_ts: Optional[int] = None        # epoch ms — drift-free client countdown
+    current_token: Optional[str] = None         # token currently being served in this queue
 
     @classmethod
     def from_queue_user_and_metrics(
@@ -660,6 +679,8 @@ class CustomerTodayAppointmentResponse(BaseModel):
         service_summary: Optional[str],
         appointment_time_12h: Optional[str],
         queue_service_uuids: Optional[List[str]] = None,
+        expected_at_ts: Optional[int] = None,
+        current_token: Optional[str] = None,
     ) -> "CustomerTodayAppointmentResponse":
         """Build from queue user, queue, business ids/names, computed metrics, service summary, and formatted time."""
         st = getattr(qu, "scheduled_start", None)
@@ -683,6 +704,8 @@ class CustomerTodayAppointmentResponse(BaseModel):
             scheduled_start=st.strftime("%H:%M") if st else None,
             scheduled_end=se.strftime("%H:%M") if se else None,
             delay_minutes=getattr(qu, "delay_minutes", None),
+            expected_at_ts=expected_at_ts,
+            current_token=current_token,
         )
 
 

@@ -2,8 +2,11 @@
 Customer-facing controller: profile, appointments (list + detail + update).
 Request/response only; business logic in services.
 """
+import logging
 from typing import Optional
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
@@ -15,6 +18,8 @@ from app.services.address_service import AddressService
 from app.services.queue_service import QueueService
 from app.services.booking_calculation_service import BookingCalculationService
 from app.services.realtime.queue_manager import queue_manager
+from app.services.realtime.live_queue_manager import live_queue_manager
+from app.services.realtime.customer_queue_manager import customer_queue_manager
 from app.schemas.profile import CustomerProfileResponse, OwnerInfo, AddressData
 from app.schemas.customer import (
     CustomerProfileUpdateInput,
@@ -272,17 +277,28 @@ class CustomerController:
                 pass
 
         if qu.queue_date == today_app_date():
+            date_str = format_date_iso(qu.queue_date)
             try:
                 await queue_manager.connect_to_redis()
                 await queue_manager.remove_from_queue(
                     db=self.db,
                     queue_id=str(queue_id),
                     user_id=str(user_id),
-                    date_str=format_date_iso(qu.queue_date),
+                    date_str=date_str,
                     business_id=str(business_id),
                 )
             except Exception:
                 pass
+
+            # Broadcast updated queue state to employee UI and remaining customers
+            try:
+                await live_queue_manager.broadcast(
+                    str(queue_id), date_str, "live_queue_update",
+                    live_queue_manager.get_live_queue_state(self.db, str(queue_id), date_str)
+                )
+                await customer_queue_manager.broadcast_to_queue(self.db, str(queue_id), date_str)
+            except Exception:
+                logger.warning("Live broadcast failed after cancel queue_id=%s", queue_id, exc_info=True)
 
         refreshed = self.queue_service.get_appointment_by_id_for_user(user_id, queue_user_id)
         if not refreshed:

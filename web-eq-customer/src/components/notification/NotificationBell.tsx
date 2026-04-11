@@ -9,6 +9,7 @@ export default function NotificationBell() {
       <button
         className="cl-notif-bell"
         onClick={togglePanel}
+        onMouseDown={(e) => e.stopPropagation()}
         aria-label="Notifications"
       >
         🔔

@@ -69,8 +69,16 @@ class SlotGenerationService:
         for s in slots:
             self.db.add(s)
         self.db.commit()
-        for s in slots:
-            self.db.refresh(s)
+        # Re-query in a single SELECT instead of N individual refresh calls
+        slots = (
+            self.db.query(AppointmentSlot)
+            .filter(
+                AppointmentSlot.queue_id == queue_id,
+                AppointmentSlot.slot_date == target_date,
+            )
+            .order_by(AppointmentSlot.slot_start)
+            .all()
+        )
         return slots
 
     def _generate_slots_for_queue(self, queue: Queue, target_date: date) -> List[AppointmentSlot]:
@@ -82,7 +90,8 @@ class SlotGenerationService:
             return []
 
         slot_duration = self.queue_service.get_queue_min_slot_duration_minutes(queue.uuid)
-        slot_interval = queue.slot_interval_minutes if queue.slot_interval_minutes is not None else slot_duration
+        raw_interval = queue.slot_interval_minutes
+        slot_interval = raw_interval if (raw_interval is not None and raw_interval > 0) else slot_duration
         capacity = max(1, queue.max_per_slot or 1)
 
         slots: List[AppointmentSlot] = []

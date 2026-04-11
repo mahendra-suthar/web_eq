@@ -11,7 +11,8 @@ from app.core.constants import TIMEZONE
 from app.services.queue_service import QueueService
 from app.services.business_service import BusinessService
 from app.services.realtime.queue_manager import queue_manager
-from app.services.realtime.live_queue_manager import live_queue_manager
+from app.services.realtime.live_queue_manager import live_queue_manager, calculate_queue_waits
+from app.services.realtime.customer_queue_manager import customer_queue_manager
 from app.schemas.queue import (
     QueueCreate, QueueCreateBatch, QueueData, QueueDetailData, QueueServiceDetailData,
     QueueUpdate, QueueServicesAdd, QueueServiceUpdate,
@@ -590,6 +591,17 @@ class QueueController:
                 metrics, services_data, token_number,
             )
 
+            # Broadcast live queue update to employee UI and connected customers (today only)
+            if data.queue_date == today_app_date():
+                try:
+                    await live_queue_manager.broadcast(
+                        str(queue_id), date_str, "live_queue_update",
+                        live_queue_manager.get_live_queue_state(self.db, str(queue_id), date_str)
+                    )
+                    await customer_queue_manager.broadcast_to_queue(self.db, str(queue_id), date_str)
+                except Exception:
+                    logger.warning("Live broadcast failed after booking queue_id=%s", queue_id, exc_info=True)
+
             # Fire-and-forget notifications — failures must never block booking
             try:
                 assigned_emp = self.employee_service.get_verified_employee_by_queue(
@@ -849,8 +861,9 @@ class QueueController:
             # Broadcast to all connected WS clients
             date_str = today.isoformat()
             await live_queue_manager.broadcast(
-                str(queue_id), date_str, "live_queue_update", live_data.model_dump()
+                str(queue_id), date_str, "live_queue_update", live_data.model_dump(mode="json")
             )
+            await customer_queue_manager.broadcast_to_queue(self.db, str(queue_id), date_str)
 
             return live_data
         except ValueError as e:
@@ -885,6 +898,7 @@ class QueueController:
                 str(queue_id), today_str, "queue_started",
                 {"queue_id": str(queue_id), "queue_status": QUEUE_RUNNING}
             )
+            await customer_queue_manager.broadcast_to_queue(self.db, str(queue_id), today_str)
 
             return QueueData.from_queue(queue)
         except HTTPException:
@@ -917,6 +931,7 @@ class QueueController:
                 str(queue_id), today_str, "queue_stopped",
                 {"queue_id": str(queue_id), "queue_status": QUEUE_STOPPED}
             )
+            await customer_queue_manager.broadcast_to_queue(self.db, str(queue_id), today_str)
 
             return QueueData.from_queue(queue)
         except HTTPException:
@@ -977,6 +992,20 @@ class QueueController:
         if not queue_users:
             return CustomerTodayAppointmentsResponse(items=[])
 
+        waits_by_queue: dict = {}
+        for qu in queue_users:
+            qid = str(qu.queue_id)
+            if qid not in waits_by_queue:
+                try:
+                    rows, svc_by_user = self.queue_service.get_live_queue_users_raw(
+                        qu.queue_id, today
+                    )
+                    users_raw = build_live_queue_users_raw(rows, svc_by_user)
+                    result = calculate_queue_waits(users_raw)
+                    waits_by_queue[qid] = result
+                except Exception:
+                    waits_by_queue[qid] = {"current_token": None, "wait_data": {}}
+
         calc_service = BookingCalculationService(self.db)
         items = []
         for qu in queue_users:
@@ -997,11 +1026,21 @@ class QueueController:
                         service_names.append(qs.service.name)
             service_summary = " · ".join(service_names) if service_names else None
 
+            queue_waits = waits_by_queue.get(str(qu.queue_id), {})
+            wd = queue_waits.get("wait_data", {}).get(str(qu.uuid), {})
+            expected_at_ts = wd.get("expected_at_ts")
+            dynamic_appt_time = wd.get("estimated_appointment_time") or metrics.get("appointment_time")
+            live_wait = wd.get("estimated_wait_minutes")
+            if live_wait is not None:
+                metrics = {**metrics, "wait_minutes": live_wait}
+
             items.append(
                 CustomerTodayAppointmentResponse.from_queue_user_and_metrics(
                     qu, queue, business_id, business_name,
-                    metrics, service_summary, metrics.get("appointment_time"),
+                    metrics, service_summary, dynamic_appt_time,
                     queue_service_uuids=qs_uuids,
+                    expected_at_ts=expected_at_ts,
+                    current_token=queue_waits.get("current_token"),
                 )
             )
         return CustomerTodayAppointmentsResponse(items=items)

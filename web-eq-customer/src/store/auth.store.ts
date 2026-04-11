@@ -11,6 +11,7 @@ export interface UserInfo {
   phone_number: string;
   full_name?: string | null;
   email?: string | null;
+  email_verify?: boolean;
   date_of_birth?: string | null;
   gender?: number | null;
 }

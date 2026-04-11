@@ -48,6 +48,8 @@ type UIUser = {
   time_label: string;
   estimated_wait_label: string;
   expected_at_label: string;
+  est_remaining_label: string;   // for IN_PROGRESS: "~X min remaining" or "Any moment now"
+  expected_at_ts?: number | null;
   position?: number | null;
   appointment_type?: string | null;
   scheduled_start?: string | null;
@@ -55,7 +57,7 @@ type UIUser = {
   delay_minutes?: number | null;
 };
 
-type CurrentUser = UIUser & { position: number; estimated_token: string };
+type CurrentUser = UIUser & { position: number | null; estimated_token: string };
 
 function mapLiveData(data: LiveQueueData): {
   completed: UIUser[];
@@ -65,12 +67,34 @@ function mapLiveData(data: LiveQueueData): {
   const completed: UIUser[] = [];
   const waiting: UIUser[] = [];
   let current: CurrentUser | null = null;
+  const now = Date.now();
 
   for (const u of data.users) {
     const timeLabel = formatTimeToDisplay(u.dequeue_time || u.enqueue_time);
-    const estWaitLabel =
-      u.estimated_wait_minutes != null ? formatDurationMinutes(u.estimated_wait_minutes) : "";
+
+    // Use epoch timestamp for drift-free countdown — no server round-trip needed
+    let estWaitLabel = "";
+    if (u.expected_at_ts != null) {
+      const remainingMs = u.expected_at_ts - now;
+      estWaitLabel = remainingMs <= 60_000
+        ? "< 1m"
+        : formatDurationMinutes(Math.ceil(remainingMs / 60_000));
+    } else if (u.estimated_wait_minutes != null) {
+      estWaitLabel = u.estimated_wait_minutes === 0
+        ? "< 1m"
+        : formatDurationMinutes(u.estimated_wait_minutes);
+    }
+
     const expectedAtLabel = u.estimated_appointment_time ?? "";
+
+    // For IN_PROGRESS: compute finish countdown using expected_at_ts
+    let estRemainingLabel = "";
+    if (u.status === QueueUserStatus.IN_PROGRESS && u.expected_at_ts != null) {
+      const remainingMs = u.expected_at_ts - now;
+      estRemainingLabel = remainingMs <= 0
+        ? "Any moment now"
+        : `~${formatDurationMinutes(Math.ceil(remainingMs / 60_000))} remaining`;
+    }
 
     const base: UIUser = {
       id: u.uuid,
@@ -81,6 +105,8 @@ function mapLiveData(data: LiveQueueData): {
       time_label: timeLabel,
       estimated_wait_label: estWaitLabel,
       expected_at_label: expectedAtLabel,
+      est_remaining_label: estRemainingLabel,
+      expected_at_ts: u.expected_at_ts ?? null,
       position: u.position ?? null,
       appointment_type: u.appointment_type ?? null,
       scheduled_start: u.scheduled_start ?? null,
@@ -93,7 +119,7 @@ function mapLiveData(data: LiveQueueData): {
     } else if (u.status === QueueUserStatus.IN_PROGRESS) {
       current = {
         ...base,
-        position: u.position ?? 1,
+        position: u.position ?? null,
         estimated_token: u.token || "",
       };
     } else {
@@ -104,28 +130,20 @@ function mapLiveData(data: LiveQueueData): {
   return { completed, current, waiting };
 }
 
-// ─── component ──────────────────────────────────────────────────────────────
-
 const LiveQueue: React.FC = () => {
   const { t } = useTranslation();
   const profile = useUserStore((s) => s.profile);
   const getBusinessId = useUserStore((s) => s.getBusinessId);
-
   const businessId = getBusinessId();
-
-  // Queue selection: employee → their assigned queue; business → pick from list
   const employeeQueueId: string | null =
     profile?.profile_type === "EMPLOYEE"
       ? (profile?.employee as any)?.queue_id ?? null
       : null;
 
-  const [selectedQueueId, setSelectedQueueId] = useState<string | null>(
-    employeeQueueId
-  );
+  const [selectedQueueId, setSelectedQueueId] = useState<string | null>(employeeQueueId);
   const [queues, setQueues] = useState<QueueData[]>([]);
   const [queuesLoading, setQueuesLoading] = useState(false);
-
-  // Live queue state
+  const [tick, setTick] = useState(0);
   const [liveData, setLiveData] = useState<LiveQueueData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -163,7 +181,6 @@ const LiveQueue: React.FC = () => {
       })
       .catch(() => {})
       .finally(() => setQueuesLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId, employeeQueueId]);
 
   // Fetch live queue data
@@ -185,6 +202,12 @@ const LiveQueue: React.FC = () => {
       fetchLiveQueue(selectedQueueId);
     }
   }, [selectedQueueId, fetchLiveQueue]);
+
+  // Tick every 30s so the countdown re-renders without a server round-trip
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   // Real-time WebSocket updates
   const handleWsUpdate = useCallback((data: LiveQueueData) => {
@@ -215,11 +238,12 @@ const LiveQueue: React.FC = () => {
     onStopped: handleWsStopped,
   });
 
-  // Derived UI state
-  const { completed, current, waiting } = useMemo(
-    () => (liveData ? mapLiveData(liveData) : { completed: [], current: null, waiting: [] }),
-    [liveData]
-  );
+  // Derived UI state — recalculates on new server data OR every 30s tick
+  const { completed, current, waiting } = useMemo(() => {
+    if (!liveData) return { completed: [], current: null, waiting: [] };
+    return mapLiveData(liveData);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveData, tick]);
 
   const inProgressCount = liveData?.in_progress_count ?? 0;
   const waitingCount = liveData?.waiting_count ?? 0;
@@ -227,8 +251,6 @@ const LiveQueue: React.FC = () => {
   const queueName = liveData?.queue_name ?? "Live Queue";
   const queueStatus = liveData?.queue_status;
   const employeeOnLeave = liveData?.employee_on_leave ?? false;
-
-  // ─── actions ──────────────────────────────────────────────────────────────
 
   const handleNext = useCallback(async () => {
     if (!selectedQueueId || nextLoading) return;
@@ -276,8 +298,6 @@ const LiveQueue: React.FC = () => {
     }
   }, [selectedQueueId, businessId, actionLoading]);
 
-  // ─── timeline ─────────────────────────────────────────────────────────────
-
   const timelineItems = useMemo(() => {
     type TItem = { id: string; status: "done" | "progress" | "waiting"; user: UIUser };
     const items: TItem[] = [];
@@ -287,15 +307,17 @@ const LiveQueue: React.FC = () => {
     return items;
   }, [completed, current, waiting]);
 
-  // ─── render helpers ───────────────────────────────────────────────────────
-
   const isRunning = queueStatus === 2;
   const isStopped = queueStatus === 3;
 
+  // True when the in-progress customer has gone past their expected finish time
+  const isQueueRunningLate =
+    current != null &&
+    current.expected_at_ts != null &&
+    current.expected_at_ts < Date.now();
+
   // Queue selector (only for business owners who have multiple queues)
   const showSelector = !employeeQueueId && queues.length > 1;
-
-  // When employee is on leave, all actions are disabled (view-only)
   const actionsDisabled = employeeOnLeave;
 
   if (!selectedQueueId && !queuesLoading) {
@@ -334,6 +356,11 @@ const LiveQueue: React.FC = () => {
               )}
               {isStopped && <span className="lq-badge lq-badge--stopped">Stopped</span>}
               {isRunning && <span className="lq-badge lq-badge--running">Running</span>}
+              {isQueueRunningLate && (
+                <span className="lq-badge lq-badge--late">
+                  {t("runningLateQueue") || "Running late"}
+                </span>
+              )}
               {employeeOnLeave && (
                 <span className="lq-badge lq-badge--onLeave">
                   {t("employeeOnLeave") || "On leave"}
@@ -470,6 +497,11 @@ const LiveQueue: React.FC = () => {
                         {t("inProgress") || "In Progress"}
                       </span>
                     </div>
+                    {current.est_remaining_label && (
+                      <div className="lq-currentCard__delay">
+                        {current.est_remaining_label}
+                      </div>
+                    )}
                     {current.appointment_type === "APPROXIMATE" &&
                       current.delay_minutes != null &&
                       current.delay_minutes > 0 && (
@@ -493,10 +525,6 @@ const LiveQueue: React.FC = () => {
                       <span className="lq-sep" aria-hidden />
                       <span>
                         {t("tokenNumber") || "Token"} <strong>{current.token}</strong>
-                      </span>
-                      <span className="lq-sep" aria-hidden />
-                      <span>
-                        {t("position") || "Position"} <strong>#{current.position}</strong>
                       </span>
                       {current.expected_at_label && (
                         <>
@@ -675,7 +703,12 @@ const LiveQueue: React.FC = () => {
                             {t("position") || "Position"} #{item.user.position}
                           </span>
                         )}
-                        {item.user.estimated_wait_label && (
+                        {item.status === "progress" && item.user.est_remaining_label && (
+                          <span className="lq-row__est">
+                            {item.user.est_remaining_label}
+                          </span>
+                        )}
+                        {item.status !== "progress" && item.user.estimated_wait_label && (
                           <span className="lq-row__est">
                             {t("est") || "Est."} {item.user.estimated_wait_label}
                           </span>
