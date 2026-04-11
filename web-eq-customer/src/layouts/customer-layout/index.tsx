@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/auth.store";
@@ -15,6 +15,8 @@ function getInitials(name: string | null | undefined): string {
   return (parts[0]?.[0] ?? "?").toUpperCase();
 }
 import { useNotificationWS } from "../../hooks/useNotificationWS";
+import { AppointmentService } from "../../services/appointment/appointment.service";
+import type { TodayAppointmentResponse } from "../../services/appointment/appointment.service";
 import eqLogoWhite from "../../assets/white_transparent_logo.png";
 import { EXTERNAL_LINKS } from "../../config/links";
 import "../../components/notification/notification.scss";
@@ -35,6 +37,19 @@ export default function CustomerLayout() {
   }, [isAuthenticated, profileType, resetUser, navigate]);
 
   useNotificationWS(userInfo?.uuid ?? null, token);
+
+  // Sticky queue banner — loads once when logged in, shows active appointment
+  const [activeAppt, setActiveAppt] = useState<TodayAppointmentResponse | null>(null);
+  useEffect(() => {
+    if (!isAuthenticated()) { setActiveAppt(null); return; }
+    const svc = new AppointmentService();
+    svc.getTodayAppointments()
+      .then((items) => {
+        const active = items.find((a) => a.status === 1 || a.status === 2) ?? null;
+        setActiveAppt(active);
+      })
+      .catch(() => {});
+  }, [userInfo?.uuid]);
 
   const handleLogout = async () => {
     await new AuthService().logout();
@@ -135,6 +150,33 @@ export default function CustomerLayout() {
           ) : undefined
         }
       />
+
+      {/* Sticky queue banner — shown on all pages when customer has an active appointment */}
+      {activeAppt && (
+        <div
+          className={`cl-queue-banner${activeAppt.status === 2 ? " cl-queue-banner--serving" : ""}`}
+          role="status"
+          onClick={() => navigate("/profile?tab=appointments")}
+        >
+          <span className="cl-queue-banner__icon">{activeAppt.status === 2 ? "🔔" : "⏳"}</span>
+          <span className="cl-queue-banner__text">
+            <strong>{activeAppt.queue_name}</strong>
+            {activeAppt.status === 2 ? (
+              <> · {t("youreBeingServed") || "You're being served"}</>
+            ) : (
+              <>
+                {activeAppt.position != null && (
+                  <> · #{activeAppt.position} {t("inLine") || "in line"}</>
+                )}
+                {activeAppt.expected_at_ts != null && activeAppt.expected_at_ts > Date.now() && activeAppt.estimated_appointment_time && (
+                  <> · {t("expectedAt") || "Expected at"} {activeAppt.estimated_appointment_time}</>
+                )}
+              </>
+            )}
+          </span>
+          <span className="cl-queue-banner__cta">{t("profile.navAppointments") || "View"} →</span>
+        </div>
+      )}
 
       <main className="cl-main">
         <Outlet />

@@ -44,6 +44,9 @@ class CustomerAppointmentListItem(BaseModel):
     scheduled_start: Optional[str] = None
     scheduled_end: Optional[str] = None
     delay_minutes: Optional[int] = None
+    enqueue_time: Optional[datetime] = None       # actual serve-start time (completed)
+    dequeue_time: Optional[datetime] = None       # actual serve-end time (completed)
+    cancellation_reason: Optional[str] = None    # set when cancelled
 
     @classmethod
     def from_orm_row(
@@ -79,6 +82,9 @@ class CustomerAppointmentListItem(BaseModel):
             scheduled_start=st.strftime("%H:%M") if st else None,
             scheduled_end=se.strftime("%H:%M") if se else None,
             delay_minutes=getattr(queue_user, "delay_minutes", None),
+            enqueue_time=getattr(queue_user, "enqueue_time", None),
+            dequeue_time=getattr(queue_user, "dequeue_time", None),
+            cancellation_reason=getattr(queue_user, "cancellation_reason", None),
         )
 
 

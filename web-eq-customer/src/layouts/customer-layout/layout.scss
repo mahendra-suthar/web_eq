@@ -497,3 +497,53 @@
 
   .cl-footer-link { margin-left: 20px; }
 }
+
+// ─── Sticky queue banner ───────────────────────────────────────────────────────
+.cl-queue-banner {
+  position: sticky;
+  top: 64px;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(90deg, #4f46e5 0%, #6366f1 100%);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.2s, background 0.3s;
+
+  &:hover { opacity: 0.92; }
+
+  // "Being served" state — green banner to signal urgency
+  &--serving {
+    background: linear-gradient(90deg, #059669 0%, #10b981 100%);
+    animation: banner-pulse 2s ease-in-out infinite;
+  }
+}
+
+@keyframes banner-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.88; }
+}
+
+.cl-queue-banner__icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.cl-queue-banner__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cl-queue-banner__cta {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0.85;
+}

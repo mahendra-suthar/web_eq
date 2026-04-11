@@ -553,6 +553,12 @@
   color: #475569;
 }
 
+.lq-badge--late {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.25);
+  color: #b45309;
+}
+
 /* ─── 5) Loading / error / idle / empty states ─── */
 .lq-shell--empty {
   display: flex;

@@ -786,6 +786,65 @@
 
 .ac-appt-queue-chip { color: $muted-green; font-weight: 400 !important; }
 
+.ac-appt-queue-chip--serving {
+  background: rgba(5, 150, 105, 0.08);
+  border-color: rgba(5, 150, 105, 0.3);
+  color: #065f46 !important;
+  font-weight: 600 !important;
+}
+
+// Appointment type chip (Walk-in / Fixed / Approx.)
+.ac-appt-type-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: $radius-full;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  background: rgba($forest, 0.06);
+  color: $muted-green;
+  border: 1px solid rgba($forest, 0.14);
+  white-space: nowrap;
+
+  &[data-type="FIXED"] {
+    background: rgba(79, 70, 229, 0.07);
+    color: #4338ca;
+    border-color: rgba(79, 70, 229, 0.2);
+  }
+  &[data-type="APPROXIMATE"] {
+    background: rgba(217, 119, 6, 0.07);
+    color: #92400e;
+    border-color: rgba(217, 119, 6, 0.2);
+  }
+}
+
+// "Served at X:XX PM" chip for completed appointments
+.ac-appt-time-chip--served {
+  background: rgba(5, 150, 105, 0.06) !important;
+  border-color: rgba(5, 150, 105, 0.25) !important;
+  color: #065f46 !important;
+
+  svg { color: #059669 !important; }
+}
+
+// Cancellation reason text
+.ac-appt-cancel-reason {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 12px !important;
+  color: #b91c1c;
+  background: rgba(185, 28, 28, 0.05);
+  border: 1px solid rgba(185, 28, 28, 0.15);
+  border-radius: 8px;
+  padding: 5px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+
 .ac-appt-footer-actions {
   display: flex;
   gap: 8px;
@@ -927,6 +986,16 @@
 .ac-toggle input:checked + .ac-toggle-slider { background: $forest; }
 .ac-toggle input:checked + .ac-toggle-slider::before { transform: translateX(20px); }
 
+// Disabled settings
+.ac-setting-row--disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.ac-toggle--disabled {
+  cursor: not-allowed;
+}
+
 // Danger zone
 .ac-danger-zone {
   background: #fff;
@@ -969,6 +1038,18 @@
   transition: all 0.22s;
 
   &:hover { background: #e05c5c; color: #fff; }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+    &:hover { background: rgba(224, 92, 92, 0.08); color: #e05c5c; }
+  }
+}
+
+.ac-danger-zone--disabled {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 // ─── Toast ─────────────────────────────────────────────────────────────────────
@@ -997,3 +1078,20 @@
 }
 
 .ac-toast-icon { color: #2ecc8a; flex-shrink: 0; }
+
+// ─── Today's live queue cards ─────────────────────────────────────────────────
+.ac-today-queue {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ac-today-queue__label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+  margin-bottom: 2px;
+}

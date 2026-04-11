@@ -6,6 +6,7 @@ class OwnerInfo(BaseModel):
     uuid: str
     full_name: Optional[str] = None
     email: Optional[str] = None
+    email_verify: bool = False
     phone_number: str
     country_code: str
     profile_picture: Optional[str] = None
@@ -18,6 +19,7 @@ class OwnerInfo(BaseModel):
             uuid=str(user.uuid),  # type: ignore
             full_name=str(user.full_name) if user.full_name else None,  # type: ignore
             email=str(user.email) if user.email else None,  # type: ignore
+            email_verify=bool(user.email_verify) if user.email_verify is not None else False,  # type: ignore
             phone_number=str(user.phone_number),  # type: ignore
             country_code=str(user.country_code),  # type: ignore
             profile_picture=str(user.profile_picture) if user.profile_picture else None,  # type: ignore

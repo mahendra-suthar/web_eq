@@ -141,8 +141,11 @@ export function formatTimeToDisplay(
     if (value instanceof Date) {
       date = value;
     } else if (typeof value === "string") {
-      if (/^\d{1,2}:\d{2}$/.test(value.trim())) {
-        const [h, min] = value.trim().split(":").map(Number);
+      const trimmed = value.trim();
+      // Already a formatted 12h string like "4:30 PM" — return as-is
+      if (/^\d{1,2}:\d{2}\s*(AM|PM)$/i.test(trimmed)) return trimmed;
+      if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+        const [h, min] = trimmed.split(":").map(Number);
         date = new Date();
         date.setHours(h, min, 0, 0);
       } else {

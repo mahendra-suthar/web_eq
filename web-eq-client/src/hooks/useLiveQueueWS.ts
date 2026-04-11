@@ -89,7 +89,6 @@ export function useLiveQueueWS(
             try {
                 const msg = JSON.parse(event.data as string);
                 switch (msg.type) {
-                    case "initial_state":
                     case "live_queue_update":
                         onUpdateRef.current?.(msg.data as LiveQueueData);
                         break;

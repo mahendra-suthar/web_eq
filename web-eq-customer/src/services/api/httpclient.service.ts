@@ -46,10 +46,7 @@ class HttpClient {
       this.handleSuccess,
       (error: any) => {
         const status = error?.response?.status;
-        const code = error?.code;
         if (status === 401 || status === 403) {
-          window.dispatchEvent(new Event("auth:unauthorized"));
-        } else if (code === "ERR_NETWORK") {
           window.dispatchEvent(new Event("auth:unauthorized"));
         }
         return Promise.reject(error);

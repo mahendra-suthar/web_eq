@@ -693,6 +693,19 @@
       animation: lp-pulse-status 1.6s ease-in-out infinite;
     }
   }
+
+  &--serving {
+    background: rgba(5, 150, 105, 0.12);
+    color: #065f46;
+    border: 1px solid rgba(5, 150, 105, 0.4);
+
+    &::before {
+      content: '🔔';
+      font-size: 9px;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+  }
 }
 
 @keyframes lp-pulse-status {

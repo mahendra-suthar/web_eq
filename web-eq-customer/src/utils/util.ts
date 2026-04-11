@@ -94,8 +94,14 @@ export function formatTimeToDisplay(
     if (value instanceof Date) {
       date = value;
     } else if (typeof value === "string") {
-      if (/^\d{1,2}:\d{2}$/.test(value.trim())) {
-        const [h, min] = value.trim().split(":").map(Number);
+      const trimmed = value.trim();
+      // Already a formatted 12h string like "4:30 PM" or "11:45 AM" — return as-is
+      if (/^\d{1,2}:\d{2}\s*(AM|PM)$/i.test(trimmed)) {
+        return trimmed;
+      }
+      if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+        // HH:MM 24h format
+        const [h, min] = trimmed.split(":").map(Number);
         date = new Date();
         date.setHours(h, min, 0, 0);
       } else {
@@ -144,6 +150,29 @@ export function formatAppointmentTimeSummary(
     return `Expected at ${formatTimeToDisplay(estimatedAppointmentTime)}`;
   }
   return "";
+}
+
+/** UI label for appointment type (profile cards, history). */
+export function formatApptType(type: string | null | undefined): string {
+  if (!type) return "Walk-in";
+  const upper = String(type).toUpperCase();
+  if (upper === "FIXED") return "Fixed time";
+  if (upper === "APPROXIMATE") return "Approx. time";
+  return "Walk-in";
+}
+
+/**
+ * User initials from full name, with optional phone fallback.
+ * e.g. "Mahendra Suthar" → "MS", "Mahendra" → "M", null + "9876543210" → "0"
+ */
+export function getInitials(name?: string | null, phone?: string | null): string {
+  if (name?.trim()) {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return parts[0][0].toUpperCase();
+  }
+  if (phone) return phone.slice(-1);
+  return "?";
 }
 
 /** Delay message for APPROXIMATE when delay_minutes > 0. */

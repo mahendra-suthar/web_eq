@@ -1,7 +1,10 @@
 import secrets
 import hashlib
 from datetime import date, datetime, time as dt_time, timezone, timedelta
+from decimal import Decimal
+from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
+from uuid import UUID
 
 import pytz
 
@@ -18,6 +21,7 @@ from app.core.constants import (
 ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
 _APP_TZ = pytz.timezone(TIMEZONE)
+APP_TZ = _APP_TZ  # public alias — import this in services that need the timezone object
 _UTC_MIN = datetime.min.replace(tzinfo=timezone.utc)
 
 
@@ -168,6 +172,31 @@ def wait_minutes_from_now(estimated_enqueue_time: Optional[datetime]) -> Optiona
         return None
 
 
+def json_safe(obj: Any) -> Any:
+    """Recursively convert any non-JSON-serialisable value to a safe type.
+
+    Handles: datetime → ISO string, date → ISO string, time → HH:MM string,
+    UUID → str, Decimal → float, Enum → value, tuple → list.
+    """
+    if isinstance(obj, dict):
+        return {k: json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [json_safe(v) for v in obj]
+    if isinstance(obj, datetime):           # before date — datetime IS a date
+        return serialise_dt(obj)
+    if isinstance(obj, date):
+        return obj.isoformat()
+    if isinstance(obj, dt_time):
+        return obj.strftime("%H:%M")
+    if isinstance(obj, UUID):
+        return str(obj)
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if isinstance(obj, Enum):
+        return obj.value
+    return obj
+
+
 def serialise_dt(val: Any) -> Optional[str]:
     """Serialize a datetime (or None) to ISO string for JSON.
 
@@ -225,6 +254,7 @@ def build_live_queue_users_raw(
             "token": qu.token_number,
             "service_summary": " · ".join(names) if names else "",
             "status": qu.status,
+            "turn_time": getattr(qu, "turn_time", None),
             "enqueue_time": qu.enqueue_time,
             "dequeue_time": qu.dequeue_time,
             "position": pos,

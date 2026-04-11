@@ -56,6 +56,10 @@
   "connecting": "Connecting...",
   "today": "Today",
   "tomorrow": "Tomorrow",
+  "nowServing": "Now serving",
+  "expectedAt": "Expected at",
+  "inLine": "in line",
+  "youreBeingServed": "You're being served",
   "employeeNotAvailable": "Not Available",
   "employeeNotAvailableOnDay": "Employee is not available on this day",
 
@@ -412,6 +416,7 @@
     "filterCompleted": "Completed",
     "filterPast": "Past",
     "tokenLabel": "Token",
+    "servedAt": "Served at",
     "loadOlder": "Load older appointments",
     "loadingMore": "Loading…",
     "statusWaiting": "Waiting",
@@ -437,7 +442,8 @@
     "prefLocationDesc": "Your saved city for search suggestions.",
     "dangerZoneTitle": "Danger Zone",
     "dangerZoneDesc": "Deleting your account is permanent and cannot be undone. All your bookings, history and data will be removed immediately.",
-    "deleteAccount": "Delete my account"
+    "deleteAccount": "Delete my account",
+    "todayQueue": "Today's Queue"
   }
   ,
   "rv": {

@@ -147,7 +147,7 @@ async def get_available_slots(
 
 
 @queue_router.get("/slots", response_model=SlotsListResponse)
-async def get_queue_slots(
+def get_queue_slots(
     queue_id: UUID = Query(..., description="Queue UUID"),
     date: date = Query(..., description="Slot date (YYYY-MM-DD)"),
     db: Session = Depends(get_db),

@@ -170,6 +170,7 @@ export interface LiveQueueUserItem {
     position?: number | null; // 1-indexed, only for waiting users
     estimated_wait_minutes?: number | null;   // for waiting users
     estimated_appointment_time?: string | null; // e.g. "4:30 PM"
+    expected_at_ts?: number | null;            // epoch ms — drift-free client countdown
     appointment_type?: string | null;  // QUEUE, FIXED, APPROXIMATE
     scheduled_start?: string | null;
     scheduled_end?: string | null;

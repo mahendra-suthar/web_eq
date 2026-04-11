@@ -15,8 +15,10 @@ from datetime import datetime
 from app.db.database import get_db
 from app.services.realtime.queue_manager import queue_manager
 from app.services.realtime.live_queue_manager import live_queue_manager
+from app.core.utils import json_safe
 from app.services.realtime.customer_appointment_manager import customer_appointment_manager
-from uuid import UUID as _UUID
+from app.services.realtime.customer_queue_manager import customer_queue_manager
+from app.models.queue import QueueUser
 
 from app.services.realtime.notification_manager import notification_manager
 from app.services.notification_service import NotificationService
@@ -218,7 +220,7 @@ async def live_queue_websocket(
                         state = live_queue_manager.get_live_queue_state(db, queue_id, date)
                         await websocket.send_json({
                             "type": "live_queue_update",
-                            "data": state,
+                            "data": json_safe(state),
                             "timestamp": datetime.now().isoformat(),
                         })
                 except Exception:
@@ -235,6 +237,98 @@ async def live_queue_websocket(
         logger.error(f"Live queue WebSocket error: {e}")
     finally:
         await live_queue_manager.disconnect(queue_id, date, websocket)
+
+
+@router.websocket("/ws/queue-status/{queue_id}/{date}")
+async def customer_queue_status_websocket(
+    queue_id: str,
+    date: str,
+    websocket: WebSocket,
+    db: Session = Depends(get_db),
+):
+    """
+    Customer WebSocket for real-time personal queue position updates.
+
+    URL: ws(s)://host/api/ws/queue-status/{queue_id}/{date}
+    Required query params:
+      - queue_user_id=<uuid>   the customer's queue user record
+      - token=<jwt>            auth (or use httpOnly cookie)
+
+    Events sent to client:
+      initial_state          – personal position/wait on connect
+      customer_queue_update  – when queue advances (employee clicks Next)
+      ping                   – keepalive
+    """
+    await websocket.accept()
+
+    user_id = await get_user_from_token(websocket)
+    if not user_id:
+        await websocket.close(code=4001, reason="Authentication required")
+        return
+
+    queue_user_id = websocket.query_params.get("queue_user_id")
+    if not queue_user_id:
+        await websocket.close(code=1003, reason="queue_user_id query param required")
+        return
+
+    try:
+        datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        await websocket.close(code=1003, reason="Invalid date format. Use YYYY-MM-DD")
+        return
+
+    # Validate that this queue_user belongs to the authenticated user
+    try:
+        qu = db.query(QueueUser).filter(QueueUser.uuid == UUID(queue_user_id)).first()
+        if qu is None or str(qu.user_id) != str(user_id):
+            await websocket.close(code=4003, reason="Forbidden")
+            return
+    except Exception as exc:
+        logger.error("CustomerQueueStatus: validation error: %s", exc)
+        await websocket.close(code=1011, reason="Internal error")
+        return
+
+    try:
+        await customer_queue_manager.connect(
+            db=db,
+            queue_id=queue_id,
+            date_str=date,
+            queue_user_id=queue_user_id,
+            websocket=websocket,
+        )
+    except Exception as exc:
+        logger.error("CustomerQueueStatus: connect error: %s", exc)
+        try:
+            await websocket.close(code=1011, reason=str(exc))
+        except Exception:
+            pass
+        return
+
+    try:
+        while True:
+            try:
+                message = await asyncio.wait_for(
+                    websocket.receive_text(),
+                    timeout=30.0,
+                )
+                try:
+                    data = json.loads(message)
+                    if data.get("type") == "ping":
+                        await websocket.send_json({"type": "pong"})
+                except Exception:
+                    pass
+            except asyncio.TimeoutError:
+                if websocket.client_state == WebSocketState.CONNECTED:
+                    try:
+                        await websocket.send_json({"type": "ping"})
+                    except Exception:
+                        break
+    except WebSocketDisconnect:
+        logger.info("CustomerQueueStatus WS disconnected: queue=%s date=%s user=%s", queue_id, date, queue_user_id)
+    except Exception as exc:
+        logger.error("CustomerQueueStatus WS error: %s", exc)
+    finally:
+        await customer_queue_manager.disconnect(queue_id, date, queue_user_id, websocket)
 
 
 @router.websocket("/ws/notifications/{user_id}")

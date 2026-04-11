@@ -35,20 +35,20 @@ const Topbar = ({ onMenuOpen }: TopbarProps) => {
         const isEmployeeAdd = path === ROUTERS_PATH.EMPLOYEES + "/new";
         const isEmployeeDetail = path.startsWith(ROUTERS_PATH.EMPLOYEES + "/") && path !== ROUTERS_PATH.EMPLOYEES && !isEmployeeAdd;
 
-        if (path === ROUTERS_PATH.DASHBOARD)          return t("dashboard");
-        if (isEmployeeAdd)                            return t("addEmployee");
-        if (isEmployeeDetail)                         return t("employeeDetail");
-        if (path === ROUTERS_PATH.EMPLOYEES)          return t("employeeManagement");
-        if (path === ROUTERS_PATH.ALLUSERS)           return t("userManagement");
-        if (path === ROUTERS_PATH.BUSINESSPROFILE)    return t("businessProfile");
-        if (path === ROUTERS_PATH.QUEUES)             return t("queues") || "Queues";
-        if (path === ROUTERS_PATH.QUEUES + "/new")    return t("addQueue") || "Add Queue";
+        if (path === ROUTERS_PATH.DASHBOARD) return t("dashboard");
+        if (isEmployeeAdd) return t("addEmployee");
+        if (isEmployeeDetail) return t("employeeDetail");
+        if (path === ROUTERS_PATH.EMPLOYEES) return t("employeeManagement");
+        if (path === ROUTERS_PATH.ALLUSERS) return t("userManagement");
+        if (path === ROUTERS_PATH.BUSINESSPROFILE) return t("businessProfile");
+        if (path === ROUTERS_PATH.QUEUES) return t("queues") || "Queues";
+        if (path === ROUTERS_PATH.QUEUES + "/new") return t("addQueue") || "Add Queue";
         if (path.startsWith(ROUTERS_PATH.QUEUES + "/") && path !== ROUTERS_PATH.QUEUES)
-                                                      return t("queueDetail") || "Queue Detail";
-        if (path === ROUTERS_PATH.LIVE_QUEUE)         return t("liveQueue") || "Live Queue";
-        if (path === ROUTERS_PATH.QUEUEUSERS)         return t("queueUsers");
+            return t("queueDetail") || "Queue Detail";
+        if (path === ROUTERS_PATH.LIVE_QUEUE) return t("liveQueue") || "Live Queue";
+        if (path === ROUTERS_PATH.QUEUEUSERS) return t("queueUsers");
         if (path.startsWith(ROUTERS_PATH.QUEUEUSERS + "/") && path !== ROUTERS_PATH.QUEUEUSERS)
-                                                      return t("queueUserDetail") || "Queue User Detail";
+            return t("queueUserDetail") || "Queue User Detail";
         return t("dashboard");
     }, [location.pathname, t, ROUTERS_PATH]);
 

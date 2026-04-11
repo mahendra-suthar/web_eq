@@ -1,19 +1,19 @@
-import pytz
 from uuid import UUID
 from sqlalchemy.orm import Session
 from typing import List, Dict, Optional, Any, Tuple
 from datetime import datetime, date, time, timedelta
 
 from app.core.constants import (
-    TIMEZONE,
     BIZ_LATEST_TIME,
     TIME_FORMAT_HM,
     DEFAULT_AVG_TIME,
     DEFAULT_OPEN_TIME,
     APPOINTMENT_TYPE_APPROXIMATE,
 )
-from app.core.utils import today_app_date
+from app.core.utils import today_app_date, now_app_tz, APP_TZ
 from app.models.schedule import ScheduleEntityType
+from app.services.queue_service import QueueService
+from app.services.schedule_service import ScheduleService
 
 
 class BookingCalculationService:
@@ -21,14 +21,8 @@ class BookingCalculationService:
 
     def __init__(self, db: Session):
         self.db = db
-        from app.services.queue_service import QueueService
-        from app.services.schedule_service import ScheduleService
         self.queue = QueueService(db)
         self.schedule = ScheduleService(db)
-        self.ist = pytz.timezone(TIMEZONE)
-
-    def now_ist(self) -> datetime:
-        return datetime.now(self.ist)
 
     # ──────────────────────────────────────────────────────────────────────────
     # Employee schedule helpers  (DB queries delegated to ScheduleService)
@@ -117,7 +111,7 @@ class BookingCalculationService:
 
         def to_dt(t: time) -> datetime:
             if is_aware:
-                return self.ist.localize(datetime.combine(base_date, t))
+                return APP_TZ.localize(datetime.combine(base_date, t))
             return datetime.combine(base_date, t)
 
         break_dts = [(to_dt(bs), to_dt(be)) for bs, be in breaks]
@@ -225,7 +219,7 @@ class BookingCalculationService:
         percentile_map = self.queue.get_historical_percentile_wait_batch(
             queue_ids, booking_date, 0.75, float(DEFAULT_AVG_TIME)
         )
-        current_time = self.now_ist()
+        current_time = now_app_tz()
 
         if booking_date == today:
             metrics = today_metrics if today_metrics is not None else {}
@@ -278,8 +272,8 @@ class BookingCalculationService:
                 "services": queue_services,
             }
 
-        open_dt = self.ist.localize(datetime.combine(today_date, open_time))
-        close_dt = self.ist.localize(datetime.combine(today_date, close_time))
+        open_dt = APP_TZ.localize(datetime.combine(today_date, open_time))
+        close_dt = APP_TZ.localize(datetime.combine(today_date, close_time))
         base_dt = max(current_time, open_dt)
 
         appointment_dt = self.work_minutes_to_clock_time(base_dt, wait_minutes, breaks)
@@ -376,7 +370,7 @@ class BookingCalculationService:
             percentile_wait, buffer_pct=0.15,
         )
 
-        current_time = self.now_ist()
+        current_time = now_app_tz()
         queue = self.queue.get_queue_by_id(queue_id)
         appointment_dt = self.resolve_today_appointment(queue, current_time, wait_minutes)
         return {
@@ -412,7 +406,7 @@ class BookingCalculationService:
         }
 
     def get_existing_queue_user_metrics(self, existing_queue_user: Any) -> Dict:
-        """Position, wait time, appointment time for an already-queued user (same-day)."""
+        """Position, wait time, appointment time for an already-queued user (today or future)."""
         ahead = self.queue.get_queue_user_ahead_metrics(
             queue_id=existing_queue_user.queue_id,
             queue_date=existing_queue_user.queue_date,
@@ -436,7 +430,7 @@ class BookingCalculationService:
         wait_max = wait_minutes + buffer
         wait_range = f"{wait_min}-{wait_max} min"
 
-        current_time = self.now_ist()
+        current_time = now_app_tz()
         queue = self.queue.get_queue_by_id(existing_queue_user.queue_id)
 
         # For APPROXIMATE bookings, include stored delay_minutes in the ETA so
@@ -445,7 +439,12 @@ class BookingCalculationService:
             delay = getattr(existing_queue_user, "delay_minutes", 0) or 0
             wait_minutes = wait_minutes + int(delay)
 
-        appointment_dt = self.resolve_today_appointment(queue, current_time, wait_minutes)
+        appt_date = existing_queue_user.queue_date
+        if isinstance(appt_date, date) and appt_date > current_time.date():
+            appointment_dt = self.resolve_future_appointment(queue, appt_date, wait_minutes)
+        else:
+            appointment_dt = self.resolve_today_appointment(queue, current_time, wait_minutes)
+
         return {
             "position": position,
             "wait_minutes": wait_minutes,
@@ -494,7 +493,7 @@ class BookingCalculationService:
 
         today_date = current_time.date()
         open_time, _close, breaks, _ = self.get_employee_window(queue, today_date)
-        open_dt = self.ist.localize(datetime.combine(today_date, open_time))
+        open_dt = APP_TZ.localize(datetime.combine(today_date, open_time))
         base_dt = max(current_time, open_dt)
         return self.work_minutes_to_clock_time(base_dt, wait_minutes, breaks)
 

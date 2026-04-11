@@ -22,6 +22,8 @@ export interface TodayAppointmentResponse {
   scheduled_start?: string | null;
   scheduled_end?: string | null;
   delay_minutes?: number | null;
+  expected_at_ts?: number | null;       // epoch ms — drift-free client countdown
+  current_token?: string | null;        // token currently being served in this queue
 }
 
 export interface CustomerAppointmentListItem {
@@ -44,6 +46,9 @@ export interface CustomerAppointmentListItem {
   scheduled_start?: string | null;
   scheduled_end?: string | null;
   delay_minutes?: number | null;
+  enqueue_time?: string | null;
+  dequeue_time?: string | null;
+  cancellation_reason?: string | null;
 }
 
 export interface CustomerAppointmentListResponse {
@@ -74,6 +79,7 @@ export interface CustomerAppointmentDetailResponse {
   scheduled_start?: string | null;
   scheduled_end?: string | null;
   delay_minutes?: number | null;
+  cancellation_reason?: string | null;
 }
 
 export interface TodayAppointmentsResponse {
