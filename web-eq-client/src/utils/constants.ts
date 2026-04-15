@@ -48,6 +48,7 @@ export enum ProfileType {
   BUSINESS = "BUSINESS",
   EMPLOYEE = "EMPLOYEE",
   CUSTOMER = "CUSTOMER",
+  ADMIN = "ADMIN",
 }
 
 // ============================================================================
@@ -78,7 +79,12 @@ export enum QueueUserStatus {
 // ============================================================================
 
 export enum BusinessStatus {
+  DRAFT      = 0,
   REGISTERED = 1,
+  ACTIVE     = 2,
+  SUSPENDED  = 3,
+  INACTIVE   = 4,
+  TERMINATED = 5,
 }
 
 // ============================================================================
@@ -110,6 +116,11 @@ export const OTP_LENGTH = 5;
  * Default items per page for pagination
  */
 export const DEFAULT_PAGE_LIMIT = 10;
+
+/**
+ * Items per page for admin list pages (categories, services, businesses, users)
+ */
+export const ADMIN_LIST_LIMIT = 20;
 
 /**
  * Default initial page number

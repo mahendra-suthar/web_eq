@@ -29,7 +29,11 @@ class BookingCalculationService:
     # ──────────────────────────────────────────────────────────────────────────
 
     def get_employee_window(
-        self, queue: Any, booking_date: date
+        self,
+        queue: Any,
+        booking_date: date,
+        schedule_map: Optional[Dict[UUID, Any]] = None,
+        exception_map: Optional[Dict[UUID, Any]] = None,
     ) -> Tuple[time, time, List[Tuple[time, time]], bool]:
         """Return (opening_time, closing_time, sorted_breaks, employee_available).
 
@@ -41,6 +45,10 @@ class BookingCalculationService:
           1. Employee's Schedule row + ScheduleBreak rows + any ScheduleException for *booking_date*.
           2. Queue.start_time / Queue.end_time (no breaks) — treated as available.
           3. Hardcoded defaults (DEFAULT_OPEN_TIME / BIZ_LATEST_TIME, no breaks) — treated as available.
+
+        *schedule_map* and *exception_map* are pre-loaded batch dicts supplied by
+        get_queue_options() so that iterating N queues issues 0 extra DB queries.
+        When None (single-queue callers), individual queries are issued as before.
         """
         # Frontend stores day_of_week using JS convention: 0=Sun, 1=Mon, …, 6=Sat
         # Python weekday() uses:                          0=Mon, 1=Tue, …, 6=Sun
@@ -50,8 +58,12 @@ class BookingCalculationService:
 
         if employees:
             employee = employees[0]
-            schedule = self.schedule.get_schedule_with_breaks_for_day(
-                employee.uuid, ScheduleEntityType.EMPLOYEE, day_of_week
+            schedule = (
+                schedule_map.get(employee.uuid)
+                if schedule_map is not None
+                else self.schedule.get_schedule_with_breaks_for_day(
+                    employee.uuid, ScheduleEntityType.EMPLOYEE, day_of_week
+                )
             )
             if schedule:
                 # NOTE: time(0, 0) is falsy in Python — use explicit None checks so
@@ -59,7 +71,11 @@ class BookingCalculationService:
                 opening = schedule.opening_time if schedule.opening_time is not None else DEFAULT_OPEN_TIME
                 closing = schedule.closing_time if schedule.closing_time is not None else BIZ_LATEST_TIME
 
-                exception = self.schedule.get_exception_for_date(schedule.uuid, booking_date)
+                exception = (
+                    exception_map.get(schedule.uuid)
+                    if exception_map is not None
+                    else self.schedule.get_exception_for_date(schedule.uuid, booking_date)
+                )
                 if exception:
                     if exception.is_closed:
                         return opening, opening, [], False
@@ -210,6 +226,7 @@ class BookingCalculationService:
 
         today_metrics and services_by_queue are built by the controller from DB data.
         """
+        # employees already eager-loaded inside get_queues_offering_service_ids
         queues = self.queue.get_queues_offering_service_ids(business_id, queue_service_ids)
         if not queues:
             return []
@@ -221,16 +238,33 @@ class BookingCalculationService:
         )
         current_time = now_app_tz()
 
+        # Batch-load employee schedules + exceptions for booking_date —
+        # avoids 2N extra queries when iterating N queues below.
+        day_of_week = (booking_date.weekday() + 1) % 7
+        employee_ids = [q.employees[0].uuid for q in queues if q.employees]
+        schedule_map = self.schedule.get_schedules_with_breaks_batch(
+            employee_ids, ScheduleEntityType.EMPLOYEE, day_of_week
+        )
+        exception_map = self.schedule.get_exceptions_for_schedules_batch(
+            list(schedule_map.keys()), booking_date
+        )
+
         if booking_date == today:
             metrics = today_metrics if today_metrics is not None else {}
             return [
-                self.build_today_option(queue, metrics, percentile_map, current_time, services_by_queue)
+                self.build_today_option(
+                    queue, metrics, percentile_map, current_time, services_by_queue,
+                    schedule_map, exception_map,
+                )
                 for queue in queues
             ]
 
         future_counts = self.queue.get_future_date_counts_batch(queue_ids, booking_date)
         return [
-            self.build_future_option(queue, future_counts, percentile_map, booking_date, services_by_queue)
+            self.build_future_option(
+                queue, future_counts, percentile_map, booking_date, services_by_queue,
+                schedule_map, exception_map,
+            )
             for queue in queues
         ]
 
@@ -242,6 +276,8 @@ class BookingCalculationService:
         percentile_map: Dict[UUID, float],
         current_time: datetime,
         services_by_queue: Dict,
+        schedule_map: Optional[Dict[UUID, Any]] = None,
+        exception_map: Optional[Dict[UUID, Any]] = None,
     ) -> Dict:
         t = today_metrics.get(
             queue.uuid,
@@ -253,7 +289,9 @@ class BookingCalculationService:
         )
 
         today_date = current_time.date()
-        open_time, close_time, breaks, employee_available = self.get_employee_window(queue, today_date)
+        open_time, close_time, breaks, employee_available = self.get_employee_window(
+            queue, today_date, schedule_map, exception_map
+        )
 
         queue_services = services_by_queue.get(queue.uuid, [])
 
@@ -302,13 +340,17 @@ class BookingCalculationService:
         percentile_map: Dict[UUID, float],
         booking_date: date,
         services_by_queue: Dict,
+        schedule_map: Optional[Dict[UUID, Any]] = None,
+        exception_map: Optional[Dict[UUID, Any]] = None,
     ) -> Dict:
         scheduled_count = future_counts.get(queue.uuid, 0)
         position, wait_minutes, wait_range = self.compute_future_wait(
             scheduled_count, percentile_map.get(queue.uuid, DEFAULT_AVG_TIME), buffer_pct=0.20,
         )
 
-        open_time, close_time, breaks, employee_available = self.get_employee_window(queue, booking_date)
+        open_time, close_time, breaks, employee_available = self.get_employee_window(
+            queue, booking_date, schedule_map, exception_map
+        )
 
         queue_services = services_by_queue.get(queue.uuid, [])
 
@@ -371,7 +413,7 @@ class BookingCalculationService:
         )
 
         current_time = now_app_tz()
-        queue = self.queue.get_queue_by_id(queue_id)
+        queue = self.queue.get_queue_by_id_with_employees(queue_id)
         appointment_dt = self.resolve_today_appointment(queue, current_time, wait_minutes)
         return {
             "position": position,
@@ -396,7 +438,7 @@ class BookingCalculationService:
             scheduled_count, percentile_wait, buffer_pct=0.20,
         )
 
-        queue = self.queue.get_queue_by_id(queue_id)
+        queue = self.queue.get_queue_by_id_with_employees(queue_id)
         appointment_dt = self.resolve_future_appointment(queue, booking_date, wait_minutes)
         return {
             "position": position,
@@ -431,7 +473,7 @@ class BookingCalculationService:
         wait_range = f"{wait_min}-{wait_max} min"
 
         current_time = now_app_tz()
-        queue = self.queue.get_queue_by_id(existing_queue_user.queue_id)
+        queue = self.queue.get_queue_by_id_with_employees(existing_queue_user.queue_id)
 
         # For APPROXIMATE bookings, include stored delay_minutes in the ETA so
         # customers see a delay-aware "Expected at" time.

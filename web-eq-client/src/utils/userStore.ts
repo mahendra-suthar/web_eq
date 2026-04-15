@@ -40,7 +40,12 @@ export const useUserStore = create(
         const profile = get().profile;
         if (!profile?.profile_type) return null;
         const pt = profile.profile_type.toUpperCase();
-        if (pt === ProfileType.BUSINESS || pt === ProfileType.EMPLOYEE || pt === ProfileType.CUSTOMER) {
+        if (
+          pt === ProfileType.BUSINESS ||
+          pt === ProfileType.EMPLOYEE ||
+          pt === ProfileType.CUSTOMER ||
+          pt === ProfileType.ADMIN
+        ) {
           return pt as ProfileType;
         }
         return null;

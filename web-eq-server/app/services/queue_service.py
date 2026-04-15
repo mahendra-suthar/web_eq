@@ -480,7 +480,8 @@ class QueueService:
 
     def get_queue_user_for_update(self, queue_user_id: UUID, user_id: UUID) -> Optional[QueueUser]:
         try:
-            qu = (
+            # Step 1: acquire row-level lock while verifying ownership.
+            locked = (
                 self.db.query(QueueUser)
                 .filter(
                     QueueUser.uuid == queue_user_id,
@@ -489,15 +490,23 @@ class QueueService:
                 .with_for_update()
                 .first()
             )
-            if qu is None:
+            if locked is None:
                 return None
-            self.db.query(QueueUser).options(
-                joinedload(QueueUser.queue).joinedload(Queue.business),
-                selectinload(QueueUser.queue_user_services)
-                .joinedload(QueueUserService.queue_service)
-                .joinedload(QueueServiceModel.service),
-            ).filter(QueueUser.uuid == queue_user_id).first()
-            return qu
+            # Step 2: populate all relationships on the same identity-map object.
+            # selectinload issues separate IN-queries that are NOT part of the
+            # FOR UPDATE lock — intentional; we only need to lock the QueueUser row.
+            # The returned object is the same Python instance as `locked` (identity map).
+            return (
+                self.db.query(QueueUser)
+                .options(
+                    joinedload(QueueUser.queue).joinedload(Queue.business),
+                    selectinload(QueueUser.queue_user_services)
+                    .joinedload(QueueUserService.queue_service)
+                    .joinedload(QueueServiceModel.service),
+                )
+                .filter(QueueUser.uuid == queue_user_id)
+                .first()
+            )
         except SQLAlchemyError:
             raise
 
@@ -716,6 +725,7 @@ class QueueService:
         try:
             return (
                 self.db.query(Queue)
+                .options(joinedload(Queue.employees))
                 .join(QueueServiceModel, QueueServiceModel.queue_id == Queue.uuid)
                 .filter(
                     Queue.merchant_id == business_id,
@@ -1103,6 +1113,9 @@ class QueueService:
             synchronize_session=False,
         )
         self.db.flush()
+
+    def commit_advance(self) -> None:
+        self.db.commit()
 
     def set_queue_status(self, queue_id: UUID, status: int) -> Optional[Queue]:
         try:

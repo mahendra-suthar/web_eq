@@ -6,11 +6,9 @@
 import { ProfileType } from "./constants";
 import { ROUTERS_PATH } from "../routers/routers";
 
-/** User role for access control (aligned with profile_type from API) */
-export type AppRole = ProfileType.BUSINESS | ProfileType.EMPLOYEE | ProfileType.CUSTOMER;
-
 /** Permission keys for features/pages. Add new ones here as the app grows. */
 export const Permission = {
+  // Business / Employee panel
   VIEW_DASHBOARD: "VIEW_DASHBOARD",
   VIEW_EMPLOYEES: "VIEW_EMPLOYEES",
   VIEW_ALL_USERS: "VIEW_ALL_USERS",
@@ -19,20 +17,32 @@ export const Permission = {
   VIEW_LIVE_QUEUE: "VIEW_LIVE_QUEUE",
   VIEW_BUSINESS_PROFILE: "VIEW_BUSINESS_PROFILE",
   VIEW_EMPLOYEE_PROFILE: "VIEW_EMPLOYEE_PROFILE",
+  // Super Admin panel
+  VIEW_SUPER_ADMIN: "VIEW_SUPER_ADMIN",
+  MANAGE_CATEGORIES: "MANAGE_CATEGORIES",
+  MANAGE_SERVICES: "MANAGE_SERVICES",
+  MANAGE_BUSINESSES: "MANAGE_BUSINESSES",
+  MANAGE_USERS: "MANAGE_USERS",
 } as const;
 
 export type PermissionKey = (typeof Permission)[keyof typeof Permission];
 
-/** Which roles can access each permission. Easy to extend for ADMIN etc. */
-export const ROLE_PERMISSIONS: Record<PermissionKey, AppRole[]> = {
+/** Which roles can access each permission. */
+export const ROLE_PERMISSIONS: Record<PermissionKey, ProfileType[]> = {
   [Permission.VIEW_DASHBOARD]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   [Permission.VIEW_EMPLOYEES]: [ProfileType.BUSINESS],
   [Permission.VIEW_ALL_USERS]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   [Permission.VIEW_QUEUE_USERS]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
-  [Permission.VIEW_QUEUES]: [ProfileType.BUSINESS], // Employees see their queue in profile → Queue tab only
+  [Permission.VIEW_QUEUES]: [ProfileType.BUSINESS],
   [Permission.VIEW_LIVE_QUEUE]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   [Permission.VIEW_BUSINESS_PROFILE]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   [Permission.VIEW_EMPLOYEE_PROFILE]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
+  // Super Admin
+  [Permission.VIEW_SUPER_ADMIN]: [ProfileType.ADMIN],
+  [Permission.MANAGE_CATEGORIES]: [ProfileType.ADMIN],
+  [Permission.MANAGE_SERVICES]: [ProfileType.ADMIN],
+  [Permission.MANAGE_BUSINESSES]: [ProfileType.ADMIN],
+  [Permission.MANAGE_USERS]: [ProfileType.ADMIN],
 };
 
 /** Map route path to required permission. Used for route guards. */
@@ -45,6 +55,11 @@ export const ROUTE_PERMISSION: Record<string, PermissionKey> = {
   [ROUTERS_PATH.LIVE_QUEUE]: Permission.VIEW_LIVE_QUEUE,
   [ROUTERS_PATH.BUSINESSPROFILE]: Permission.VIEW_BUSINESS_PROFILE,
   [ROUTERS_PATH.EMPLOYEEPROFILE]: Permission.VIEW_EMPLOYEE_PROFILE,
+  [ROUTERS_PATH.SUPER_ADMIN]: Permission.VIEW_SUPER_ADMIN,
+  [ROUTERS_PATH.SUPER_ADMIN_CATEGORIES]: Permission.MANAGE_CATEGORIES,
+  [ROUTERS_PATH.SUPER_ADMIN_SERVICES]: Permission.MANAGE_SERVICES,
+  [ROUTERS_PATH.SUPER_ADMIN_BUSINESSES]: Permission.MANAGE_BUSINESSES,
+  [ROUTERS_PATH.SUPER_ADMIN_USERS]: Permission.MANAGE_USERS,
 };
 
 export interface NavItemConfig {
@@ -55,7 +70,7 @@ export interface NavItemConfig {
   sectionTitle?: string;
 }
 
-/** Sidebar nav items with required permission. Single place to add/remove or reorder. */
+/** Business/Employee sidebar nav items. */
 export const NAV_ITEMS: NavItemConfig[] = [
   { path: ROUTERS_PATH.DASHBOARD, label: "Dashboard", icon: "📊", permission: Permission.VIEW_DASHBOARD, sectionTitle: "Overview" },
   { path: ROUTERS_PATH.EMPLOYEES, label: "Employees", icon: "👷", permission: Permission.VIEW_EMPLOYEES, sectionTitle: "Employee Management" },
@@ -65,15 +80,24 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { path: ROUTERS_PATH.QUEUEUSERS, label: "Queue Users", icon: "📋", permission: Permission.VIEW_QUEUE_USERS, sectionTitle: "Queue Management" },
 ];
 
+/** Super Admin sidebar nav items. */
+export const SUPER_ADMIN_NAV_ITEMS: NavItemConfig[] = [
+  { path: ROUTERS_PATH.SUPER_ADMIN, label: "Dashboard", icon: "📊", permission: Permission.VIEW_SUPER_ADMIN, sectionTitle: "Overview" },
+  { path: ROUTERS_PATH.SUPER_ADMIN_CATEGORIES, label: "Categories", icon: "🗂️", permission: Permission.MANAGE_CATEGORIES, sectionTitle: "Catalogue" },
+  { path: ROUTERS_PATH.SUPER_ADMIN_SERVICES, label: "Services", icon: "🔧", permission: Permission.MANAGE_SERVICES, sectionTitle: "Catalogue" },
+  { path: ROUTERS_PATH.SUPER_ADMIN_BUSINESSES, label: "Businesses", icon: "🏢", permission: Permission.MANAGE_BUSINESSES, sectionTitle: "Platform" },
+  { path: ROUTERS_PATH.SUPER_ADMIN_USERS, label: "Users", icon: "👥", permission: Permission.MANAGE_USERS, sectionTitle: "Platform" },
+];
+
 /** Check if a role has a given permission. */
-export function hasPermission(role: AppRole | null | undefined, permission: PermissionKey): boolean {
+export function hasPermission(role: ProfileType | null | undefined, permission: PermissionKey): boolean {
   if (!role) return false;
   const allowed = ROLE_PERMISSIONS[permission];
   return allowed ? allowed.includes(role) : false;
 }
 
 /** Check if a role can access a route by path. */
-export function canAccessRoute(role: AppRole | null | undefined, path: string): boolean {
+export function canAccessRoute(role: ProfileType | null | undefined, path: string): boolean {
   const permission = ROUTE_PERMISSION[path];
   if (!permission) return true;
   return hasPermission(role, permission);

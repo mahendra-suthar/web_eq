@@ -96,6 +96,13 @@ async def get_employee_profile_route(employee_id: UUID, db: Session = Depends(ge
     controller = AuthController(db)
     return await controller.get_employee_details(employee_id)
 
+
+@auth_router.post("/admin-verify-otp", response_model=LoginResponse)
+async def admin_verify_otp(payload: OTPVerifyInput, response: Response, request: Request, db: Session = Depends(get_db)):
+    controller = AuthController(db)
+    return await controller.admin_verify_otp(payload, response, request)
+
+
 @auth_router.post("/logout", status_code=204)
 async def logout(request: Request, response: Response):
     """Clear the auth cookie for whichever app type is calling (customer or business/employee)."""
