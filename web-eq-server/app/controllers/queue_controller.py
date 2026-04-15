@@ -822,7 +822,7 @@ class QueueController:
                     in_progress.uuid,
                     overrun,
                 )
-            self.db.commit()
+            self.queue_service.commit_advance()
 
             # Fire-and-forget notifications — must not block queue advance
             try:

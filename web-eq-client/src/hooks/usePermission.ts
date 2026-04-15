@@ -1,15 +1,15 @@
 import { useMemo } from "react";
 import { useUserStore } from "../utils/userStore";
+import { ProfileType } from "../utils/constants";
 import {
   hasPermission,
   canAccessRoute,
   NAV_ITEMS,
   type PermissionKey,
-  type AppRole,
 } from "../utils/permissions";
 
 /** Current user's profile type (role) from store. */
-export function useProfileType(): AppRole | null {
+export function useProfileType(): ProfileType | null {
   return useUserStore((s) => s.getProfileType());
 }
 

@@ -464,6 +464,38 @@ class AuthController:
             gender=None,
         )
 
+    async def admin_verify_otp(self, data: OTPVerifyInput, response: Response, request: Request) -> LoginResponse:
+        """Verify OTP for admin login. Only succeeds if the user has the ADMIN role."""
+        try:
+            self.validate_otp_and_consume(data.country_code, data.phone_number, data.otp)
+            user = self.user_service.get_user_by_phone(data.country_code, data.phone_number)
+            if not user:
+                raise HTTPException(
+                    status_code=403,
+                    detail={"message": "No admin account found for this phone number."},
+                )
+            has_admin = self.role_controller.check_user_has_role(user.uuid, "ADMIN")  # type: ignore[arg-type]
+            if not has_admin:
+                raise HTTPException(
+                    status_code=403,
+                    detail={"message": "Access denied. This account does not have admin privileges."},
+                )
+            client_type = detect_client_type(request, data.client_type)
+            return await self.auth_service.generate_auth_response(
+                user,
+                response,
+                client_type,
+                user_type="ADMIN",
+                next_step="dashboard",
+                profile_type="ADMIN",
+            )
+        except HTTPException:
+            raise
+        except SQLAlchemyError:
+            raise HTTPException(status_code=500, detail="Database error")
+        except Exception:
+            raise
+
     async def get_profile(self, user: User) -> UnifiedProfileResponse:
         user_type = RequestContext.get_user_type()
         user_info = OwnerInfo.from_user(user)
@@ -503,6 +535,12 @@ class AuthController:
                 employee=EmployeeInfo.from_employee(employee, queue=employee.queue),
                 address=address,
                 schedule=schedule,
+            )
+
+        if user_type == "ADMIN":
+            return UnifiedProfileResponse(
+                profile_type="ADMIN",
+                user=user_info,
             )
 
         addresses = self.address_service.get_addresses_by_entity(EntityType.USER, entity_id)

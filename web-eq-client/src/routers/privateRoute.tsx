@@ -24,6 +24,9 @@ export function PrivateRoute({ children }: PrivateRouteProps) {
     resetUser();
     return <Navigate to={ROUTERS_PATH.SENDOTP} replace />;
   }
+  if (profileType === "ADMIN") {
+    return <Navigate to={ROUTERS_PATH.SUPER_ADMIN} replace />;
+  }
 
   if (!canAccessDashboard()) {
     const redirectTo = (nextStep && NEXT_STEP_REDIRECT[nextStep]) || ROUTERS_PATH.SENDOTP;

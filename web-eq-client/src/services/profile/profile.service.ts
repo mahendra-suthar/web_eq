@@ -77,7 +77,7 @@ export interface AddressData {
 }
 
 export interface UnifiedProfileResponse {
-  profile_type: "BUSINESS" | "EMPLOYEE" | "CUSTOMER";
+  profile_type: "BUSINESS" | "EMPLOYEE" | "CUSTOMER" | "ADMIN";
   user: OwnerInfo;
   business?: BusinessInfo;
   employee?: EmployeeInfo;

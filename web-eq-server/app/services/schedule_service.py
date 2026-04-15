@@ -57,6 +57,53 @@ class ScheduleService:
             .first()
         )
 
+    def get_schedules_with_breaks_batch(
+        self,
+        entity_ids: List[UUID],
+        entity_type: ScheduleEntityType,
+        day_of_week: int,
+    ) -> Dict[UUID, Schedule]:
+        """Batch fetch schedules (with breaks eagerly loaded) for multiple entities on one day.
+
+        Returns a dict keyed by entity_id. One SELECT + one IN-subquery for breaks —
+        eliminates N per-entity queries when processing a list of queues.
+        """
+        if not entity_ids:
+            return {}
+        rows = (
+            self.db.query(Schedule)
+            .options(joinedload(Schedule.breaks))
+            .filter(
+                Schedule.entity_id.in_(entity_ids),
+                Schedule.entity_type == entity_type,
+                Schedule.day_of_week == day_of_week,
+            )
+            .all()
+        )
+        return {row.entity_id: row for row in rows}
+
+    def get_exceptions_for_schedules_batch(
+        self,
+        schedule_ids: List[UUID],
+        exception_date: date_type,
+    ) -> Dict[UUID, ScheduleException]:
+        """Batch fetch schedule exceptions for multiple schedules on one date.
+
+        Returns a dict keyed by schedule_id. One SELECT with IN clause —
+        eliminates N per-schedule queries when processing a list of queues.
+        """
+        if not schedule_ids:
+            return {}
+        rows = (
+            self.db.query(ScheduleException)
+            .filter(
+                ScheduleException.schedule_id.in_(schedule_ids),
+                ScheduleException.exception_date == exception_date,
+            )
+            .all()
+        )
+        return {row.schedule_id: row for row in rows}
+
     def get_schedules_by_entity(
         self, entity_id: UUID, entity_type: ScheduleEntityType
     ) -> List[Schedule]:
@@ -143,6 +190,7 @@ class ScheduleService:
                     )
                 )
 
+        self.db.commit()
         return new_schedules
 
 

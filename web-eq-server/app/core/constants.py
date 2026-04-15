@@ -1,4 +1,5 @@
 from datetime import time as _time
+from enum import Enum
 
 UNPROTECTED_ROUTE_PATHS = [
     "/healthz",                           # Render / load balancer health checks
@@ -7,6 +8,7 @@ UNPROTECTED_ROUTE_PATHS = [
     "/api/auth/verify-otp",
     "/api/auth/verify-otp-customer",
     "/api/auth/business-verify-otp",
+    "/api/auth/admin-verify-otp",         # Admin OTP login — unprotected so unauthenticated admins can log in
     "/api/auth/logout",                   # Cookie clear — must work even when session is expired
     # ── Public catalogue reads ────────────────────────────────────────────────
     "/api/category/",                     # get_categories, tree
@@ -100,7 +102,24 @@ APPOINTMENT_TYPE_APPROXIMATE = "APPROXIMATE"
 
 # Notification event type constants
 NOTIF_BOOKING_CONFIRMED = "BOOKING_CONFIRMED"
-NOTIF_NEW_CUSTOMER      = "NEW_CUSTOMER"
-NOTIF_IN_SERVICE        = "IN_SERVICE"
-NOTIF_CALLED_NEXT       = "CALLED_NEXT"
+NOTIF_NEW_CUSTOMER = "NEW_CUSTOMER"
+NOTIF_IN_SERVICE = "IN_SERVICE"
+NOTIF_CALLED_NEXT = "CALLED_NEXT"
 NOTIF_SERVICE_COMPLETED = "SERVICE_COMPLETED"
+
+# Business status label map (int → display string)
+BUSINESS_STATUS_LABELS = {
+    BUSINESS_DRAFT: "Draft",
+    BUSINESS_REGISTERED: "Registered",
+    BUSINESS_ACTIVE: "Active",
+    BUSINESS_SUSPENDED: "Suspended",
+    BUSINESS_INACTIVE: "Inactive",
+    BUSINESS_TERMINATED: "Terminated",
+}
+
+# Application roles
+class AppRole(str, Enum):
+    ADMIN = "ADMIN"
+    BUSINESS = "BUSINESS"
+    EMPLOYEE = "EMPLOYEE"
+    CUSTOMER = "CUSTOMER"

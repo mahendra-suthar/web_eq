@@ -1,0 +1,99 @@
+.sa-login {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a1f2e 0%, #2d3748 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.sa-login-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+}
+
+.sa-login-header {
+  text-align: center;
+  margin-bottom: 32px;
+
+  .sa-login-icon { font-size: 40px; margin-bottom: 12px; }
+  h1 { font-size: 22px; font-weight: 700; color: #1e293b; margin: 0 0 4px; }
+  p { color: #64748b; font-size: 14px; margin: 0; }
+}
+
+.sa-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  label { font-size: 13px; font-weight: 600; color: #374151; }
+}
+
+.sa-phone-row {
+  display: flex;
+  gap: 8px;
+}
+
+.sa-country-select {
+  padding: 10px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #f9fafb;
+  color: #374151;
+  flex-shrink: 0;
+}
+
+.sa-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1e293b;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+
+  &:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+  &--otp { letter-spacing: 4px; text-align: center; font-size: 20px; font-weight: 700; }
+}
+
+.sa-btn {
+  padding: 12px;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover:not(:disabled) { background: #4f46e5; }
+  &:disabled { opacity: 0.55; cursor: not-allowed; }
+}
+
+.sa-btn-link {
+  background: none;
+  border: none;
+  color: #6366f1;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  padding: 4px;
+  &:hover { text-decoration: underline; }
+}
+
+.sa-error {
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  color: #dc2626;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+}

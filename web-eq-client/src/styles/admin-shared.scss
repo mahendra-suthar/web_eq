@@ -1,0 +1,417 @@
+// ── Shared content-area styles for admin panels ───────────────────────────────
+// Used by both AdminLayout (business/employee) and SuperAdminLayout.
+// Contains only standalone (non-nested) classes — no layout structure.
+
+// ── Design tokens ─────────────────────────────────────────────────────────────
+$sh-teal:       #00695C;
+$sh-teal-dark:  #00574B;
+$sh-teal-light: #E0F2F1;
+$sh-teal-mid:   #B2DFDB;
+$sh-teal-500:   #009688;
+
+$sh-slate-900: #0f172a;
+$sh-slate-800: #1e293b;
+$sh-slate-700: #334155;
+$sh-slate-600: #475569;
+$sh-slate-500: #64748b;
+$sh-slate-400: #94a3b8;
+$sh-slate-300: #cbd5e1;
+$sh-slate-200: #e2e8f0;
+$sh-slate-100: #f1f5f9;
+$sh-slate-50:  #f8fafc;
+
+$sh-radius-sm: 6px;
+$sh-radius-md: 8px;
+$sh-radius-lg: 12px;
+
+$sh-shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+$sh-shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+
+// ── Skeleton animation ────────────────────────────────────────────────────────
+@keyframes admin-shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+
+// ── Page header ───────────────────────────────────────────────────────────────
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+
+  h2 { font-size: 20px; font-weight: 700; color: $sh-slate-800; margin: 0; }
+  p { color: $sh-slate-500; font-size: 13px; margin: 0; }
+}
+
+// ── Alerts ────────────────────────────────────────────────────────────────────
+.alert {
+  padding: 12px 16px;
+  border-radius: $sh-radius-md;
+  font-size: 14px;
+  margin-bottom: 16px;
+
+  &.alert--error   { background: #fef2f2; color: #dc2626; border: 1px solid #fca5a5; }
+  &.alert--success { background: #f0fdf4; color: #16a34a; border: 1px solid #86efac; }
+}
+
+// ── Toolbar ───────────────────────────────────────────────────────────────────
+.page-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-input {
+  flex: 1;
+  min-width: 180px;
+  padding: 8px 12px;
+  border: 1px solid $sh-slate-200;
+  border-radius: $sh-radius-md;
+  font-size: 14px;
+  outline: none;
+  background: white;
+  color: $sh-slate-800;
+  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+
+  &:focus {
+    border-color: $sh-teal;
+    box-shadow: 0 0 0 3px rgba(0, 105, 92, 0.1);
+  }
+}
+
+.filter-select {
+  padding: 8px 12px;
+  border: 1px solid $sh-slate-200;
+  border-radius: $sh-radius-md;
+  font-size: 14px;
+  background: white;
+  color: $sh-slate-800;
+  outline: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s;
+
+  &:focus { border-color: $sh-teal; }
+}
+
+// ── Buttons ───────────────────────────────────────────────────────────────────
+.btn {
+  padding: 8px 16px;
+  border-radius: $sh-radius-md;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-family: inherit;
+
+  &.btn-primary {
+    background: $sh-teal;
+    color: white;
+    &:hover   { background: $sh-teal-dark; }
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
+  }
+
+  &.btn-secondary {
+    background: white;
+    color: $sh-slate-600;
+    border: 1px solid $sh-slate-200;
+    &:hover { background: $sh-teal-light; color: $sh-teal; border-color: $sh-teal-mid; }
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
+  }
+
+  &.btn-danger {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    &:hover { background: #fee2e2; }
+
+    &.btn-danger--solid {
+      background: #ef4444;
+      color: white;
+      border-color: #ef4444;
+      &:hover   { background: #dc2626; border-color: #dc2626; }
+      &:disabled { opacity: 0.5; cursor: not-allowed; }
+    }
+  }
+
+  &.btn-sm { padding: 6px 12px; font-size: 13px; }
+}
+
+.action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: $sh-radius-sm;
+  border: 1px solid $sh-slate-200;
+  background: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 15px;
+  color: $sh-slate-500;
+
+  &:hover { background: $sh-teal-light; border-color: $sh-teal-mid; color: $sh-teal; }
+  &.action-btn--danger:hover { background: #fef2f2; border-color: #fca5a5; color: #dc2626; }
+}
+
+// ── Card ──────────────────────────────────────────────────────────────────────
+.content-card {
+  background: white;
+  border-radius: $sh-radius-lg;
+  border: 1px solid $sh-slate-200;
+  overflow: hidden;
+  box-shadow: $sh-shadow-sm;
+  margin-bottom: 20px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid $sh-slate-100;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: $sh-slate-800;
+  margin: 0;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+// ── Table ─────────────────────────────────────────────────────────────────────
+.data-table-container {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  thead {
+    background: $sh-slate-50;
+    border-bottom: 1px solid $sh-slate-200;
+  }
+
+  th {
+    padding: 11px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: $sh-slate-500;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 14px 16px;
+    border-bottom: 1px solid $sh-slate-100;
+    font-size: 14px;
+    color: $sh-slate-600;
+    vertical-align: middle;
+  }
+
+  tbody tr {
+    transition: background 0.12s;
+    &:hover { background: #f7fbfa; }
+    &:last-child td { border-bottom: none; }
+  }
+}
+
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+.skeleton-row td { padding: 14px 16px; border-bottom: 1px solid $sh-slate-100; }
+
+.skeleton-cell {
+  height: 14px;
+  border-radius: $sh-radius-sm;
+  background: linear-gradient(90deg, $sh-slate-100 25%, #edf1f5 50%, $sh-slate-100 75%);
+  background-size: 600px 100%;
+  animation: admin-shimmer 1.4s infinite linear;
+
+  &.skeleton-cell--sm  { width: 60px; }
+  &.skeleton-cell--med { width: 120px; }
+  &.skeleton-cell--lg  { width: 200px; }
+  &.skeleton-cell--wide   { width: 70%; }
+  &.skeleton-cell--short  { width: 30%; }
+  &.skeleton-cell--avatar { width: 32px; height: 32px; border-radius: 50%; }
+}
+
+// ── Status badges ─────────────────────────────────────────────────────────────
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  &.active       { background: #dcfce7; color: #15803d; }
+  &.registered   { background: #dbeafe; color: #1d4ed8; }
+  &.suspended    { background: #fef3c7; color: #b45309; }
+  &.draft        { background: $sh-slate-100; color: $sh-slate-500; }
+  &.inactive     { background: #fef3c7; color: #d97706; }
+  &.terminated   { background: #fee2e2; color: #7f1d1d; }
+  &.pending      { background: #dbeafe; color: #1d4ed8; }
+  &.open         { background: #dcfce7; color: #15803d; }
+  &.closed       { background: $sh-slate-100; color: $sh-slate-500; }
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: $sh-slate-400;
+
+  .empty-state-icon  { font-size: 40px; margin-bottom: 12px; }
+  .empty-state-title { font-size: 15px; font-weight: 600; color: $sh-slate-600; margin-bottom: 6px; }
+  .empty-state-sub   { font-size: 13px; margin-top: 4px; }
+}
+
+// ── Pagination row ────────────────────────────────────────────────────────────
+.pagination-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-top: 1px solid $sh-slate-100;
+  font-size: 13px;
+  color: $sh-slate-500;
+}
+
+.pagination-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.page-btn {
+  padding: 6px 12px;
+  border: 1px solid $sh-slate-200;
+  border-radius: $sh-radius-sm;
+  background: white;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  transition: all 0.15s;
+  color: $sh-slate-600;
+  min-width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover:not(:disabled) { background: $sh-teal; color: white; border-color: $sh-teal; }
+  &:disabled  { opacity: 0.4; cursor: not-allowed; }
+  &.active    { background: $sh-teal; color: white; border-color: $sh-teal; }
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal {
+  background: white;
+  border-radius: $sh-radius-lg;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: $sh-shadow-lg;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid $sh-slate-200;
+
+  h3 { margin: 0; font-size: 16px; font-weight: 700; color: $sh-slate-800; }
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: $sh-slate-400;
+  font-size: 20px;
+  padding: 2px 6px;
+  border-radius: $sh-radius-sm;
+  transition: color 0.15s;
+  line-height: 1;
+  font-family: inherit;
+
+  &:hover { color: $sh-slate-800; }
+}
+
+.modal-body { padding: 20px; font-size: 14px; color: $sh-slate-600; }
+
+.modal-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 16px 20px;
+  border-top: 1px solid $sh-slate-200;
+}
+
+// ── Form ──────────────────────────────────────────────────────────────────────
+.form-group {
+  margin-bottom: 16px;
+
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: $sh-slate-700;
+    margin-bottom: 6px;
+  }
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid $sh-slate-200;
+  border-radius: $sh-radius-md;
+  font-size: 14px;
+  color: $sh-slate-800;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+
+  &:focus {
+    border-color: $sh-teal;
+    box-shadow: 0 0 0 3px rgba(0, 105, 92, 0.1);
+  }
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
