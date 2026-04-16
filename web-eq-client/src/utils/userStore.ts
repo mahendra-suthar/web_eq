@@ -7,6 +7,11 @@ interface UserState {
   profile: UnifiedProfileResponse | null;
   nextStep: string | null;
   token: string | null;
+
+  impersonating: boolean;
+  impersonatedBusinessName: string | null;
+  preImpersonationProfile: UnifiedProfileResponse | null;
+
   setProfile: (profile: UnifiedProfileResponse) => void;
   setNextStep: (step: string | null) => void;
   setToken: (token: string | null) => void;
@@ -16,6 +21,10 @@ interface UserState {
   getBusinessId: () => string | null;
   getEmployeeId: () => string | null;
   resetUser: () => void;
+
+  startImpersonation: (token: string, businessName: string) => void;
+  exitImpersonation: () => void;
+  isImpersonating: () => boolean;
 }
 
 export const useUserStore = create(
@@ -24,6 +33,9 @@ export const useUserStore = create(
       profile: null,
       nextStep: null,
       token: null,
+      impersonating: false,
+      impersonatedBusinessName: null,
+      preImpersonationProfile: null,
 
       setProfile: (profile) => set({ profile }),
       setNextStep: (step) => set({ nextStep: step }),
@@ -79,12 +91,43 @@ export const useUserStore = create(
         profile: null,
         nextStep: null,
         token: null,
+        impersonating: false,
+        impersonatedBusinessName: null,
+        preImpersonationProfile: null,
       }),
+
+      // Impersonation
+
+      startImpersonation: (token, businessName) =>
+        set((state) => ({
+          preImpersonationProfile: state.profile,
+          token,
+          impersonating: true,
+          impersonatedBusinessName: businessName,
+        })),
+
+      exitImpersonation: () =>
+        set((state) => ({
+          profile: state.preImpersonationProfile,
+          nextStep: "dashboard",
+          token: null,
+          impersonating: false,
+          impersonatedBusinessName: null,
+          preImpersonationProfile: null,
+        })),
+
+      isImpersonating: () => get().impersonating,
     }),
     {
       name: "web-eq-user",
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ profile: state.profile, nextStep: state.nextStep }) as UserState,
+      partialize: (state) => ({
+        profile: state.profile,
+        nextStep: state.nextStep,
+        impersonating: state.impersonating,
+        impersonatedBusinessName: state.impersonatedBusinessName,
+        preImpersonationProfile: state.preImpersonationProfile,
+      }) as UserState,
     }
   )
 );

@@ -276,6 +276,7 @@ export default function VerifyOTP() {
               onChange={handleOtpChange}
               containerClassName={`otp-container ${error ? 'invalid' : ''}`}
               disabled={hasReachedLimit}
+              autoFocus
               render={({ slots }) => (
                 <div className="otp-box">
                   {slots.map((slot, idx) => (

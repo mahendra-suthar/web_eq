@@ -56,6 +56,13 @@ export interface UserAdminItem {
   created_at: string;
 }
 
+export interface ImpersonationResult {
+  token: string;
+  business_name: string;
+  business_uuid: string;
+  expires_at: string;
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;
@@ -144,6 +151,10 @@ export class SuperAdminService extends HttpClient {
 
   async updateBusinessStatus(uuid: string, status: number): Promise<BusinessAdminItem> {
     return this.patch(`${this.base}/businesses/${uuid}/status`, { status });
+  }
+
+  async impersonateBusiness(uuid: string): Promise<ImpersonationResult> {
+    return this.post(`${this.base}/businesses/${uuid}/impersonate`);
   }
 
   // Users

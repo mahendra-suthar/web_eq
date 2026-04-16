@@ -1,15 +1,17 @@
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
+from app.core.context import RequestContext
 from app.db.database import get_db
 from app.controllers.admin_controller import AdminController
 from app.schemas.super_admin import (
     BusinessAdminResponse,
     BusinessListResponse,
     BusinessStatusUpdate,
+    ImpersonationResponse,
 )
 
 businesses_router = APIRouter()
@@ -24,6 +26,16 @@ def list_businesses(
     db: Session = Depends(get_db),
 ):
     return AdminController(db).list_businesses(page, limit, search, status)
+
+
+@businesses_router.post("/{business_uuid}/impersonate", response_model=ImpersonationResponse)
+def impersonate_business(
+    business_uuid: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    admin = RequestContext.get_user()
+    return AdminController(db).impersonate_business(business_uuid, admin.uuid)
 
 
 @businesses_router.patch("/{business_uuid}/status", response_model=BusinessAdminResponse)
