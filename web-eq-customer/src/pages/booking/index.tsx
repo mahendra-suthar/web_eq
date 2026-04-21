@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useBookingStore, type QueueOptionData, type QueueServiceInfo, type SlotData, type SlotsListResponse } from "../../store/booking.store";
 import { useAuthStore } from "../../store/auth.store";
@@ -17,6 +17,8 @@ export default function BookingPage() {
   const { businessId } = useParams<{ businessId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const preselectedQueueId = searchParams.get("queue") ?? null;
   const { isAuthenticated } = useAuthStore();
 
   const {
@@ -80,7 +82,7 @@ export default function BookingPage() {
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      const returnTo = `/business/${businessId}/book`;
+      const returnTo = `/business/${businessId}/book${location.search}`;
       const state = {
         returnTo,
         selectedServices: initialSelectedServices,
@@ -327,8 +329,11 @@ export default function BookingPage() {
 
       setQueueOptions(preview.queues || []);
 
+      const preselected = preselectedQueueId
+        ? preview.queues?.find((q) => q.queue_id === preselectedQueueId) ?? null
+        : null;
       const recommended = preview.queues?.find((q) => q.is_recommended);
-      const defaultSelection = recommended ?? preview.queues?.[0] ?? null;
+      const defaultSelection = preselected ?? recommended ?? preview.queues?.[0] ?? null;
       if (defaultSelection) {
         handleQueueOptionSelect(defaultSelection);
       }
@@ -344,7 +349,7 @@ export default function BookingPage() {
     } finally {
       setPreviewLoading(false);
     }
-  }, [businessId, selectedDate, serviceIds, setAvailableSlots, setSelectedQueue]);
+  }, [businessId, selectedDate, serviceIds, preselectedQueueId, setAvailableSlots, setSelectedQueue]);
 
   useEffect(() => {
     if (selectedDate && !isDateInPast(selectedDate) && serviceIds.length > 0) {

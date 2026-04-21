@@ -14,6 +14,7 @@ from app.routers.customer import customer_router
 from app.routers.notification import notification_router
 from app.routers.websocket import router as websocket_router
 from app.routers.admin import admin_router
+from app.routers.qr import qr_router
 
 routers = APIRouter()
 
@@ -32,4 +33,5 @@ routers.include_router(customer_router, prefix="/customer", tags=["Customer"])
 routers.include_router(notification_router, prefix="/notification", tags=["Notifications"])
 routers.include_router(websocket_router, tags=["WebSocket"])
 routers.include_router(admin_router, prefix="/admin", tags=["Super Admin"])
+routers.include_router(qr_router, prefix="/qr", tags=["QR Code"])
 

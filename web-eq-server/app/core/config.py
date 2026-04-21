@@ -49,3 +49,6 @@ CORS_ORIGINS = os.getenv("CORS_ORIGINS", "")
 # Queue configuration
 MAX_QUEUE_SIZE = int(os.getenv("MAX_QUEUE_SIZE", "50"))
 AVG_WAIT_TIME_PER_USER = int(os.getenv("AVG_WAIT_TIME_PER_USER", "5"))  # minutes
+
+# Customer app base URL — used when encoding URLs into QR codes
+CUSTOMER_APP_URL = os.getenv("CUSTOMER_APP_URL", "http://localhost:5174")

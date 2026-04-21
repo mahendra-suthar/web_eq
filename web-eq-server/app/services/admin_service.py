@@ -133,6 +133,15 @@ class AdminService:
             self.db.delete(user_role)
             self.db.commit()
 
+    # ── Impersonation ─────────────────────────────────────────────────────────
+
+    def get_business_by_uuid(self, business_uuid: UUID) -> Optional[Business]:
+        return (
+            self.db.query(Business)
+            .filter(Business.uuid == business_uuid)
+            .first()
+        )
+
     # ── Platform stats ────────────────────────────────────────────────────────
 
     def get_stats(self) -> dict:

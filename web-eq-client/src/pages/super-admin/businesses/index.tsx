@@ -1,10 +1,15 @@
 import { useCallback, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { SuperAdminService, BusinessAdminItem } from "../../../services/super-admin/super-admin.service";
+import { ProfileService } from "../../../services/profile/profile.service";
 import { useAdminList } from "../../../hooks/useAdminList";
 import { ConfirmModal } from "../../../components/confirm-modal";
+import { useUserStore } from "../../../utils/userStore";
 import { ADMIN_LIST_LIMIT, BusinessStatus } from "../../../utils/constants";
+import { ROUTERS_PATH } from "../../../routers/routers";
 
 const svc = new SuperAdminService();
+const profileSvc = new ProfileService();
 
 const STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
@@ -26,9 +31,13 @@ const STATUS_CLASS: Record<number, string> = {
 };
 
 const SuperAdminBusinesses = () => {
+  const navigate = useNavigate();
+  const { startImpersonation, setProfile, setNextStep } = useUserStore();
+
   const [filterStatus, setFilterStatus] = useState("");
   const [statusTarget, setStatusTarget] = useState<{ item: BusinessAdminItem; newStatus: number } | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
+  const [impersonatingUuid, setImpersonatingUuid] = useState<string | null>(null);
 
   const { items, total, page, pages, search, loading, error, setSearch, setPage, setFilters, refresh, setError } =
     useAdminList<BusinessAdminItem>({
@@ -64,9 +73,27 @@ const SuperAdminBusinesses = () => {
     }
   };
 
+  const handleLoginAs = async (item: BusinessAdminItem) => {
+    setImpersonatingUuid(item.uuid);
+    try {
+      const result = await svc.impersonateBusiness(item.uuid);
+      startImpersonation(result.token, result.business_name);
+      const businessProfile = await profileSvc.getProfile();
+      setProfile(businessProfile);
+      setNextStep("dashboard");
+      navigate(ROUTERS_PATH.DASHBOARD);
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || "Failed to enter business session.");
+    } finally {
+      setImpersonatingUuid(null);
+    }
+  };
+
   const newStatusLabel = statusTarget
     ? STATUS_OPTIONS.find((o) => o.value === String(statusTarget.newStatus))?.label ?? ""
     : "";
+
+  const colSpan = 7;
 
   return (
     <div>
@@ -97,17 +124,18 @@ const SuperAdminBusinesses = () => {
                 <th>Status</th>
                 <th>Created</th>
                 <th>Change Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i} className="skeleton-row">
-                      {Array.from({ length: 6 }).map((__, j) => <td key={j}><div className="skeleton-cell skeleton-cell--med" /></td>)}
+                      {Array.from({ length: colSpan }).map((__, j) => <td key={j}><div className="skeleton-cell skeleton-cell--med" /></td>)}
                     </tr>
                   ))
                 : items.length === 0
-                ? <tr><td colSpan={6}><div className="empty-state"><div className="empty-state-icon">🏢</div><div className="empty-state-title">No businesses found</div></div></td></tr>
+                ? <tr><td colSpan={colSpan}><div className="empty-state"><div className="empty-state-icon">🏢</div><div className="empty-state-title">No businesses found</div></div></td></tr>
                 : items.map((item) => (
                   <tr key={item.uuid}>
                     <td>
@@ -140,6 +168,16 @@ const SuperAdminBusinesses = () => {
                           <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
                       </select>
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ fontSize: 12, padding: "5px 10px" }}
+                        disabled={impersonatingUuid === item.uuid}
+                        onClick={() => handleLoginAs(item)}
+                      >
+                        {impersonatingUuid === item.uuid ? "…" : "Login as"}
+                      </button>
                     </td>
                   </tr>
                 ))}

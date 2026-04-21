@@ -135,6 +135,15 @@ class UserListResponse(BaseModel):
     pages: int
 
 
+# ── Impersonation ─────────────────────────────────────────────────────────────
+
+class ImpersonationResponse(BaseModel):
+    token: str
+    business_name: str
+    business_uuid: str
+    expires_at: str
+
+
 # ── Stats ─────────────────────────────────────────────────────────────────────
 
 class AdminStats(BaseModel):

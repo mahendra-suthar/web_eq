@@ -3,12 +3,15 @@ Admin controller — thin orchestration layer between admin routers and services
 Handles response shaping so routers stay free of business logic.
 """
 import math
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.constants import BUSINESS_STATUS_LABELS
+from app.middleware.auth import create_access_token
 from app.services.admin_service import AdminService
 from app.services.category_service import CategoryService
 from app.services.service_service import ServiceService
@@ -16,6 +19,7 @@ from app.schemas.super_admin import (
     AdminStats,
     BusinessAdminResponse, BusinessListResponse, BusinessStatusUpdate,
     CategoryAdminResponse, CategoryCreate, CategoryListResponse, CategoryUpdate,
+    ImpersonationResponse,
     ServiceAdminResponse, ServiceCreate, ServiceListResponse, ServiceUpdate,
     UserAdminResponse, UserListResponse, UserRoleAssign, UserRoleRevoke,
 )
@@ -189,6 +193,31 @@ class AdminController:
             page=page,
             limit=limit,
             pages=math.ceil(total / limit) if total else 1,
+        )
+
+    def impersonate_business(self, business_uuid: UUID, admin_id: UUID) -> ImpersonationResponse:
+        business = self.admin_svc.get_business_by_uuid(business_uuid)
+        if not business:
+            raise HTTPException(status_code=404, detail="Business not found.")
+        if business.owner_id is None:
+            raise HTTPException(status_code=422, detail="Business has no owner account.")
+
+        expires_delta = timedelta(minutes=30)
+        token = create_access_token(
+            {
+                "sub": str(business.owner_id),
+                "user_type": "BUSINESS",
+                "impersonated_by": str(admin_id),
+            },
+            expires_delta,
+        )
+        expires_at = (datetime.now(timezone.utc) + expires_delta).isoformat()
+
+        return ImpersonationResponse(
+            token=token,
+            business_name=str(business.name),
+            business_uuid=str(business.uuid),
+            expires_at=expires_at,
         )
 
     def update_business_status(self, business_uuid: UUID, data: BusinessStatusUpdate) -> BusinessAdminResponse:
