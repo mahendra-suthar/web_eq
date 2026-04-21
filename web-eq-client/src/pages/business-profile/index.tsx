@@ -1,6 +1,8 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { QRService } from '../../services/qr/qr.service';
+import QRCard from '../../components/qr-card';
 import { AddressData, DaySchedule } from '../../utils/businessRegistrationStore';
 import LocationEditor from '../../components/location-editor';
 import { ProfileService, UnifiedProfileResponse } from '../../services/profile/profile.service';
@@ -27,7 +29,7 @@ interface OwnerProfileData {
     email: string;
 }
 
-type TabType = 'overview' | 'location' | 'schedule';
+type TabType = 'overview' | 'location' | 'schedule' | 'qr';
 
 const BusinessProfile = () => {
     const { t } = useTranslation();
@@ -42,6 +44,12 @@ const BusinessProfile = () => {
     const profileService = useMemo(() => new ProfileService(), []);
     const businessService = useMemo(() => new BusinessService(), []);
     const otpService = useMemo(() => new OTPService(), []);
+    const qrService = useMemo(() => new QRService(), []);
+
+    const [qrObjectUrl, setQrObjectUrl] = useState<string | null>(null);
+    const [qrLoading, setQrLoading] = useState(false);
+    const [qrError, setQrError] = useState<string>("");
+    const qrFetchedRef = useRef(false);
 
     const [businessId, setBusinessId] = useState<string>("");
     const [ownerCountryCode, setOwnerCountryCode] = useState<string>("");
@@ -175,6 +183,23 @@ const BusinessProfile = () => {
         }
     }, [editingTab, categories.length, businessService]);
 
+    useEffect(() => {
+        if (activeTab !== 'qr' || qrFetchedRef.current) return;
+        qrFetchedRef.current = true;
+        setQrLoading(true);
+        setQrError("");
+        qrService.getBusinessQR()
+            .then((blob: Blob) => setQrObjectUrl(URL.createObjectURL(blob)))
+            .catch(() => setQrError(t("failedToLoad") || "Failed to load QR code."))
+            .finally(() => setQrLoading(false));
+    }, [activeTab, qrService, t]);
+
+    useEffect(() => {
+        return () => {
+            if (qrObjectUrl) URL.revokeObjectURL(qrObjectUrl);
+        };
+    }, [qrObjectUrl]);
+
     const handleSaveOverview = async () => {
         setSaveError("");
         const fullName = ownerData.fullName.trim();
@@ -286,6 +311,7 @@ const BusinessProfile = () => {
                         { id: 'overview', label: t("basicInformation") },
                         { id: 'location', label: t("location") },
                         { id: 'schedule', label: t("schedule") },
+                        { id: 'qr', label: "QR Code" },
                     ]}
                     activeTabId={activeTab}
                     onTabChange={(id) => setActiveTab(id as TabType)}
@@ -588,6 +614,36 @@ const BusinessProfile = () => {
                                             );
                                         })}
                                     </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {/* QR Code Tab */}
+                    {activeTab === 'qr' && (
+                        <div className="profile-section">
+                            <div className="section-header">
+                                <h2 className="section-title">Business QR Code</h2>
+                            </div>
+                            <div className="section-content">
+                                {qrLoading && (
+                                    <div className="loading-state" style={{ padding: "2rem", textAlign: "center" }}>
+                                        {t("loading")}
+                                    </div>
+                                )}
+                                {qrError && (
+                                    <div className="error-message" role="alert" style={{ color: "red", padding: "1rem" }}>
+                                        {qrError}
+                                    </div>
+                                )}
+                                {qrObjectUrl && (
+                                    <QRCard
+                                        qrUrl={qrObjectUrl}
+                                        name={businessData.businessName}
+                                        meta={businessData.category || undefined}
+                                        badge="Business"
+                                        hint="Share this QR code with customers. When scanned, it opens your business page directly where they can view details and join your queue."
+                                        filename="business-qr.png"
+                                    />
                                 )}
                             </div>
                         </div>

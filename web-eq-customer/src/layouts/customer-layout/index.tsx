@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
+
+const QRScannerModal = lazy(() => import("../../components/qr-scanner"));
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/auth.store";
 import { AuthService } from "../../services/auth/auth.service";
@@ -7,19 +9,14 @@ import { useNotificationStore } from "../../store/notification.store";
 import ProfileDropdown from "../../components/profile-dropdown";
 import NotificationBell from "../../components/notification/NotificationBell";
 import Navbar from "../../components/Navbar";
-
-function getInitials(name: string | null | undefined): string {
-  if (!name) return "?";
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  return (parts[0]?.[0] ?? "?").toUpperCase();
-}
 import { useNotificationWS } from "../../hooks/useNotificationWS";
+import { getInitials } from "../../utils/util";
 import { AppointmentService } from "../../services/appointment/appointment.service";
 import type { TodayAppointmentResponse } from "../../services/appointment/appointment.service";
 import eqLogoWhite from "../../assets/white_transparent_logo.png";
 import { EXTERNAL_LINKS } from "../../config/links";
 import "../../components/notification/notification.scss";
+import "../../components/qr-scanner/qr-scanner.scss";
 import "./layout.scss";
 
 export default function CustomerLayout() {
@@ -28,6 +25,7 @@ export default function CustomerLayout() {
   const { t } = useTranslation();
   const { userInfo, isAuthenticated, resetUser, token, profileType } = useAuthStore();
   const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated() && profileType && profileType !== "CUSTOMER") {
@@ -96,6 +94,29 @@ export default function CustomerLayout() {
 
   return (
     <div className="customer-layout">
+      {/* Full-screen QR scanner — lazy loaded, mobile FAB triggers it */}
+      {scannerOpen && (
+        <Suspense fallback={null}>
+          <QRScannerModal
+            onClose={() => setScannerOpen(false)}
+            onNavigate={(path) => { setScannerOpen(false); navigate(path); }}
+          />
+        </Suspense>
+      )}
+
+      {/* Mobile-only floating action button */}
+      <button
+        className="qr-fab"
+        onClick={() => setScannerOpen(true)}
+        aria-label="Scan QR code"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+          <rect x="7" y="7" width="4" height="4"/><rect x="13" y="7" width="4" height="4"/>
+          <rect x="7" y="13" width="4" height="4"/><rect x="13" y="13" width="4" height="4"/>
+        </svg>
+      </button>
+
       <Navbar
         right={
           isAuthenticated() ? (
@@ -147,7 +168,7 @@ export default function CustomerLayout() {
                 {t("profile.navSignOut")}
               </button>
             </div>
-          ) : undefined
+          ) : null
         }
       />
 

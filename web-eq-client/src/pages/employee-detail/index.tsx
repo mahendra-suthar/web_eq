@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AddressData, DaySchedule } from '../../utils/businessRegistrationStore';
@@ -9,6 +9,8 @@ import { Tabs } from '../../components/tabs/Tabs';
 import { EmployeeOverviewForm } from '../../components/employee/EmployeeOverviewForm';
 import { RouterConstant } from '../../routers/index';
 import { backendDowToUiDow, emailRegex, formatDurationMinutes, getQueueStatusLabel, uiDowToBackendDow } from '../../utils/utils';
+import { QRService } from '../../services/qr/qr.service';
+import QRCard from '../../components/qr-card';
 import './employee-detail.scss';
 import '../../components/employee/employee-overview-form.scss';
 
@@ -38,7 +40,7 @@ const iconQueue = (
     </svg>
 );
 
-type TabType = 'overview' | 'location' | 'schedule' | 'queue';
+type TabType = 'overview' | 'location' | 'schedule' | 'queue' | 'qr';
 
 const EmployeeDetail = () => {
     const { t } = useTranslation();
@@ -52,6 +54,12 @@ const EmployeeDetail = () => {
     const profileService = useMemo(() => new ProfileService(), []);
     const employeeService = useMemo(() => new EmployeeService(), []);
     const businessService = useMemo(() => new BusinessService(), []);
+    const qrService = useMemo(() => new QRService(), []);
+
+    const [qrObjectUrl, setQrObjectUrl] = useState<string | null>(null);
+    const [qrLoading, setQrLoading] = useState(false);
+    const [qrError, setQrError] = useState<string>("");
+    const qrFetchedRef = useRef(false);
 
     const [userDisplay, setUserDisplay] = useState({ fullName: "", phoneDisplay: "", email: "" });
     const [employeeDisplay, setEmployeeDisplay] = useState({
@@ -290,12 +298,31 @@ const EmployeeDetail = () => {
         fetchProfile();
     }, [fetchProfile]);
 
+    useEffect(() => {
+        if (activeTab !== 'qr' || qrFetchedRef.current || !queueDetail) return;
+        qrFetchedRef.current = true;
+        if (!employeeId) return;
+        setQrLoading(true);
+        setQrError("");
+        qrService.getEmployeeQR(employeeId)
+            .then((blob: Blob) => setQrObjectUrl(URL.createObjectURL(blob)))
+            .catch(() => setQrError(t("failedToLoad") || "Failed to load QR code."))
+            .finally(() => setQrLoading(false));
+    }, [activeTab, queueDetail, employeeId, qrService, t]);
+
+    useEffect(() => {
+        return () => {
+            if (qrObjectUrl) URL.revokeObjectURL(qrObjectUrl);
+        };
+    }, [qrObjectUrl]);
+
     const tabItems = useMemo(() => {
         return [
             { id: 'overview' as TabType, label: t("basicInformation"), icon: iconOverview },
             { id: 'location' as TabType, label: t("location"), icon: iconLocation },
             { id: 'schedule' as TabType, label: t("schedule"), icon: iconSchedule },
             { id: 'queue' as TabType, label: t("queue"), icon: iconQueue },
+            { id: 'qr' as TabType, label: "QR Code", icon: iconQueue },
         ];
     }, [t]);
 
@@ -713,6 +740,47 @@ const EmployeeDetail = () => {
                                     <div className="queue-empty-state">
                                         <p className="queue-empty-message">{t("noQueueAssignedToEmployee")}</p>
                                     </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* QR Code Tab */}
+                    {activeTab === 'qr' && (
+                        <div className="profile-section queue-tab-section">
+                            <div className="section-header">
+                                <h2 className="section-title">Employee QR Code</h2>
+                            </div>
+                            <div className="section-content">
+                                {!queueDetail ? (
+                                    <div className="queue-empty-state">
+                                        <p className="queue-empty-message">
+                                            Assign a queue to this employee to generate a QR code.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {qrLoading && (
+                                            <div className="loading-state" style={{ padding: "2rem", textAlign: "center" }}>
+                                                {t("loading")}
+                                            </div>
+                                        )}
+                                        {qrError && (
+                                            <div className="employee-detail-save-error" role="alert">
+                                                {qrError}
+                                            </div>
+                                        )}
+                                        {qrObjectUrl && (
+                                            <QRCard
+                                                qrUrl={qrObjectUrl}
+                                                name={employeeDisplay.fullName}
+                                                meta={queueDetail.name ? `Queue: ${queueDetail.name}` : undefined}
+                                                badge="Employee"
+                                                hint="Place this QR code at the employee's station. Customers scan it to book directly with this employee."
+                                                filename="employee-qr.png"
+                                            />
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </div>

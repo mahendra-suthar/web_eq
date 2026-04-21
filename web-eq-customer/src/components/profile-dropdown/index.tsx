@@ -5,6 +5,7 @@ import {
   PROFILE_DROPDOWN_MENU_ITEMS,
   PROFILE_DROPDOWN_FIRST_ITEM_ID,
 } from "../../utils/constants";
+import { getInitials } from "../../utils/util";
 import "./profile-dropdown.scss";
 
 export interface ProfileDropdownProps {
@@ -12,15 +13,6 @@ export interface ProfileDropdownProps {
   userName: string | null | undefined;
   /** Callback when user chooses Logout */
   onLogout: () => void;
-}
-
-function getInitials(name: string | null | undefined): string {
-  if (!name || typeof name !== "string") return "?";
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase().slice(0, 2);
-  }
-  return (parts[0]?.[0] ?? "?").toUpperCase();
 }
 
 export default function ProfileDropdown({ userName, onLogout }: ProfileDropdownProps) {

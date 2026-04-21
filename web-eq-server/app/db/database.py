@@ -32,8 +32,10 @@ engine = create_engine(
     db_url,
     echo=db_settings.DB_ECHO_LOGS,
     pool_pre_ping=True,
-    pool_size=20,
-    max_overflow=30,
+    pool_size=5,       # Render Starter DB allows 25 connections max; keep headroom
+    max_overflow=10,   # 15 total — leaves room for migrations and admin queries
+    pool_timeout=30,
+    pool_recycle=1800, # Recycle connections every 30 min to avoid stale connections
 )
 
 # Define the Base class

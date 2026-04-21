@@ -158,6 +158,17 @@ class EmployeeService:
         except SQLAlchemyError:
             raise
 
+    def get_employee_by_uuid_and_business(self, employee_uuid: UUID, business_id: UUID) -> Optional[Employee]:
+        """Fetch an employee only if they belong to the given business (ownership check)."""
+        try:
+            return (
+                self.db.query(Employee)
+                .filter(Employee.uuid == employee_uuid, Employee.business_id == business_id)
+                .first()
+            )
+        except SQLAlchemyError:
+            raise
+
     def get_verified_employee_by_queue(self, queue_id: UUID, business_id: UUID) -> Optional[Employee]:
         try:
             return (

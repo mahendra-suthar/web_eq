@@ -1,0 +1,217 @@
+/* ============================================================
+   QR Scanner — Full-Screen Overlay
+   ============================================================ */
+
+.qr-fs-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000;
+  overflow: hidden;
+}
+
+/* ── Camera region ─────────────────────────────────────────── */
+/* html5-qrcode mounts video inside this div.
+   We use JS (patchScannerStyles) to override its inline px styles,
+   but CSS here acts as a safety net. */
+
+.qr-fs-camera {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden;
+  background: #000;
+
+  // Force all injected wrapper divs to fill
+  div {
+    width: 100% !important;
+    height: 100% !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  // Video fills the screen, cropped to cover (portrait/landscape)
+  video {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    border-radius: 0 !important;
+    display: block !important;
+  }
+
+  // canvas used internally for decoding — hide visually, keep functional
+  canvas {
+    display: none !important;
+  }
+
+  // html5-qrcode sometimes injects an img for the qrbox border — hide it
+  img {
+    display: none !important;
+  }
+}
+
+/* ── Top bar ───────────────────────────────────────────────── */
+.qr-fs-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 52px 20px 20px; // extra top for status bar / notch
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
+  pointer-events: none; // let touches pass through except children
+
+  > * { pointer-events: auto; }
+}
+
+.qr-fs-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 0.15s;
+
+  &:hover, &:active {
+    background: rgba(255, 255, 255, 0.32);
+  }
+}
+
+.qr-fs-title {
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* ── Viewfinder frame ──────────────────────────────────────── */
+.qr-fs-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 240px;
+  height: 240px;
+  z-index: 10;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.qr-fs-frame__corner {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-style: solid;
+  border-color: #fff;
+  border-width: 0;
+
+  &--tl { top: 0; left: 0;     border-top-width: 3px;    border-left-width: 3px;   border-top-left-radius: 4px; }
+  &--tr { top: 0; right: 0;    border-top-width: 3px;    border-right-width: 3px;  border-top-right-radius: 4px; }
+  &--bl { bottom: 0; left: 0;  border-bottom-width: 3px; border-left-width: 3px;   border-bottom-left-radius: 4px; }
+  &--br { bottom: 0; right: 0; border-bottom-width: 3px; border-right-width: 3px;  border-bottom-right-radius: 4px; }
+}
+
+@keyframes qr-scan-line {
+  0%   { top: 0; opacity: 0.9; }
+  100% { top: calc(100% - 2px); opacity: 0.3; }
+}
+
+.qr-fs-frame__scan-line {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: linear-gradient(to right, transparent, #4ade80, transparent);
+  animation: qr-scan-line 1.8s ease-in-out infinite alternate;
+  border-radius: 2px;
+}
+
+/* ── Instruction hint ──────────────────────────────────────── */
+.qr-fs-hint {
+  position: absolute;
+  bottom: 140px;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  font-weight: 500;
+  pointer-events: none;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Error banner ──────────────────────────────────────────── */
+.qr-fs-error {
+  position: absolute;
+  bottom: 80px;
+  left: 20px;
+  right: 20px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  background: rgba(220, 38, 38, 0.9);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  svg { flex-shrink: 0; }
+}
+
+/* ============================================================
+   QR Scan FAB — mobile only, fixed bottom-right
+   ============================================================ */
+
+.qr-fab {
+  display: none; // hidden on desktop
+
+  @media (max-width: 768px) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    bottom: 24px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: none;
+    background: var(--color-primary, #16a34a);
+    color: #fff;
+    cursor: pointer;
+    z-index: 900;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.14);
+    transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+
+    svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    &:active {
+      background: var(--color-primary-dark, #15803d);
+      transform: scale(0.94);
+    }
+  }
+}
