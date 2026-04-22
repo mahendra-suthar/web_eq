@@ -35,18 +35,38 @@ export default function BusinessEmployees({
   const { t } = useLayoutContext();
   const employeeService = useMemo(() => new EmployeeService(), []);
   const { profile } = useUserStore();
-  const { setSelfEmployee } = useBusinessRegistrationStore();
+  const { setSelfEmployee, isSelfEmployee } = useBusinessRegistrationStore();
   const [selfEmployee, setSelfEmployeeLocal] = useState(
-    () => !!initialData?.some((e) => e.is_owner)
+    () => isSelfEmployee || !!initialData?.some((e) => e.is_owner)
   );
 
   const [loading, setLoading] = useState(false);
-  const [employees, setEmployees] = useState<EmployeeWithPreview[]>(
-    () => initialData?.map((emp) => ({ ...emp, preview: "" })) ?? []
-  );
+  const [employees, setEmployees] = useState<EmployeeWithPreview[]>(() => {
+    const mapped: EmployeeWithPreview[] = initialData?.map((emp) => ({ ...emp, preview: "" })) ?? [];
+    if (isSelfEmployee && !mapped.some((e) => e.is_owner)) {
+      const ownerUserId = profile?.user?.uuid;
+      const existingIdx = ownerUserId ? mapped.findIndex((e) => e.user_id === ownerUserId) : -1;
+      if (existingIdx >= 0) {
+        const updated = [...mapped];
+        updated[existingIdx] = { ...updated[existingIdx], is_owner: true };
+        return updated;
+      }
+      return [{
+        ...(ownerUserId ? { user_id: ownerUserId } : {}),
+        is_owner: true,
+        full_name: profile?.user?.full_name ?? "",
+        email: profile?.user?.email ?? "",
+        country_code: profile?.user?.country_code ?? "+91",
+        phone_number: profile?.user?.phone_number ?? "",
+        preview: "",
+      }, ...mapped];
+    }
+    return mapped;
+  });
   const [errors, setErrors] = useState<
     Record<number, { full_name?: string; email?: string; phone_number?: string; profile_picture?: string }>
   >({});
+  const [stepError, setStepError] = useState<string>("");
   const initialMap = useMemo(
     () => new Map(initialData?.map((e) => [e.uuid, e]) ?? []),
     [initialData]
@@ -69,12 +89,16 @@ export default function BusinessEmployees({
       setEmployees((prev) =>
         prev.some((e) => e.is_owner) ? prev : [buildOwnerEntry(), ...prev]
       );
+      setStepError("");
     } else {
       setEmployees((prev) => prev.filter((e) => !e.is_owner));
     }
   };
 
-  const addEmployee = () => setEmployees((prev) => [...prev, EMPTY_EMPLOYEE()]);
+  const addEmployee = () => {
+    setEmployees((prev) => [...prev, EMPTY_EMPLOYEE()]);
+    setStepError("");
+  };
 
   const removeEmployee = (index: number) => {
     setEmployees((prev) => prev.filter((_, i) => i !== index));
@@ -167,6 +191,13 @@ export default function BusinessEmployees({
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
+    setStepError("");
+
+    if (!selfEmployee && employees.length === 0) {
+      setStepError(t("atLeastOneEmployee"));
+      return;
+    }
+
     if (!validateEmployees()) return;
 
     if (!businessId) {
@@ -214,10 +245,21 @@ export default function BusinessEmployees({
           : Promise.resolve([] as EmployeeData[]),
       ]);
 
+      // API responses don't include is_owner or user_id — restore by index (creation order is preserved)
+      const createdWithFlags = (createdResults as EmployeeData[]).map((emp, i) => ({
+        ...emp,
+        ...(newEmployees[i]?.is_owner ? { is_owner: true } : {}),
+        ...(newEmployees[i]?.user_id ? { user_id: newEmployees[i].user_id } : {}),
+      }));
+      const updatedWithFlags = (updatedResults as EmployeeData[]).map((emp, i) => ({
+        ...emp,
+        ...(modifiedEmployees[i]?.is_owner ? { is_owner: true } : {}),
+      }));
+
       const finalEmployees = [
         ...unchangedEmployees,
-        ...(updatedResults as EmployeeData[]),
-        ...(createdResults as EmployeeData[]),
+        ...updatedWithFlags,
+        ...createdWithFlags,
       ];
 
       onNext({ employees: finalEmployees });
@@ -407,6 +449,10 @@ export default function BusinessEmployees({
             + {t("addEmployee")}
           </button>
         </div>
+
+        {stepError && (
+          <div className="step-error" role="alert">{stepError}</div>
+        )}
 
         <div className="business-employees-form-action">
           {onBack && (

@@ -1,10 +1,12 @@
-from sqlalchemy import func, extract, case, or_, select
+import logging
+from sqlalchemy import func, extract, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.exc import SQLAlchemyError
+from fastapi import HTTPException
 from typing import List, Tuple, Dict, cast, Optional, Any
 from collections import defaultdict
 from uuid import UUID
-from datetime import datetime, date, time, timedelta, timezone
+from datetime import datetime, date, time, timedelta
 
 from app.models.queue import Queue, QueueService as QueueServiceModel, QueueUser, QueueUserService, AppointmentSlot
 from app.models.service import Service
@@ -26,13 +28,14 @@ from app.core.constants import (
     QUEUE_USER_CANCELLED,
     QUEUE_USER_EXPIRED,
     DEFAULT_SLOT_MINUTES,
-    DEFAULT_AVG_TIME,
     SLOT_DURATION_FLOOR,
     SLOT_DURATION_CEILING,
     APPOINTMENT_TYPE_QUEUE,
     APPOINTMENT_TYPE_FIXED,
     APPOINTMENT_TYPE_APPROXIMATE,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class QueueService:
@@ -100,7 +103,8 @@ class QueueService:
             return new_queue
         except Exception:
             self.db.rollback()
-            raise
+            logger.exception("Failed to create_queue (business_id=%s name=%s)", data.business_id, data.name)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def create_queues_batch(
         self,
@@ -131,15 +135,25 @@ class QueueService:
                 created.append(queue)
             self.db.commit()
             return created
-        except Exception:
+        except HTTPException:
+            raise
+        except ValueError:
             self.db.rollback()
             raise
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to create_queues_batch (business_id=%s)", business_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_services_by_ids(self, service_ids: List[UUID]) -> List[Service]:
         """Return Service models for the given UUIDs. Used by controller for response building."""
         if not service_ids:
             return []
-        return self.db.query(Service).filter(Service.uuid.in_(service_ids)).all()
+        try:
+            return self.db.query(Service).filter(Service.uuid.in_(service_ids)).all()
+        except Exception:
+            logger.exception("Failed to get_services_by_ids")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def update_queue(self, queue_id: UUID, business_id: UUID, data: QueueUpdate) -> Optional[Queue]:
         queue = self.get_queue_by_id_and_business(queue_id, business_id)
@@ -159,7 +173,8 @@ class QueueService:
             return queue
         except Exception:
             self.db.rollback()
-            raise
+            logger.exception("Failed to update_queue (queue_id=%s)", queue_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def add_services_to_queue(
         self, queue_id: UUID, business_id: UUID, items: List[QueueServiceAddItem]
@@ -195,7 +210,8 @@ class QueueService:
             return created
         except Exception:
             self.db.rollback()
-            raise
+            logger.exception("Failed to add_services_to_queue (queue_id=%s)", queue_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def update_queue_service(
         self, queue_service_id: UUID, data: QueueServiceUpdate
@@ -211,7 +227,8 @@ class QueueService:
             return qs
         except Exception:
             self.db.rollback()
-            raise
+            logger.exception("Failed to update_queue_service (queue_service_id=%s)", queue_service_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def delete_queue_service(self, queue_service_id: UUID) -> bool:
         qs = self.db.query(QueueServiceModel).filter(QueueServiceModel.uuid == queue_service_id).first()
@@ -223,7 +240,8 @@ class QueueService:
             return True
         except Exception:
             self.db.rollback()
-            raise
+            logger.exception("Failed to delete_queue_service (queue_service_id=%s)", queue_service_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queue_user_by_id_with_relations(self, queue_user_id: UUID) -> Optional[QueueUser]:
         try:
@@ -237,8 +255,9 @@ class QueueService:
                 .filter(QueueUser.uuid == queue_user_id)
                 .first()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_queue_user_by_id_with_relations (queue_user_id=%s)", queue_user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_appointments_for_user(
         self, user_id: UUID, limit: int = 50, offset: int = 0
@@ -258,22 +277,21 @@ class QueueService:
                 .all()
             )
             return [(qu, q, b) for qu, q, b in rows]
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_appointments_for_user (user_id=%s)", user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def count_appointments_for_user(self, user_id: UUID) -> int:
         try:
             return self.db.query(QueueUser).filter(QueueUser.user_id == user_id).count()
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to count_appointments_for_user (user_id=%s)", user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_user_upcoming_active_appointments(
         self, user_id: UUID
     ) -> List[Tuple[QueueUser, "Queue", "Business"]]:
-        """Return active (waiting/in_progress) appointments from today onwards for conflict checking.
-
-        Only fetches the columns needed for time-conflict detection — no heavy service relations.
-        """
+        """Return active (waiting/in_progress) appointments from today onwards for conflict checking."""
         today = today_app_date()
         try:
             rows = (
@@ -289,22 +307,17 @@ class QueueService:
                 .all()
             )
             return [(qu, q, b) for qu, q, b in rows]
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_user_upcoming_active_appointments (user_id=%s)", user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queue_booking_at_estimated_time(
         self,
         user_id: UUID,
         queue_date: date,
-        appointment_time_str: str,   # "HH:MM" 24-hour, app-timezone naive
+        appointment_time_str: str,
         tolerance_minutes: int = 30,
     ) -> Optional[QueueUser]:
-        """Check if the user already has an active QUEUE booking whose estimated appointment
-        time falls within ±tolerance_minutes of the new booking's estimated time on the same date.
-
-        estimated_enqueue_time is stored as a naive datetime in app timezone (see appointment_time_to_enqueue_dequeue),
-        so direct comparison against a similarly-constructed naive datetime is correct.
-        """
         t = parse_time_string(appointment_time_str)
         if t is None:
             return None
@@ -324,8 +337,9 @@ class QueueService:
                 )
                 .first()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_queue_booking_at_estimated_time (user_id=%s date=%s)", user_id, queue_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_booking_at_time(
         self,
@@ -334,10 +348,6 @@ class QueueService:
         slot_start: "time",
         exclude_queue_user_id: Optional[UUID] = None,
     ) -> Optional[QueueUser]:
-        """Check if the user already has an active FIXED/APPROXIMATE booking at the given time on the given date.
-        Used as the authoritative server-side conflict guard inside create_booking.
-        Pass exclude_queue_user_id when rescheduling so the appointment being moved is not counted.
-        """
         try:
             q = (
                 self.db.query(QueueUser)
@@ -351,8 +361,9 @@ class QueueService:
             if exclude_queue_user_id:
                 q = q.filter(QueueUser.uuid != exclude_queue_user_id)
             return q.first()
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_booking_at_time (user_id=%s date=%s)", user_id, queue_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def expire_past_day_appointments(self, before_date: date) -> int:
         try:
@@ -372,15 +383,16 @@ class QueueService:
             )
             self.db.commit()
             return updated
-        except SQLAlchemyError:
+        except Exception:
             self.db.rollback()
-            raise
+            logger.exception("Failed to expire_past_day_appointments (before_date=%s)", before_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_appointment_by_id_for_user(
         self, user_id: UUID, queue_user_id: UUID
     ) -> Optional[QueueUser]:
         try:
-            qu = (
+            return (
                 self.db.query(QueueUser)
                 .options(
                     joinedload(QueueUser.user),
@@ -393,9 +405,9 @@ class QueueService:
                 )
                 .first()
             )
-            return qu
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_appointment_by_id_for_user (user_id=%s queue_user_id=%s)", user_id, queue_user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queue_services_for_booking(
         self, service_ids: List[UUID], business_id: UUID
@@ -409,27 +421,32 @@ class QueueService:
                 )
                 .all()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_queue_services_for_booking (business_id=%s)", business_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_booking_services_data(
         self, queue_services: List[QueueServiceModel]
     ) -> List[dict]:
         if not queue_services:
             return []
-        service_ids = [qs.service_id for qs in queue_services]
-        services = self.db.query(Service).filter(Service.uuid.in_(service_ids)).all()
-        by_id = {s.uuid: s for s in services}
-        return [
-            {
-                "uuid": str(qs.uuid),
-                "name": by_id[qs.service_id].name,
-                "price": qs.service_fee,
-                "duration": qs.avg_service_time,
-            }
-            for qs in queue_services
-            if qs.service_id in by_id
-        ]
+        try:
+            service_ids = [qs.service_id for qs in queue_services]
+            services = self.db.query(Service).filter(Service.uuid.in_(service_ids)).all()
+            by_id = {s.uuid: s for s in services}
+            return [
+                {
+                    "uuid": str(qs.uuid),
+                    "name": by_id[qs.service_id].name,
+                    "price": qs.service_fee,
+                    "duration": qs.avg_service_time,
+                }
+                for qs in queue_services
+                if qs.service_id in by_id
+            ]
+        except Exception:
+            logger.exception("Failed to get_booking_services_data")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def create_booking(
         self,
@@ -449,38 +466,42 @@ class QueueService:
         scheduled_end: Optional[time] = None,
     ) -> QueueUser:
         """Create a QueueUser and its QueueUserService links. Commits the transaction. Returns the created QueueUser."""
-        appt_type = appointment_type or APPOINTMENT_TYPE_QUEUE
-        queue_user = QueueUser(
-            user_id=user_id,
-            queue_id=queue_id,
-            queue_date=queue_date,
-            token_number=token_number,
-            status=QUEUE_USER_REGISTERED,
-            turn_time=turn_time,
-            notes=notes,
-            is_scheduled=is_scheduled,
-            estimated_enqueue_time=estimated_enqueue_time,
-            estimated_dequeue_time=estimated_dequeue_time,
-            appointment_type=appt_type,
-            slot_id=slot_id,
-            scheduled_start=scheduled_start,
-            scheduled_end=scheduled_end,
-        )
-        self.db.add(queue_user)
-        self.db.flush()
-        for qs in queue_services:
-            self.db.add(
-                QueueUserService(
-                    queue_user_id=queue_user.uuid,
-                    queue_service_id=qs.uuid,
-                )
+        try:
+            appt_type = appointment_type or APPOINTMENT_TYPE_QUEUE
+            queue_user = QueueUser(
+                user_id=user_id,
+                queue_id=queue_id,
+                queue_date=queue_date,
+                token_number=token_number,
+                status=QUEUE_USER_REGISTERED,
+                turn_time=turn_time,
+                notes=notes,
+                is_scheduled=is_scheduled,
+                estimated_enqueue_time=estimated_enqueue_time,
+                estimated_dequeue_time=estimated_dequeue_time,
+                appointment_type=appt_type,
+                slot_id=slot_id,
+                scheduled_start=scheduled_start,
+                scheduled_end=scheduled_end,
             )
-        self.db.commit()
-        return queue_user
+            self.db.add(queue_user)
+            self.db.flush()
+            for qs in queue_services:
+                self.db.add(
+                    QueueUserService(
+                        queue_user_id=queue_user.uuid,
+                        queue_service_id=qs.uuid,
+                    )
+                )
+            self.db.commit()
+            return queue_user
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to create_booking (user_id=%s queue_id=%s date=%s)", user_id, queue_id, queue_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queue_user_for_update(self, queue_user_id: UUID, user_id: UUID) -> Optional[QueueUser]:
         try:
-            # Step 1: acquire row-level lock while verifying ownership.
             locked = (
                 self.db.query(QueueUser)
                 .filter(
@@ -492,10 +513,6 @@ class QueueService:
             )
             if locked is None:
                 return None
-            # Step 2: populate all relationships on the same identity-map object.
-            # selectinload issues separate IN-queries that are NOT part of the
-            # FOR UPDATE lock — intentional; we only need to lock the QueueUser row.
-            # The returned object is the same Python instance as `locked` (identity map).
             return (
                 self.db.query(QueueUser)
                 .options(
@@ -507,8 +524,9 @@ class QueueService:
                 .filter(QueueUser.uuid == queue_user_id)
                 .first()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_queue_user_for_update (queue_user_id=%s user_id=%s)", queue_user_id, user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def update_appointment(
         self,
@@ -522,15 +540,15 @@ class QueueService:
     ) -> QueueUser:
         try:
             if queue_changed and new_queue_id is not None:
-                queue_user.queue_id = new_queue_id
-                queue_user.reschedule_count = (queue_user.reschedule_count or 0) + 1
+                queue_user.queue_id = new_queue_id  # type: ignore[assignment]
+                queue_user.reschedule_count = (queue_user.reschedule_count or 0) + 1  # type: ignore[assignment]
 
             if date_changed and new_date is not None:
-                queue_user.queue_date = new_date
-                queue_user.reschedule_count = (queue_user.reschedule_count or 0) + 1
+                queue_user.queue_date = new_date  # type: ignore[assignment]
+                queue_user.reschedule_count = (queue_user.reschedule_count or 0) + 1  # type: ignore[assignment]
 
             if new_notes is not None:
-                queue_user.notes = new_notes
+                queue_user.notes = new_notes  # type: ignore[assignment]
 
             if new_queue_services is not None:
                 self.db.query(QueueUserService).filter(
@@ -541,14 +559,15 @@ class QueueService:
                         queue_user_id=queue_user.uuid,
                         queue_service_id=qs.uuid,
                     ))
-                queue_user.turn_time = sum((qs.avg_service_time or 5) for qs in new_queue_services)
+                queue_user.turn_time = sum((qs.avg_service_time or 5) for qs in new_queue_services)  # type: ignore[assignment]
 
             self.db.commit()
             self.db.refresh(queue_user)
             return queue_user
-        except SQLAlchemyError:
+        except Exception:
             self.db.rollback()
-            raise
+            logger.exception("Failed to update_appointment (queue_user_id=%s)", queue_user.uuid)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def count_active_users_in_queue(self, queue_id: UUID, queue_date: date) -> int:
         try:
@@ -561,19 +580,21 @@ class QueueService:
                 )
                 .scalar() or 0
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to count_active_users_in_queue (queue_id=%s date=%s)", queue_id, queue_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def cancel_appointment(self, queue_user: QueueUser, reason: str = "customer_cancelled") -> QueueUser:
         try:
-            queue_user.status = QUEUE_USER_CANCELLED
-            queue_user.cancellation_reason = reason
+            queue_user.status = QUEUE_USER_CANCELLED  # type: ignore[assignment]
+            queue_user.cancellation_reason = reason  # type: ignore[assignment]
             self.db.commit()
             self.db.refresh(queue_user)
             return queue_user
-        except SQLAlchemyError:
+        except Exception:
             self.db.rollback()
-            raise
+            logger.exception("Failed to cancel_appointment (queue_user_id=%s)", queue_user.uuid)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_registered_queue_users_for_serving(
         self, queue_id: UUID, queue_date: date
@@ -593,8 +614,9 @@ class QueueService:
                 )
                 .all()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_registered_queue_users_for_serving (queue_id=%s date=%s)", queue_id, queue_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queues_by_business_id(self, business_id: UUID) -> List[Queue]:
         try:
@@ -603,14 +625,16 @@ class QueueService:
                 .filter(Queue.merchant_id == business_id)
                 .all()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_queues_by_business_id (business_id=%s)", business_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queue_by_id(self, queue_id: UUID) -> Optional[Queue]:
         try:
             return self.db.query(Queue).filter(Queue.uuid == queue_id).first()
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_queue_by_id (queue_id=%s)", queue_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queue_by_id_with_employees(self, queue_id: UUID) -> Optional[Queue]:
         try:
@@ -620,8 +644,9 @@ class QueueService:
                 .filter(Queue.uuid == queue_id)
                 .first()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_queue_by_id_with_employees (queue_id=%s)", queue_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queue_services_with_service(self, queue_id: UUID) -> List[Tuple[QueueServiceModel, Service]]:
         try:
@@ -631,8 +656,9 @@ class QueueService:
                 .filter(QueueServiceModel.queue_id == queue_id)
                 .all()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_queue_services_with_service (queue_id=%s)", queue_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queue_by_id_and_business(
         self, queue_id: UUID, business_id: UUID
@@ -643,8 +669,9 @@ class QueueService:
                 .filter(Queue.uuid == queue_id, Queue.merchant_id == business_id)
                 .first()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_queue_by_id_and_business (queue_id=%s business_id=%s)", queue_id, business_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queue_min_slot_duration_minutes(self, queue_id: UUID) -> int:
         try:
@@ -662,6 +689,7 @@ class QueueService:
             minutes = int(min(values))
             return max(SLOT_DURATION_FLOOR, min(SLOT_DURATION_CEILING, minutes))
         except SQLAlchemyError:
+            logger.warning("get_queue_min_slot_duration_minutes failed (queue_id=%s), using default", queue_id)
             return DEFAULT_SLOT_MINUTES
 
     def reserve_slot_atomic(self, slot_id: UUID) -> Optional[AppointmentSlot]:
@@ -672,29 +700,33 @@ class QueueService:
                 .with_for_update()
                 .first()
             )
-            if not slot or slot.is_blocked or slot.booked_count >= slot.capacity:
+            if not slot or slot.is_blocked or slot.booked_count >= slot.capacity:  # type: ignore[operator]
                 return None
-            slot.booked_count += 1
+            slot.booked_count += 1  # type: ignore[assignment]
             self.db.flush()
             return slot
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to reserve_slot_atomic (slot_id=%s)", slot_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def release_slot(self, slot_id: UUID) -> None:
         try:
             slot = self.db.query(AppointmentSlot).filter(AppointmentSlot.uuid == slot_id).first()
-            if slot and slot.booked_count > 0:
-                slot.booked_count -= 1
+            if slot and slot.booked_count > 0:  # type: ignore[operator]
+                slot.booked_count -= 1  # type: ignore[assignment]
             self.db.commit()
-        except SQLAlchemyError:
+        except Exception:
             self.db.rollback()
-            raise
+            logger.exception("Failed to release_slot (slot_id=%s)", slot_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_slot_by_id(self, slot_id: UUID) -> Optional[AppointmentSlot]:
         try:
             return self.db.query(AppointmentSlot).filter(AppointmentSlot.uuid == slot_id).first()
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_slot_by_id (slot_id=%s)", slot_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_active_scheduled_bookings_for_date(
         self, queue_id: UUID, queue_date: date
@@ -714,8 +746,9 @@ class QueueService:
                 )
                 .all()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_active_scheduled_bookings_for_date (queue_id=%s date=%s)", queue_id, queue_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queues_offering_service_ids(
         self, business_id: UUID, queue_service_ids: List[UUID]
@@ -734,8 +767,9 @@ class QueueService:
                 .distinct()
                 .all()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_queues_offering_service_ids (business_id=%s)", business_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queue_service_details_for_ids(
         self, queue_service_ids: List[UUID]
@@ -760,8 +794,9 @@ class QueueService:
                 }
                 for qs, svc in rows
             ]
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_queue_service_details_for_ids")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queue_to_service_ids(self, queue_ids: List[UUID]) -> Dict[UUID, List[UUID]]:
         if not queue_ids:
@@ -776,8 +811,9 @@ class QueueService:
             for qid, sid in rows:
                 result[qid].append(sid)
             return dict(result)
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_queue_to_service_ids")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_today_active_queue_user_rows(
         self, queue_ids: List[UUID], booking_date: date
@@ -808,8 +844,9 @@ class QueueService:
                 }
                 for row in rows
             ]
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_today_active_queue_user_rows (date=%s)", booking_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_future_date_counts_batch(
         self, queue_ids: List[UUID], booking_date: date
@@ -828,8 +865,9 @@ class QueueService:
                 .all()
             )
             return {row.queue_id: row.cnt for row in rows}
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_future_date_counts_batch (date=%s)", booking_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_historical_percentile_wait_batch(
         self,
@@ -869,8 +907,9 @@ class QueueService:
                 index = int(len(times) * percentile)
                 result[qid] = times[min(index, len(times) - 1)]
             return result
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_historical_percentile_wait_batch (date=%s)", reference_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_historical_percentile_wait_single(
         self,
@@ -923,11 +962,12 @@ class QueueService:
                 .scalar() or 0
             )
             return {"ahead_count": ahead_count, "total_wait_minutes": int(total_wait)}
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_queue_user_ahead_metrics (queue_id=%s date=%s)", queue_id, queue_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_existing_same_day_booking(
-        self, user_id: UUID, queue_id: UUID, queue_date
+        self, user_id: UUID, queue_id: UUID, queue_date: date
     ) -> Optional[QueueUser]:
         """Return existing queue user if already in this queue for this date (registered or in-progress)."""
         try:
@@ -941,14 +981,14 @@ class QueueService:
                 )
                 .first()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_existing_same_day_booking (user_id=%s queue_id=%s)", user_id, queue_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_today_active_appointment_for_user(
         self, user_id: UUID, today: date
     ) -> Optional[QueueUser]:
-        """Return latest active (waiting or in_progress) queue user for this user and date, or None.
-        Optimized for index (user_id, queue_date, status)."""
+        """Return latest active (waiting or in_progress) queue user for this user and date, or None."""
         try:
             return (
                 self.db.query(QueueUser)
@@ -965,8 +1005,9 @@ class QueueService:
                 .order_by(QueueUser.created_at.desc())
                 .first()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_today_active_appointment_for_user (user_id=%s date=%s)", user_id, today)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_today_active_appointments_for_user(
         self, user_id: UUID, today: date
@@ -988,13 +1029,14 @@ class QueueService:
                 .order_by(QueueUser.created_at.desc())
                 .all()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_today_active_appointments_for_user (user_id=%s date=%s)", user_id, today)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_user_ids_in_queue_for_date(
         self, queue_id: UUID, queue_date: date
     ) -> List[UUID]:
-        """Return user_ids of users with active (registered or in_progress) appointment in this queue on this date."""
+        """Return user_ids of users with active appointment in this queue on this date."""
         try:
             rows = (
                 self.db.query(QueueUser.user_id)
@@ -1007,8 +1049,9 @@ class QueueService:
                 .all()
             )
             return [r[0] for r in rows]
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_user_ids_in_queue_for_date (queue_id=%s date=%s)", queue_id, queue_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_live_queue_users_raw(
         self, queue_id: UUID, queue_date: date
@@ -1038,50 +1081,63 @@ class QueueService:
             for uid, name in svc_rows:
                 svc_by_user[uid].append(name)
             return rows, dict(svc_by_user)
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_live_queue_users_raw (queue_id=%s date=%s)", queue_id, queue_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_active_queue_users_with_lock(
         self, queue_id: UUID, queue_date: date
     ) -> List[QueueUser]:
-        return (
-            self.db.query(QueueUser)
-            .filter(
-                QueueUser.queue_id == queue_id,
-                QueueUser.queue_date == queue_date,
-                QueueUser.status.in_([QUEUE_USER_IN_PROGRESS, QUEUE_USER_REGISTERED]),
+        try:
+            return (
+                self.db.query(QueueUser)
+                .filter(
+                    QueueUser.queue_id == queue_id,
+                    QueueUser.queue_date == queue_date,
+                    QueueUser.status.in_([QUEUE_USER_IN_PROGRESS, QUEUE_USER_REGISTERED]),
+                )
+                .with_for_update()
+                .order_by(
+                    QueueUser.enqueue_time.asc().nullslast(),
+                    QueueUser.created_at.asc(),
+                )
+                .all()
             )
-            .with_for_update()
-            .order_by(
-                QueueUser.enqueue_time.asc().nullslast(),
-                QueueUser.created_at.asc(),
-            )
-            .all()
-        )
+        except Exception:
+            logger.exception("Failed to get_active_queue_users_with_lock (queue_id=%s date=%s)", queue_id, queue_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def mark_queue_user_completed(
         self, queue_user_id: UUID, dequeue_time: datetime
     ) -> None:
-        self.db.query(QueueUser).filter(QueueUser.uuid == queue_user_id).update(
-            {
-                QueueUser.status: QUEUE_USER_COMPLETED,
-                QueueUser.dequeue_time: dequeue_time,
-            },
-            synchronize_session=False,
-        )
-        self.db.flush()
+        try:
+            self.db.query(QueueUser).filter(QueueUser.uuid == queue_user_id).update(
+                {
+                    QueueUser.status: QUEUE_USER_COMPLETED,
+                    QueueUser.dequeue_time: dequeue_time,
+                },
+                synchronize_session=False,
+            )
+            self.db.flush()
+        except Exception:
+            logger.exception("Failed to mark_queue_user_completed (queue_user_id=%s)", queue_user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def mark_queue_user_in_progress(
         self, queue_user_id: UUID, enqueue_time: datetime
     ) -> None:
-        self.db.query(QueueUser).filter(QueueUser.uuid == queue_user_id).update(
-            {
-                QueueUser.status: QUEUE_USER_IN_PROGRESS,
-                QueueUser.enqueue_time: enqueue_time,
-            },
-            synchronize_session=False,
-        )
-        self.db.flush()
+        try:
+            self.db.query(QueueUser).filter(QueueUser.uuid == queue_user_id).update(
+                {
+                    QueueUser.status: QUEUE_USER_IN_PROGRESS,
+                    QueueUser.enqueue_time: enqueue_time,
+                },
+                synchronize_session=False,
+            )
+            self.db.flush()
+        except Exception:
+            logger.exception("Failed to mark_queue_user_in_progress (queue_user_id=%s)", queue_user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def add_delay_to_later_approx_bookings(
         self,
@@ -1108,26 +1164,36 @@ class QueueService:
         ]
         if order_after is not None:
             filters.append(order_after)
-        self.db.query(QueueUser).filter(*filters).update(
-            {QueueUser.delay_minutes: QueueUser.delay_minutes + delay_minutes},
-            synchronize_session=False,
-        )
-        self.db.flush()
+        try:
+            self.db.query(QueueUser).filter(*filters).update(
+                {QueueUser.delay_minutes: QueueUser.delay_minutes + delay_minutes},
+                synchronize_session=False,
+            )
+            self.db.flush()
+        except Exception:
+            logger.exception("Failed to add_delay_to_later_approx_bookings (queue_id=%s date=%s)", queue_id, queue_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def commit_advance(self) -> None:
-        self.db.commit()
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to commit_advance")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def set_queue_status(self, queue_id: UUID, status: int) -> Optional[Queue]:
         try:
             queue = self.db.query(Queue).filter(Queue.uuid == queue_id).first()
             if not queue:
                 return None
-            queue.status = status
+            queue.status = status  # type: ignore[assignment]
             self.db.commit()
             return queue
-        except SQLAlchemyError:
+        except Exception:
             self.db.rollback()
-            raise
+            logger.exception("Failed to set_queue_status (queue_id=%s status=%s)", queue_id, status)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queues(self, business_id: UUID):  # type: ignore
         try:
@@ -1181,10 +1247,9 @@ class QueueService:
                 .all()
             )
             return result
-        except SQLAlchemyError:
-            raise
         except Exception:
-            raise
+            logger.exception("Failed to get_queues (business_id=%s)", business_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_business_services(self, business_id: UUID, service_ids: Optional[List[UUID]] = None) -> List[Tuple[QueueServiceModel, Service]]:  # type: ignore
         try:
@@ -1195,35 +1260,33 @@ class QueueService:
                 .all()
             )
             return cast(List[Tuple[QueueServiceModel, Service]], result)
-        except SQLAlchemyError:
-            raise
         except Exception:
-            raise
+            logger.exception("Failed to get_business_services (business_id=%s)", business_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_businesses_services(self, business_ids: List[UUID]) -> dict[UUID, List[Tuple[QueueServiceModel, Service]]]:  # type: ignore
         try:
             if not business_ids:
                 return {}
-            
+
             result = (
                 self.db.query(QueueServiceModel, Service)
                 .join(Service, QueueServiceModel.service_id == Service.uuid)
                 .filter(QueueServiceModel.business_id.in_(business_ids))
                 .all()
             )
-            
+
             services_by_business: dict[UUID, List[Tuple[QueueServiceModel, Service]]] = {}
             for queue_service, service in result:
                 business_id = queue_service.business_id
                 if business_id not in services_by_business:
                     services_by_business[business_id] = []
                 services_by_business[business_id].append((queue_service, service))
-            
+
             return services_by_business
-        except SQLAlchemyError:
-            raise
         except Exception:
-            raise
+            logger.exception("Failed to get_businesses_services")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queue_users(
         self,
@@ -1264,10 +1327,6 @@ class QueueService:
             query = query.order_by(QueueUser.enqueue_time.desc().nullslast())
             result = query.offset(offset).limit(limit).all()
             return cast(list[tuple[QueueUser, User]], result)
-
-        except SQLAlchemyError:
-            raise
         except Exception:
-            raise
-
-
+            logger.exception("Failed to get_queue_users (business_id=%s page=%s)", business_id, page)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})

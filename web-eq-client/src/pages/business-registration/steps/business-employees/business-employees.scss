@@ -353,6 +353,16 @@
   }
 }
 
+.step-error {
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  color: #dc2626;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
 .business-employees-form-action {
   display: flex;
   gap: 16px;

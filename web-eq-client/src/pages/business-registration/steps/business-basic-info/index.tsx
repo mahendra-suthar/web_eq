@@ -44,6 +44,14 @@ export default function BusinessBasicInfo({
   const [profilePicture, setProfilePicture] = useState<File | undefined>(initialData?.profile_picture);
   const [profilePicturePreview, setProfilePicturePreview] = useState<string>("");
 
+  useEffect(() => {
+    if (initialData?.profile_picture instanceof File) {
+      const reader = new FileReader();
+      reader.onloadend = () => setProfilePicturePreview(reader.result as string);
+      reader.readAsDataURL(initialData.profile_picture);
+    }
+  }, []);
+
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<SubcategoryMinimal[]>([]);
   const [loadingCategories, setLoadingCategories] = useState<boolean>(false);

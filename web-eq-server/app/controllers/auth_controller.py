@@ -1,7 +1,7 @@
+import logging
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, Response, Request
 
@@ -33,6 +33,7 @@ from app.schemas.profile import (
 from app.schemas.schedule import ScheduleData
 from app.core.context import RequestContext
 
+logger = logging.getLogger(__name__)
 
 
 class AuthController:
@@ -122,10 +123,9 @@ class AuthController:
             return OTPRequestResponse(message="OTP sent successfully")
         except HTTPException:
             raise
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Database error")
         except Exception:
-            raise
+            logger.exception("Failed to send_otp (country_code=%s)", data.country_code)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def verify_otp_customer(self, data: OTPVerifyInput, response: Response, request: Request) -> LoginResponse:
         try:
@@ -151,10 +151,9 @@ class AuthController:
             )
         except HTTPException:
             raise
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Database error")
         except Exception:
-            raise
+            logger.exception("Failed to verify_otp_customer (country_code=%s)", data.country_code)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_or_create_user_for_business_flow(
         self, country_code: str, phone_number: str, client_type: Optional[str]
@@ -230,10 +229,9 @@ class AuthController:
             )
         except HTTPException:
             raise
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Database error")
         except Exception:
-            raise
+            logger.exception("Failed to business_verify_otp (country_code=%s)", data.country_code)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def verify_otp(self, data: OTPVerifyInput, response: Response, request: Request) -> LoginResponse:
         if data.user_type and data.user_type.lower() == "customer":
@@ -244,26 +242,29 @@ class AuthController:
         self, data: VerifyInvitationInput, response: Response, request: Request, user: User
     ) -> LoginResponse:
         """Verify employee invitation code: link current user to employee and return auth response."""
-        employee = self.employee_service.get_employee_by_invitation_code(data.code)
-        if not employee:
-            raise HTTPException(
-                status_code=400,
-                detail={"message": "Invalid or expired invitation code."},
-            )
         try:
+            employee = self.employee_service.get_employee_by_invitation_code(data.code)
+            if not employee:
+                raise HTTPException(
+                    status_code=400,
+                    detail={"message": "Invalid or expired invitation code."},
+                )
             self.employee_service.activate_employee(employee.uuid, user.uuid)
-        except SQLAlchemyError:
+            client_type = detect_client_type(request, None)
+            return await self.auth_service.generate_auth_response(
+                user,
+                response,
+                client_type,
+                user_type="EMPLOYEE",
+                next_step="dashboard",
+                profile_type="EMPLOYEE",
+            )
+        except HTTPException:
+            raise
+        except Exception:
             self.db.rollback()
-            raise HTTPException(status_code=500, detail="Database error")
-        client_type = detect_client_type(request, None)
-        return await self.auth_service.generate_auth_response(
-            user,
-            response,
-            client_type,
-            user_type="EMPLOYEE",
-            next_step="dashboard",
-            profile_type="EMPLOYEE",
-        )
+            logger.exception("Failed to verify_invitation_code (user_id=%s)", user.uuid)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def create_user(self, data: UserRegistrationInput, response: Response, request: Request) -> LoginResponse:
         try:
@@ -281,10 +282,10 @@ class AuthController:
             )
         except HTTPException:
             raise
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Database error")
-        except Exception as e:
-            raise e
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to create_user (user_type=%s)", data.user_type)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def create_business_owner(self, data: UserRegistrationInput) -> UserData:
         try:
@@ -296,10 +297,10 @@ class AuthController:
             return UserData.from_user(updated_user)
         except HTTPException:
             raise
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Database error")
-        except Exception as e:
-            raise e
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to create_business_owner")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def update_user_profile(self, data: UserRegistrationInput, response: Response, request: Request) -> LoginResponse:
         try:
@@ -309,7 +310,7 @@ class AuthController:
 
             updated_user = self.user_service.update_user_profile(user, data)
             client_type = detect_client_type(request, data.client_type)
-            
+
             if data.user_type.lower() == "customer":
                 self.role_controller.assign_role_to_user(updated_user.uuid, "CUSTOMER")  # type: ignore[arg-type]
 
@@ -318,23 +319,27 @@ class AuthController:
             )
         except HTTPException:
             raise
-        except SQLAlchemyError as e:
-            self.db.rollback()
-            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
         except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e))
-        except Exception as e:
+            raise HTTPException(status_code=404, detail={"message": str(e)})
+        except Exception:
             self.db.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to update profile: {str(e)}")
+            logger.exception("Failed to update_user_profile (user_type=%s)", data.user_type)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def get_customer_profile(self, user: User) -> CustomerProfileResponse:
-        if RequestContext.get_user_type() != "CUSTOMER":
-            raise HTTPException(status_code=403, detail="Customer profile is only for customers")
-        entity_id = UUID(str(user.uuid))  # type: ignore[arg-type]
-        user_info = OwnerInfo.from_user(user)
-        addresses = self.address_service.get_addresses_by_entity(EntityType.USER, entity_id)
-        address = AddressData.from_address(addresses[0]) if addresses else None
-        return CustomerProfileResponse(user=user_info, address=address)
+        try:
+            if RequestContext.get_user_type() != "CUSTOMER":
+                raise HTTPException(status_code=403, detail="Customer profile is only for customers")
+            entity_id = UUID(str(user.uuid))  # type: ignore[arg-type]
+            user_info = OwnerInfo.from_user(user)
+            addresses = self.address_service.get_addresses_by_entity(EntityType.USER, entity_id)
+            address = AddressData.from_address(addresses[0]) if addresses else None
+            return CustomerProfileResponse(user=user_info, address=address)
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_customer_profile (user_id=%s)", user.uuid)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_primary_address(self, entity_type: EntityType, entity_id: UUID) -> Optional[AddressData]:
         addresses = self.address_service.get_addresses_by_entity(entity_type, entity_id)
@@ -357,65 +362,77 @@ class AuthController:
         )
 
     async def get_business_profile(self, user: User) -> BusinessProfileResponse:
-        user_type = RequestContext.get_user_type()
-        if user_type not in ("BUSINESS", "EMPLOYEE"):
-            raise HTTPException(status_code=403, detail="Business profile is only for business owners or employees")
+        try:
+            user_type = RequestContext.get_user_type()
+            if user_type not in ("BUSINESS", "EMPLOYEE"):
+                raise HTTPException(status_code=403, detail="Business profile is only for business owners or employees")
 
-        owner_info = OwnerInfo.from_user(user)
-        entity_id = UUID(str(user.uuid))  # type: ignore[arg-type]
+            owner_info = OwnerInfo.from_user(user)
+            entity_id = UUID(str(user.uuid))  # type: ignore[arg-type]
 
-        if user_type == "EMPLOYEE":
-            employee = self.employee_service.get_employee_by_user_id_with_relations(entity_id)
-            if not employee:
-                raise HTTPException(status_code=404, detail="Employee not found")
-            business = employee.business
-            if not business:
-                raise HTTPException(status_code=404, detail="Business not found")
-            employee_info = EmployeeInfo.from_employee(employee, queue=employee.queue)
-            entity_id = UUID(str(employee.uuid))  # type: ignore[arg-type]
-            entity_type_addr = EntityType.EMPLOYEE
-            entity_type_sched = ScheduleEntityType.EMPLOYEE
-            is_always_open = False
-        else:
-            business = self.business_service.get_business_by_owner(entity_id)
-            if not business:
-                raise HTTPException(status_code=404, detail="Business not found")
-            employee_info = None
-            entity_id = UUID(str(business.uuid))  # type: ignore[arg-type]
-            entity_type_addr = EntityType.BUSINESS
-            entity_type_sched = ScheduleEntityType.BUSINESS
-            is_always_open = bool(business.is_always_open)  # type: ignore[arg-type]
+            if user_type == "EMPLOYEE":
+                employee = self.employee_service.get_employee_by_user_id_with_relations(entity_id)
+                if not employee:
+                    raise HTTPException(status_code=404, detail="Employee not found")
+                business = employee.business
+                if not business:
+                    raise HTTPException(status_code=404, detail="Business not found")
+                employee_info = EmployeeInfo.from_employee(employee, queue=employee.queue)
+                entity_id = UUID(str(employee.uuid))  # type: ignore[arg-type]
+                entity_type_addr = EntityType.EMPLOYEE
+                entity_type_sched = ScheduleEntityType.EMPLOYEE
+                is_always_open = False
+            else:
+                business = self.business_service.get_business_by_owner(entity_id)
+                if not business:
+                    raise HTTPException(status_code=404, detail="Business not found")
+                employee_info = None
+                entity_id = UUID(str(business.uuid))  # type: ignore[arg-type]
+                entity_type_addr = EntityType.BUSINESS
+                entity_type_sched = ScheduleEntityType.BUSINESS
+                is_always_open = bool(business.is_always_open)  # type: ignore[arg-type]
 
-        address = self.get_primary_address(entity_type_addr, entity_id)
-        schedule = self.get_schedule_info(entity_id, entity_type_sched, is_always_open)
+            address = self.get_primary_address(entity_type_addr, entity_id)
+            schedule = self.get_schedule_info(entity_id, entity_type_sched, is_always_open)
 
-        return BusinessProfileResponse(
-            owner=owner_info,
-            business=BusinessInfo.from_business(business),
-            address=address,
-            schedule=schedule,
-            employee=employee_info,
-        )
+            return BusinessProfileResponse(
+                owner=owner_info,
+                business=BusinessInfo.from_business(business),
+                address=address,
+                schedule=schedule,
+                employee=employee_info,
+            )
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_business_profile (user_id=%s)", user.uuid)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def get_employee_details(self, employee_id: UUID) -> EmployeeDetailsResponse:
-        employee = self.employee_service.get_employee_by_id_with_relations(employee_id)
-        if not employee:
-            raise HTTPException(status_code=404, detail="Employee not found")
-        employee_info = EmployeeInfo.from_employee(employee, queue=employee.queue)
-        if employee.user:
-            user_info = OwnerInfo.from_user(employee.user)
-        else:
-            user_info = self.user_info_from_employee(employee)
-        address = self.get_primary_address(EntityType.EMPLOYEE, employee.uuid)
-        schedule = self.get_schedule_info(employee.uuid, ScheduleEntityType.EMPLOYEE, False)
-        queue_detail = self.build_queue_detail(employee.queue) if employee.queue else None
-        return EmployeeDetailsResponse(
-            user=user_info,
-            address=address,
-            schedule=schedule,
-            employee=employee_info,
-            queue_detail=queue_detail,
-        )
+        try:
+            employee = self.employee_service.get_employee_by_id_with_relations(employee_id)
+            if not employee:
+                raise HTTPException(status_code=404, detail="Employee not found")
+            employee_info = EmployeeInfo.from_employee(employee, queue=employee.queue)
+            if employee.user:
+                user_info = OwnerInfo.from_user(employee.user)
+            else:
+                user_info = self.user_info_from_employee(employee)
+            address = self.get_primary_address(EntityType.EMPLOYEE, employee.uuid)
+            schedule = self.get_schedule_info(employee.uuid, ScheduleEntityType.EMPLOYEE, False)
+            queue_detail = self.build_queue_detail(employee.queue) if employee.queue else None
+            return EmployeeDetailsResponse(
+                user=user_info,
+                address=address,
+                schedule=schedule,
+                employee=employee_info,
+                queue_detail=queue_detail,
+            )
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_employee_details (employee_id=%s)", employee_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def build_queue_detail(self, queue) -> QueueDetailInfo:
         start_time = None
@@ -491,62 +508,67 @@ class AuthController:
             )
         except HTTPException:
             raise
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Database error")
         except Exception:
-            raise
+            logger.exception("Failed to admin_verify_otp (country_code=%s)", data.country_code)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def get_profile(self, user: User) -> UnifiedProfileResponse:
-        user_type = RequestContext.get_user_type()
-        user_info = OwnerInfo.from_user(user)
-        entity_id = UUID(str(user.uuid))  # type: ignore[arg-type]
-        if user_type == "BUSINESS":
-            business = self.business_service.get_business_by_owner(entity_id)
-            if not business:
-                raise HTTPException(status_code=404, detail="Business not found")
-            addresses = self.address_service.get_addresses_by_entity(EntityType.BUSINESS, UUID(str(business.uuid)))  # type: ignore[arg-type]
+        try:
+            user_type = RequestContext.get_user_type()
+            user_info = OwnerInfo.from_user(user)
+            entity_id = UUID(str(user.uuid))  # type: ignore[arg-type]
+            if user_type == "BUSINESS":
+                business = self.business_service.get_business_by_owner(entity_id)
+                if not business:
+                    raise HTTPException(status_code=404, detail="Business not found")
+                addresses = self.address_service.get_addresses_by_entity(EntityType.BUSINESS, UUID(str(business.uuid)))  # type: ignore[arg-type]
+                address = AddressData.from_address(addresses[0]) if addresses else None
+                schedules = self.schedule_service.get_schedules_by_entity(UUID(str(business.uuid)), ScheduleEntityType.BUSINESS)  # type: ignore[arg-type]
+                return UnifiedProfileResponse(
+                    profile_type="BUSINESS",
+                    user=user_info,
+                    business=BusinessInfo.from_business(business),
+                    address=address,
+                    schedule=ScheduleInfo(
+                        is_always_open=bool(business.is_always_open),  # type: ignore[arg-type]
+                        schedules=[ScheduleData.from_schedule(s) for s in schedules],
+                    ),
+                )
+
+            if user_type == "EMPLOYEE":
+                employee = self.employee_service.get_employee_by_user_id_with_relations(entity_id)
+                if not employee:
+                    raise HTTPException(status_code=404, detail="Employee not found")
+                business = employee.business
+                addresses = self.address_service.get_addresses_by_entity(EntityType.EMPLOYEE, UUID(str(employee.uuid)))  # type: ignore[arg-type]
+                address = AddressData.from_address(addresses[0]) if addresses else None
+                schedule = self.get_schedule_info(
+                    UUID(str(employee.uuid)), ScheduleEntityType.EMPLOYEE, False
+                )
+                return UnifiedProfileResponse(
+                    profile_type="EMPLOYEE",
+                    user=user_info,
+                    business=BusinessInfo.from_business(business) if business else None,
+                    employee=EmployeeInfo.from_employee(employee, queue=employee.queue),
+                    address=address,
+                    schedule=schedule,
+                )
+
+            if user_type == "ADMIN":
+                return UnifiedProfileResponse(
+                    profile_type="ADMIN",
+                    user=user_info,
+                )
+
+            addresses = self.address_service.get_addresses_by_entity(EntityType.USER, entity_id)
             address = AddressData.from_address(addresses[0]) if addresses else None
-            schedules = self.schedule_service.get_schedules_by_entity(UUID(str(business.uuid)), ScheduleEntityType.BUSINESS)  # type: ignore[arg-type]
             return UnifiedProfileResponse(
-                profile_type="BUSINESS",
+                profile_type="CUSTOMER",
                 user=user_info,
-                business=BusinessInfo.from_business(business),
-                address=address,
-                schedule=ScheduleInfo(
-                    is_always_open=bool(business.is_always_open),  # type: ignore[arg-type]
-                    schedules=[ScheduleData.from_schedule(s) for s in schedules],
-                ),
+                address=address
             )
-
-        if user_type == "EMPLOYEE":
-            employee = self.employee_service.get_employee_by_user_id_with_relations(entity_id)
-            if not employee:
-                raise HTTPException(status_code=404, detail="Employee not found")
-            business = employee.business
-            addresses = self.address_service.get_addresses_by_entity(EntityType.EMPLOYEE, UUID(str(employee.uuid)))  # type: ignore[arg-type]
-            address = AddressData.from_address(addresses[0]) if addresses else None
-            schedule = self.get_schedule_info(
-                UUID(str(employee.uuid)), ScheduleEntityType.EMPLOYEE, False
-            )
-            return UnifiedProfileResponse(
-                profile_type="EMPLOYEE",
-                user=user_info,
-                business=BusinessInfo.from_business(business) if business else None,
-                employee=EmployeeInfo.from_employee(employee, queue=employee.queue),
-                address=address,
-                schedule=schedule,
-            )
-
-        if user_type == "ADMIN":
-            return UnifiedProfileResponse(
-                profile_type="ADMIN",
-                user=user_info,
-            )
-
-        addresses = self.address_service.get_addresses_by_entity(EntityType.USER, entity_id)
-        address = AddressData.from_address(addresses[0]) if addresses else None
-        return UnifiedProfileResponse(
-            profile_type="CUSTOMER",
-            user=user_info,
-            address=address
-        )
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_profile (user_id=%s)", user.uuid)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})

@@ -51,6 +51,11 @@ export default function BusinessRegistration() {
   const [error, setError] = useState<string>("");
 
   useEffect(() => {
+    const currentPhone = phoneObj?.localNumber || profile?.user?.phone_number;
+    const storedPhone = entryPhone?.localNumber;
+    if (storedPhone && currentPhone && storedPhone !== currentPhone) {
+      resetRegistration();
+    }
     if (phoneObj && (!entryPhone || !entryPhone.localNumber)) {
       setEntryPhone({ localNumber: phoneObj.localNumber, countryCode: phoneObj.countryCode });
     }
@@ -147,10 +152,9 @@ export default function BusinessRegistration() {
       setStep(currentStep - 1);
       setError("");
     } else {
-      const phone = phoneObj ?? (entryPhone ? entryPhone : undefined);
-      const resolvedUserType = userType || entryUserType;
-      navigate(ROUTERS_PATH.VERIFYOTP, {
-        state: { phone, userType: resolvedUserType },
+      const phone = entryPhone ?? phoneObj;
+      navigate(ROUTERS_PATH.USERPROFILE, {
+        state: { phone, userType: "business" },
       });
     }
   };

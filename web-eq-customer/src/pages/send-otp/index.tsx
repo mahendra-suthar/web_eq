@@ -19,7 +19,9 @@ export default function SendOTPPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(
+    (location.state?.phoneNumber as string | undefined) ?? ""
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 

@@ -2,16 +2,20 @@
 Slot generation for FIXED/APPROXIMATE appointment modes.
 Generates appointment_slots from queue's operating window; slot duration = min of queue's service avg times.
 """
+import logging
 from datetime import date, time, datetime, timedelta
 from typing import List, Optional
 from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.queue import Queue, AppointmentSlot
 from app.services.queue_service import QueueService
 from app.services.booking_calculation_service import BookingCalculationService
 from app.core.constants import BOOKING_MODE_FIXED, BOOKING_MODE_APPROXIMATE, BOOKING_MODE_HYBRID
+
+logger = logging.getLogger(__name__)
 
 
 def _time_add(t: time, delta_minutes: int, ref_date: date) -> time:
@@ -46,40 +50,46 @@ class SlotGenerationService:
         Idempotent: return existing slots for queue+date, or generate and persist new ones.
         Slot duration = queue's min service avg time (from get_queue_min_slot_duration_minutes).
         """
-        existing = (
-            self.db.query(AppointmentSlot)
-            .filter(
-                AppointmentSlot.queue_id == queue_id,
-                AppointmentSlot.slot_date == target_date,
+        try:
+            existing = (
+                self.db.query(AppointmentSlot)
+                .filter(
+                    AppointmentSlot.queue_id == queue_id,
+                    AppointmentSlot.slot_date == target_date,
+                )
+                .order_by(AppointmentSlot.slot_start)
+                .all()
             )
-            .order_by(AppointmentSlot.slot_start)
-            .all()
-        )
-        if existing:
-            return existing
+            if existing:
+                return existing
 
-        q = queue or self.queue_service.get_queue_by_id_with_employees(queue_id)
-        if not q or q.booking_mode not in (BOOKING_MODE_FIXED, BOOKING_MODE_APPROXIMATE, BOOKING_MODE_HYBRID):
-            return []
+            q = queue or self.queue_service.get_queue_by_id_with_employees(queue_id)
+            if not q or q.booking_mode not in (BOOKING_MODE_FIXED, BOOKING_MODE_APPROXIMATE, BOOKING_MODE_HYBRID):
+                return []
 
-        slots = self._generate_slots_for_queue(q, target_date)
-        if not slots:
-            return []
+            slots = self._generate_slots_for_queue(q, target_date)
+            if not slots:
+                return []
 
-        for s in slots:
-            self.db.add(s)
-        self.db.commit()
-        # Re-query in a single SELECT instead of N individual refresh calls
-        slots = (
-            self.db.query(AppointmentSlot)
-            .filter(
-                AppointmentSlot.queue_id == queue_id,
-                AppointmentSlot.slot_date == target_date,
+            for s in slots:
+                self.db.add(s)
+            self.db.commit()
+            slots = (
+                self.db.query(AppointmentSlot)
+                .filter(
+                    AppointmentSlot.queue_id == queue_id,
+                    AppointmentSlot.slot_date == target_date,
+                )
+                .order_by(AppointmentSlot.slot_start)
+                .all()
             )
-            .order_by(AppointmentSlot.slot_start)
-            .all()
-        )
-        return slots
+            return slots
+        except HTTPException:
+            raise
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to get_or_generate_slots (queue_id=%s date=%s)", queue_id, target_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def _generate_slots_for_queue(self, queue: Queue, target_date: date) -> List[AppointmentSlot]:
         """Build slot list from queue's operating window; do not persist."""
@@ -89,10 +99,10 @@ class SlotGenerationService:
         if not employee_available or open_time >= close_time:
             return []
 
-        slot_duration = self.queue_service.get_queue_min_slot_duration_minutes(queue.uuid)
+        slot_duration = self.queue_service.get_queue_min_slot_duration_minutes(queue.uuid)  # type: ignore[arg-type]
         raw_interval = queue.slot_interval_minutes
-        slot_interval = raw_interval if (raw_interval is not None and raw_interval > 0) else slot_duration
-        capacity = max(1, queue.max_per_slot or 1)
+        slot_interval = raw_interval if (raw_interval is not None and int(raw_interval) > 0) else slot_duration  # type: ignore[operator]
+        capacity = max(1, queue.max_per_slot or 1)  # type: ignore[operator]
 
         slots: List[AppointmentSlot] = []
         current = open_time
@@ -114,6 +124,6 @@ class SlotGenerationService:
                         is_blocked=False,
                     )
                 )
-            current = _time_add(current, slot_interval, ref_date)
+            current = _time_add(current, slot_interval, ref_date)  # type: ignore[arg-type]
 
         return slots

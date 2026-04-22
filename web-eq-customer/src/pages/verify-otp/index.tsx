@@ -93,6 +93,7 @@ export default function VerifyOTPPage() {
   const backState = {
     returnTo, selectedServices, selectedServicesData,
     businessName, rescheduleQueueUserId, rescheduleInitialDate,
+    phoneNumber,
   };
 
   const handleDigitChange = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -341,12 +342,6 @@ export default function VerifyOTPPage() {
               </button>
             </div>
           </form>
-
-          <div className="auth-bottom-row">
-            <button type="button" onClick={() => navigate("/send-otp", { state: backState })}>
-              {t("auth.backToPhone")}
-            </button>
-          </div>
 
         </div>
       </div>

@@ -16,12 +16,14 @@ export default function UserProfile() {
   const { profile, setProfile, setNextStep } = useUserStore();
 
   const phoneObj: PhoneNumber | undefined = location.state?.phone;
-  const userType = location.state?.userType || "";
+  const userType = (location.state?.userType || profile?.profile_type || "").toLowerCase();
 
-  const [fullName, setFullName] = useState<string>("");
-  const [email, setEmail] = useState<string>("");
-  const [birthdate, setBirthdate] = useState<string>("");
-  const [gender, setGender] = useState<string>("");
+  const [fullName, setFullName] = useState<string>(profile?.user?.full_name ?? "");
+  const [email, setEmail] = useState<string>(profile?.user?.email ?? "");
+  const [birthdate, setBirthdate] = useState<string>(profile?.user?.date_of_birth ?? "");
+  const [gender, setGender] = useState<string>(
+    profile?.user?.gender === 1 ? "male" : profile?.user?.gender === 2 ? "female" : ""
+  );
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [errors, setErrors] = useState({
@@ -177,6 +179,11 @@ export default function UserProfile() {
       return;
     }
 
+    if (!userType || !["customer", "business"].includes(userType)) {
+      setError(t("userCreationFailed"));
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -224,29 +231,21 @@ export default function UserProfile() {
         navigate(ROUTERS_PATH.DASHBOARD);
       }
     } catch (err: any) {
-      let errorMessage = t("userCreationFailed");
-      
-      if (err?.response?.data?.detail?.message) {
-        errorMessage = err.response.data.detail.message;
-      } else if (err?.customMessage) {
-        errorMessage = err.customMessage;
+      const msg = err?.response?.data?.detail?.message;
+      const status = err?.response?.status;
+
+      if (status === 409 && msg?.toLowerCase().includes("email")) {
+        setErrors((prev) => ({ ...prev, email: msg }));
+      } else if (msg) {
+        setError(msg);
       } else if (err?.code === "ERR_NETWORK" || !err?.response) {
-        errorMessage = t("networkError");
+        setError(t("networkError"));
+      } else {
+        setError(t("userCreationFailed"));
       }
-      
-      setError(errorMessage);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleBackClick = () => {
-    navigate(ROUTERS_PATH.VERIFYOTP, {
-      state: {
-        phone: phone,
-        userType: userType
-      }
-    });
   };
 
   const genderOptions = [
@@ -257,9 +256,6 @@ export default function UserProfile() {
   return (
     <div className="user-profile-page">
       <div className="user-profile-header">
-        <button className="back-button" onClick={handleBackClick}>
-          ←
-        </button>
         <div className="header-content">
           <h1 className="user-profile-title">
             {userType.toLowerCase() === "business" ? t("ownerInfo") : t("userProfile")}

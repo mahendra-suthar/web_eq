@@ -4,6 +4,7 @@ import { SuperAdminService } from "../../../services/super-admin/super-admin.ser
 import { ProfileService } from "../../../services/profile/profile.service";
 import { useUserStore } from "../../../utils/userStore";
 import { ROUTERS_PATH } from "../../../routers/routers";
+import { DEFAULT_COUNTRY_CODE, PHONE_LENGTH, OTP_LENGTH, VALID_PHONE_START } from "../../../utils/constants";
 import "./login.scss";
 
 type Step = "phone" | "otp";
@@ -16,19 +17,36 @@ const SuperAdminLogin = () => {
   const { setProfile, setToken, setNextStep } = useUserStore();
 
   const [step, setStep] = useState<Step>("phone");
-  const [countryCode, setCountryCode] = useState("+91");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, "").slice(0, PHONE_LENGTH);
+    setPhone(digits);
+    if (error) setError("");
+  };
+
+  const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, "").slice(0, OTP_LENGTH);
+    setOtp(digits);
+    if (error) setError("");
+  };
+
+  const isPhoneValid = phone.length === PHONE_LENGTH && VALID_PHONE_START.test(phone);
+  const isOtpValid = otp.length === OTP_LENGTH;
+
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone.trim()) return;
+    if (!isPhoneValid) {
+      setError("Enter a valid 10-digit Indian mobile number.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      await adminService.sendOtp(countryCode, phone.trim());
+      await adminService.sendOtp(DEFAULT_COUNTRY_CODE, phone);
       setStep("otp");
     } catch (err: any) {
       setError(err?.response?.data?.detail?.message || err?.response?.data?.detail || "Failed to send OTP.");
@@ -39,14 +57,16 @@ const SuperAdminLogin = () => {
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!otp.trim()) return;
+    if (!isOtpValid) {
+      setError("Enter the 5-digit OTP.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      const res = await adminService.verifyOtp(countryCode, phone.trim(), otp.trim());
+      const res = await adminService.verifyOtp(DEFAULT_COUNTRY_CODE, phone, otp);
       setToken(res.token.access_token);
       setNextStep(res.next_step);
-      // Fetch real profile from server instead of constructing it manually
       const profileRes = await profileService.getProfile();
       setProfile(profileRes);
       navigate(ROUTERS_PATH.SUPER_ADMIN, { replace: true });
@@ -68,49 +88,50 @@ const SuperAdminLogin = () => {
         </div>
 
         {step === "phone" ? (
-          <form onSubmit={handleSendOtp} className="sa-login-form">
-            <label>Phone Number</label>
+          <form onSubmit={handleSendOtp} className="sa-login-form" noValidate>
+            <label htmlFor="sa-phone">Phone Number</label>
             <div className="sa-phone-row">
-              <select
-                value={countryCode}
-                onChange={(e) => setCountryCode(e.target.value)}
-                className="sa-country-select"
-              >
-                <option value="+91">+91</option>
-                <option value="+1">+1</option>
-                <option value="+44">+44</option>
-                <option value="+971">+971</option>
-              </select>
+              <div className="sa-country-badge" aria-label="India +91">
+                <span>🇮🇳</span>
+                <span>{DEFAULT_COUNTRY_CODE}</span>
+              </div>
               <input
+                id="sa-phone"
                 type="tel"
+                inputMode="numeric"
                 className="sa-input"
-                placeholder="Phone number"
+                placeholder="10-digit mobile number"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={handlePhoneChange}
+                maxLength={PHONE_LENGTH}
                 autoFocus
-                required
+                autoComplete="tel-national"
+                aria-describedby="sa-phone-hint"
               />
             </div>
-            {error && <div className="sa-error">{error}</div>}
-            <button type="submit" className="sa-btn" disabled={loading || !phone.trim()}>
+            <div className="sa-input-hint" id="sa-phone-hint">India only · starts with 6–9</div>
+            {error && <div className="sa-error" role="alert">{error}</div>}
+            <button type="submit" className="sa-btn" disabled={loading || !isPhoneValid}>
               {loading ? "Sending…" : "Send OTP"}
             </button>
           </form>
         ) : (
-          <form onSubmit={handleVerifyOtp} className="sa-login-form">
-            <label>Enter OTP sent to {countryCode} {phone}</label>
+          <form onSubmit={handleVerifyOtp} className="sa-login-form" noValidate>
+            <label htmlFor="sa-otp">OTP sent to {DEFAULT_COUNTRY_CODE} {phone}</label>
             <input
+              id="sa-otp"
               type="text"
+              inputMode="numeric"
               className="sa-input sa-input--otp"
-              placeholder="Enter OTP"
+              placeholder="5-digit OTP"
               value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              maxLength={6}
+              onChange={handleOtpChange}
+              maxLength={OTP_LENGTH}
               autoFocus
-              required
+              autoComplete="one-time-code"
             />
-            {error && <div className="sa-error">{error}</div>}
-            <button type="submit" className="sa-btn" disabled={loading || !otp.trim()}>
+            {error && <div className="sa-error" role="alert">{error}</div>}
+            <button type="submit" className="sa-btn" disabled={loading || !isOtpValid}>
               {loading ? "Verifying…" : "Login"}
             </button>
             <button

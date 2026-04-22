@@ -1,24 +1,27 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useLayoutContext } from "../../layouts/general-layout";
 import { RouterConstant } from "../../routers/index";
-import { PhoneNumber, formatPhoneForDisplay, validatePhoneNumber } from "../../utils/utils";
+import { PhoneNumber, validatePhoneNumber } from "../../utils/utils";
 import PhoneInput from "../../components/phone-input";
 import Button from "../../components/button";
 import { OTPService } from "../../services/otp/otp.service";
+import { DEFAULT_COUNTRY_CODE } from "../../utils/constants";
 import "./send-otp.scss";
 
 export default function SendOTP() {
   const { t } = useLayoutContext();
   const navigate = useNavigate();
+  const location = useLocation();
   const { ROUTERS_PATH } = RouterConstant;
-  // Always use "business" user type for web-eq-client
-  const userType = "Business";
+  const prefilled = location.state?.phone as PhoneNumber | undefined;
   const [phone, setPhone] = useState<PhoneNumber>({
-    countryCode: "+91",
-    localNumber: ""
+    countryCode: prefilled?.countryCode ?? DEFAULT_COUNTRY_CODE,
+    localNumber: prefilled?.localNumber ?? "",
   });
-  const [isPhoneValid, setIsPhoneValid] = useState<boolean>(false);
+  const [isPhoneValid, setIsPhoneValid] = useState<boolean>(
+    prefilled ? validatePhoneNumber(prefilled) : false
+  );
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
