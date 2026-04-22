@@ -4,6 +4,7 @@ import {
   QueueDetailData,
   WalkInBookingPayload,
 } from "../../services/queue/queue.service";
+import { DEFAULT_COUNTRY_CODE } from "../../utils/constants";
 import "./add-customer-modal.scss";
 
 const queueService = new QueueService();
@@ -22,8 +23,6 @@ interface Props {
   onClose: () => void;
   onSuccess: () => void;
 }
-
-const DEFAULT_COUNTRY_CODE = "+91";
 
 export default function AddCustomerModal({
   queueId,

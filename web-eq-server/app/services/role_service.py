@@ -1,8 +1,12 @@
 import uuid
+import logging
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.models.role import Role, UserRoles
+
+logger = logging.getLogger(__name__)
 
 
 class RoleService:
@@ -37,10 +41,16 @@ class RoleService:
             user_id=user_id,
             role_id=role_id
         )
-        self.db.add(user_role)
-        self.db.commit()
-        self.db.refresh(user_role)
-        return user_role
+        try:
+            self.db.add(user_role)
+            self.db.commit()
+            self.db.refresh(user_role)
+            return user_role
+        except IntegrityError:
+            # Race condition: role already assigned between our check and insert — idempotent
+            self.db.rollback()
+            logger.warning("Race condition in create_user_role user_id=%s role_id=%s — returning existing", user_id, role_id)
+            return self.db.query(UserRoles).filter_by(user_id=user_id, role_id=role_id).first()  # type: ignore[return-value]
 
     def get_user_roles(self, user_id: uuid.UUID) -> list[UserRoles]:
         return (

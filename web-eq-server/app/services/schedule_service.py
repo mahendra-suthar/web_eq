@@ -1,7 +1,9 @@
+import logging
 from dataclasses import dataclass
 from datetime import date as date_type
 from sqlalchemy import delete
 from sqlalchemy.orm import Session, joinedload
+from fastapi import HTTPException
 from uuid import UUID
 from typing import List, Dict, Tuple, Optional
 
@@ -9,6 +11,8 @@ from app.models.schedule import Schedule, ScheduleBreak, ScheduleException, Sche
 from app.models.business import Business
 from app.schemas.schedule import ScheduleInput, BreakTimeInput, ScheduleExceptionCreate, ScheduleExceptionUpdate
 from app.core.constants import BIZ_EARLIEST_TIME, BIZ_LATEST_TIME
+
+logger = logging.getLogger(__name__)
 
 
 class ScheduleService:
@@ -26,17 +30,21 @@ class ScheduleService:
         day_of_week: int,
     ) -> Optional[Schedule]:
         """Return the open schedule row (with breaks eagerly loaded) for one day."""
-        return (
-            self.db.query(Schedule)
-            .options(joinedload(Schedule.breaks))
-            .filter(
-                Schedule.entity_id == entity_id,
-                Schedule.entity_type == entity_type,
-                Schedule.day_of_week == day_of_week,
-                Schedule.is_open == True,
+        try:
+            return (
+                self.db.query(Schedule)
+                .options(joinedload(Schedule.breaks))
+                .filter(
+                    Schedule.entity_id == entity_id,
+                    Schedule.entity_type == entity_type,
+                    Schedule.day_of_week == day_of_week,
+                    Schedule.is_open == True,
+                )
+                .first()
             )
-            .first()
-        )
+        except Exception:
+            logger.exception("Failed to get_schedule_for_entity_day (entity_id=%s day=%s)", entity_id, day_of_week)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_schedule_with_breaks_for_day(
         self,
@@ -46,16 +54,20 @@ class ScheduleService:
     ) -> Optional[Schedule]:
         """Return the schedule row (with breaks eagerly loaded) for one day, regardless of is_open.
         Use this when you need to know whether the entity is *explicitly* closed that day."""
-        return (
-            self.db.query(Schedule)
-            .options(joinedload(Schedule.breaks))
-            .filter(
-                Schedule.entity_id == entity_id,
-                Schedule.entity_type == entity_type,
-                Schedule.day_of_week == day_of_week,
+        try:
+            return (
+                self.db.query(Schedule)
+                .options(joinedload(Schedule.breaks))
+                .filter(
+                    Schedule.entity_id == entity_id,
+                    Schedule.entity_type == entity_type,
+                    Schedule.day_of_week == day_of_week,
+                )
+                .first()
             )
-            .first()
-        )
+        except Exception:
+            logger.exception("Failed to get_schedule_with_breaks_for_day (entity_id=%s day=%s)", entity_id, day_of_week)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_schedules_with_breaks_batch(
         self,
@@ -70,17 +82,21 @@ class ScheduleService:
         """
         if not entity_ids:
             return {}
-        rows = (
-            self.db.query(Schedule)
-            .options(joinedload(Schedule.breaks))
-            .filter(
-                Schedule.entity_id.in_(entity_ids),
-                Schedule.entity_type == entity_type,
-                Schedule.day_of_week == day_of_week,
+        try:
+            rows = (
+                self.db.query(Schedule)
+                .options(joinedload(Schedule.breaks))
+                .filter(
+                    Schedule.entity_id.in_(entity_ids),
+                    Schedule.entity_type == entity_type,
+                    Schedule.day_of_week == day_of_week,
+                )
+                .all()
             )
-            .all()
-        )
-        return {row.entity_id: row for row in rows}
+            return {row.entity_id: row for row in rows}  # type: ignore[return-value]
+        except Exception:
+            logger.exception("Failed to get_schedules_with_breaks_batch (entity_type=%s day=%s)", entity_type, day_of_week)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_exceptions_for_schedules_batch(
         self,
@@ -94,52 +110,70 @@ class ScheduleService:
         """
         if not schedule_ids:
             return {}
-        rows = (
-            self.db.query(ScheduleException)
-            .filter(
-                ScheduleException.schedule_id.in_(schedule_ids),
-                ScheduleException.exception_date == exception_date,
+        try:
+            rows = (
+                self.db.query(ScheduleException)
+                .filter(
+                    ScheduleException.schedule_id.in_(schedule_ids),
+                    ScheduleException.exception_date == exception_date,
+                )
+                .all()
             )
-            .all()
-        )
-        return {row.schedule_id: row for row in rows}
+            return {row.schedule_id: row for row in rows}  # type: ignore[return-value]
+        except Exception:
+            logger.exception("Failed to get_exceptions_for_schedules_batch (date=%s)", exception_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_schedules_by_entity(
         self, entity_id: UUID, entity_type: ScheduleEntityType
     ) -> List[Schedule]:
-        return (
-            self.db.query(Schedule)
-            .filter(
-                Schedule.entity_id == entity_id,
-                Schedule.entity_type == entity_type,
+        try:
+            return (
+                self.db.query(Schedule)
+                .filter(
+                    Schedule.entity_id == entity_id,
+                    Schedule.entity_type == entity_type,
+                )
+                .all()
             )
-            .all()
-        )
+        except Exception:
+            logger.exception("Failed to get_schedules_by_entity (entity_id=%s)", entity_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_schedules_with_breaks(
         self, entity_id: UUID, entity_type: ScheduleEntityType
     ) -> List[Schedule]:
         """Return all schedule rows with their breaks eagerly loaded."""
-        return (
-            self.db.query(Schedule)
-            .options(joinedload(Schedule.breaks))
-            .filter(
-                Schedule.entity_id == entity_id,
-                Schedule.entity_type == entity_type,
+        try:
+            return (
+                self.db.query(Schedule)
+                .options(joinedload(Schedule.breaks))
+                .filter(
+                    Schedule.entity_id == entity_id,
+                    Schedule.entity_type == entity_type,
+                )
+                .all()
             )
-            .all()
-        )
+        except Exception:
+            logger.exception("Failed to get_schedules_with_breaks (entity_id=%s)", entity_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_business_schedule_data_for_validation(
         self, business_id: UUID
     ) -> Tuple[bool, Dict[int, Schedule]]:
-        business = self.db.query(Business).filter(Business.uuid == business_id).first()
-        if not business:
-            return False, {}
-        is_always_open = bool(getattr(business, "is_always_open", False))
-        business_schedules = self.get_schedules_by_entity(business_id, ScheduleEntityType.BUSINESS)
-        by_day: Dict[int, Schedule] = {s.day_of_week: s for s in business_schedules}
-        return is_always_open, by_day
+        try:
+            business = self.db.query(Business).filter(Business.uuid == business_id).first()
+            if not business:
+                return False, {}
+            is_always_open = bool(getattr(business, "is_always_open", False))
+            business_schedules = self.get_schedules_by_entity(business_id, ScheduleEntityType.BUSINESS)
+            by_day: Dict[int, Schedule] = {s.day_of_week: s for s in business_schedules}  # type: ignore[index]
+            return is_always_open, by_day
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_business_schedule_data_for_validation (business_id=%s)", business_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     # ──────────────────────────────────────────────────────────────────────────
     # Schedule CRUD
@@ -149,10 +183,14 @@ class ScheduleService:
         self, entity_id: UUID, entity_type: ScheduleEntityType
     ) -> None:
         """Delete all schedule rows (and their breaks via CASCADE) for an entity."""
-        self.db.query(Schedule).filter(
-            Schedule.entity_id == entity_id,
-            Schedule.entity_type == entity_type,
-        ).delete()
+        try:
+            self.db.query(Schedule).filter(
+                Schedule.entity_id == entity_id,
+                Schedule.entity_type == entity_type,
+            ).delete()
+        except Exception:
+            logger.exception("Failed to delete_schedules_by_entity (entity_id=%s)", entity_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def replace_schedules_for_entity(
         self,
@@ -160,38 +198,45 @@ class ScheduleService:
         entity_type: ScheduleEntityType,
         schedules: List[ScheduleInput],
     ) -> List[Schedule]:
-        self.delete_schedules_by_entity(entity_id, entity_type)
+        try:
+            self.delete_schedules_by_entity(entity_id, entity_type)
 
-        if not schedules:
-            return []
+            if not schedules:
+                return []
 
-        new_schedules: List[Schedule] = []
-        for s in schedules:
-            schedule = Schedule(
-                entity_id=entity_id,
-                entity_type=entity_type,
-                day_of_week=s.day_of_week,
-                opening_time=s.opening_time,
-                closing_time=s.closing_time,
-                is_open=s.is_open,
-            )
-            self.db.add(schedule)
-            new_schedules.append(schedule)
-        self.db.flush()  # populate uuid for all schedules in one round-trip
-
-        # Create breaks (need schedule.uuid from flush)
-        for schedule, s in zip(new_schedules, schedules):
-            for br in s.break_times:
-                self.db.add(
-                    ScheduleBreak(
-                        schedule_id=schedule.uuid,
-                        break_start=br.break_start,
-                        break_end=br.break_end,
-                    )
+            new_schedules: List[Schedule] = []
+            for s in schedules:
+                schedule = Schedule(
+                    entity_id=entity_id,
+                    entity_type=entity_type,
+                    day_of_week=s.day_of_week,
+                    opening_time=s.opening_time,
+                    closing_time=s.closing_time,
+                    is_open=s.is_open,
                 )
+                self.db.add(schedule)
+                new_schedules.append(schedule)
+            self.db.flush()  # populate uuid for all schedules in one round-trip
 
-        self.db.commit()
-        return new_schedules
+            # Create breaks (need schedule.uuid from flush)
+            for schedule, s in zip(new_schedules, schedules):
+                for br in s.break_times:
+                    self.db.add(
+                        ScheduleBreak(
+                            schedule_id=schedule.uuid,
+                            break_start=br.break_start,
+                            break_end=br.break_end,
+                        )
+                    )
+
+            self.db.commit()
+            return new_schedules
+        except HTTPException:
+            raise
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to replace_schedules_for_entity (entity_id=%s)", entity_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
 
     def copy_business_schedule_to_employees(
@@ -248,56 +293,76 @@ class ScheduleService:
     # ──────────────────────────────────────────────────────────────────────────
 
     def get_breaks_for_schedule(self, schedule_id: UUID) -> List[ScheduleBreak]:
-        return (
-            self.db.query(ScheduleBreak)
-            .filter(ScheduleBreak.schedule_id == schedule_id)
-            .order_by(ScheduleBreak.break_start)
-            .all()
-        )
+        try:
+            return (
+                self.db.query(ScheduleBreak)
+                .filter(ScheduleBreak.schedule_id == schedule_id)
+                .order_by(ScheduleBreak.break_start)
+                .all()
+            )
+        except Exception:
+            logger.exception("Failed to get_breaks_for_schedule (schedule_id=%s)", schedule_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def create_schedule_breaks(
         self, schedule_id: UUID, break_times: List[BreakTimeInput]
     ) -> List[ScheduleBreak]:
-        new_breaks = [
-            ScheduleBreak(
-                schedule_id=schedule_id,
-                break_start=br.break_start,
-                break_end=br.break_end,
-            )
-            for br in break_times
-        ]
-        self.db.add_all(new_breaks)
-        self.db.flush()
-        return new_breaks
+        try:
+            new_breaks = [
+                ScheduleBreak(
+                    schedule_id=schedule_id,
+                    break_start=br.break_start,
+                    break_end=br.break_end,
+                )
+                for br in break_times
+            ]
+            self.db.add_all(new_breaks)
+            self.db.flush()
+            return new_breaks
+        except Exception:
+            logger.exception("Failed to create_schedule_breaks (schedule_id=%s)", schedule_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def delete_breaks_for_schedule(self, schedule_id: UUID) -> None:
-        self.db.execute(
-            delete(ScheduleBreak).where(ScheduleBreak.schedule_id == schedule_id)
-        )
+        try:
+            self.db.execute(
+                delete(ScheduleBreak).where(ScheduleBreak.schedule_id == schedule_id)
+            )
+        except Exception:
+            logger.exception("Failed to delete_breaks_for_schedule (schedule_id=%s)", schedule_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     # ──────────────────────────────────────────────────────────────────────────
     # ScheduleException CRUD
     # ──────────────────────────────────────────────────────────────────────────
 
     def get_exceptions_for_schedule(self, schedule_id: UUID) -> List[ScheduleException]:
-        return (
-            self.db.query(ScheduleException)
-            .filter(ScheduleException.schedule_id == schedule_id)
-            .order_by(ScheduleException.exception_date)
-            .all()
-        )
+        try:
+            return (
+                self.db.query(ScheduleException)
+                .filter(ScheduleException.schedule_id == schedule_id)
+                .order_by(ScheduleException.exception_date)
+                .all()
+            )
+        except Exception:
+            logger.exception("Failed to get_exceptions_for_schedule (schedule_id=%s)", schedule_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_exception_for_date(
         self, schedule_id: UUID, exception_date: date_type
     ) -> Optional[ScheduleException]:
-        return (
-            self.db.query(ScheduleException)
-            .filter(
-                ScheduleException.schedule_id == schedule_id,
-                ScheduleException.exception_date == exception_date,
+        try:
+            return (
+                self.db.query(ScheduleException)
+                .filter(
+                    ScheduleException.schedule_id == schedule_id,
+                    ScheduleException.exception_date == exception_date,
+                )
+                .first()
             )
-            .first()
-        )
+        except Exception:
+            logger.exception("Failed to get_exception_for_date (schedule_id=%s date=%s)", schedule_id, exception_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_exception_for_entity_date(
         self,
@@ -305,19 +370,25 @@ class ScheduleService:
         entity_type: ScheduleEntityType,
         lookup_date: date_type,
     ) -> Optional[ScheduleException]:
-        day_of_week = (lookup_date.weekday() + 1) % 7
-        schedule = (
-            self.db.query(Schedule)
-            .filter(
-                Schedule.entity_id == entity_id,
-                Schedule.entity_type == entity_type,
-                Schedule.day_of_week == day_of_week,
+        try:
+            day_of_week = (lookup_date.weekday() + 1) % 7
+            schedule = (
+                self.db.query(Schedule)
+                .filter(
+                    Schedule.entity_id == entity_id,
+                    Schedule.entity_type == entity_type,
+                    Schedule.day_of_week == day_of_week,
+                )
+                .first()
             )
-            .first()
-        )
-        if not schedule:
-            return None
-        return self.get_exception_for_date(schedule.uuid, lookup_date)
+            if not schedule:
+                return None
+            return self.get_exception_for_date(schedule.uuid, lookup_date)  # type: ignore[arg-type]
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_exception_for_entity_date (entity_id=%s date=%s)", entity_id, lookup_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def create_schedule_exception(
         self, data: ScheduleExceptionCreate
@@ -339,9 +410,12 @@ class ScheduleService:
             self.db.add(exc)
             self.db.commit()
             return exc
+        except HTTPException:
+            raise
         except Exception:
             self.db.rollback()
-            raise
+            logger.exception("Failed to create_schedule_exception (schedule_id=%s date=%s)", data.schedule_id, data.exception_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def update_schedule_exception(
         self, schedule_id: UUID, exception_date: date_type, data: ScheduleExceptionUpdate
@@ -357,9 +431,12 @@ class ScheduleService:
                 setattr(exc, key, val)
             self.db.commit()
             return exc
+        except HTTPException:
+            raise
         except Exception:
             self.db.rollback()
-            raise
+            logger.exception("Failed to update_schedule_exception (schedule_id=%s date=%s)", schedule_id, exception_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def delete_schedule_exception(
         self, schedule_id: UUID, exception_date: date_type
@@ -371,7 +448,10 @@ class ScheduleService:
             self.db.delete(exc)
             self.db.commit()
             return True
+        except HTTPException:
+            raise
         except Exception:
             self.db.rollback()
-            raise
+            logger.exception("Failed to delete_schedule_exception (schedule_id=%s date=%s)", schedule_id, exception_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 

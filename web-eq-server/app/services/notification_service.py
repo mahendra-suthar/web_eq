@@ -6,8 +6,8 @@ import logging
 from typing import List, Optional, Tuple
 from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
 
 from app.models.notification import Notification
 
@@ -39,10 +39,11 @@ class NotificationService:
             self.db.add(notif)
             self.db.commit()
             self.db.refresh(notif)
-        except SQLAlchemyError:
+            return notif
+        except Exception:
             self.db.rollback()
-            raise
-        return notif
+            logger.exception("Failed to create notification (user_id=%s type=%s)", user_id, type)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_for_user(
         self,
@@ -51,45 +52,56 @@ class NotificationService:
         offset: int = 0,
     ) -> Tuple[List[Notification], int]:
         """Return (rows, total_count) ordered newest-first."""
-        base_q = self.db.query(Notification).filter(Notification.user_id == user_id)
-        total = base_q.count()
-        rows = (
-            base_q
-            .order_by(Notification.created_at.desc())
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
-        return rows, total
+        try:
+            base_q = self.db.query(Notification).filter(Notification.user_id == user_id)
+            total = base_q.count()
+            rows = (
+                base_q
+                .order_by(Notification.created_at.desc())
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
+            return rows, total
+        except Exception:
+            logger.exception("Failed to get_for_user notifications (user_id=%s)", user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_unread_count(self, user_id: UUID) -> int:
-        return (
-            self.db.query(Notification)
-            .filter(Notification.user_id == user_id, Notification.is_read == False)  # noqa: E712
-            .count()
-        )
+        try:
+            return (
+                self.db.query(Notification)
+                .filter(Notification.user_id == user_id, Notification.is_read == False)  # noqa: E712
+                .count()
+            )
+        except Exception:
+            logger.exception("Failed to get_unread_count (user_id=%s)", user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def mark_read(self, notification_id: UUID, user_id: UUID) -> Optional[Notification]:
         """Mark a single notification as read (scoped to user_id for safety)."""
-        notif = (
-            self.db.query(Notification)
-            .filter(
-                Notification.uuid == notification_id,
-                Notification.user_id == user_id,
+        try:
+            notif = (
+                self.db.query(Notification)
+                .filter(
+                    Notification.uuid == notification_id,
+                    Notification.user_id == user_id,
+                )
+                .first()
             )
-            .first()
-        )
-        if not notif:
-            return None
-        if not notif.is_read:
-            notif.is_read = True
-            try:
+            if not notif:
+                return None
+            if not notif.is_read:
+                notif.is_read = True  # type: ignore[assignment]
                 self.db.commit()
                 self.db.refresh(notif)
-            except SQLAlchemyError:
-                self.db.rollback()
-                raise
-        return notif
+            return notif
+        except HTTPException:
+            raise
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to mark_read (notification_id=%s user_id=%s)", notification_id, user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def mark_all_read(self, user_id: UUID) -> int:
         """Mark all unread notifications as read. Returns number of rows updated."""
@@ -104,6 +116,7 @@ class NotificationService:
             )
             self.db.commit()
             return updated
-        except SQLAlchemyError:
+        except Exception:
             self.db.rollback()
-            raise
+            logger.exception("Failed to mark_all_read (user_id=%s)", user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})

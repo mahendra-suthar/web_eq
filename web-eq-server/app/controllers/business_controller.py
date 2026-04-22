@@ -1,5 +1,5 @@
+import logging
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
 from typing import List, Optional, Dict, Tuple
 from uuid import UUID
@@ -29,6 +29,8 @@ from app.controllers.user_controller import UserController
 from app.core.utils import format_time, current_time_app_tz, day_of_week_app_tz
 from app.models.user import User
 
+logger = logging.getLogger(__name__)
+
 
 class BusinessController:
     def __init__(self, db: Session):
@@ -53,12 +55,10 @@ class BusinessController:
 
         except HTTPException:
             raise
-        except SQLAlchemyError:
+        except Exception:
             self.db.rollback()
-            raise HTTPException(status_code=500, detail="Database error")
-        except Exception as e:
-            self.db.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to create business: {str(e)}")
+            logger.exception("Failed to create_business_basic_info (owner_id=%s)", data.owner_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def update_business_basic_info(self, data: BusinessBasicInfoUpdate, user: User) -> BusinessData:
         try:
@@ -69,12 +69,10 @@ class BusinessController:
             return BusinessData.from_business(updated)
         except HTTPException:
             raise
-        except SQLAlchemyError:
+        except Exception:
             self.db.rollback()
-            raise HTTPException(status_code=500, detail="Database error")
-        except Exception as e:
-            self.db.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to update business: {str(e)}")
+            logger.exception("Failed to update_business_basic_info (user_id=%s)", user.uuid)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_businesses(self, category_id: Optional[UUID] = None, service_ids: Optional[List[UUID]] = None) -> List[BusinessListItem]:
         try:
@@ -148,11 +146,11 @@ class BusinessController:
                 ))
 
             return result
-        except SQLAlchemyError:
-            self.db.rollback()
-            raise HTTPException(status_code=500, detail="Database error")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to get businesses: {str(e)}")
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_businesses")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_business_details(self, business_id: UUID) -> BusinessDetailData:
         try:
@@ -199,11 +197,9 @@ class BusinessController:
             )
         except HTTPException:
             raise
-        except SQLAlchemyError:
-            self.db.rollback()
-            raise HTTPException(status_code=500, detail="Database error")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to get business details: {str(e)}")
+        except Exception:
+            logger.exception("Failed to get_business_details (business_id=%s)", business_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_business_services(self, business_id: UUID) -> List[BusinessServiceData]:
         try:
@@ -223,10 +219,6 @@ class BusinessController:
             ]
         except HTTPException:
             raise
-        except SQLAlchemyError:
-            self.db.rollback()
-            raise HTTPException(status_code=500, detail="Database error")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to get business services: {str(e)}")
-
-
+        except Exception:
+            logger.exception("Failed to get_business_services (business_id=%s)", business_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})

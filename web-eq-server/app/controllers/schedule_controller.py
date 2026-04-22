@@ -1,6 +1,6 @@
+import logging
 from datetime import date as date_type
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
 from typing import List
 from uuid import UUID
@@ -15,6 +15,8 @@ from app.schemas.schedule import (
     ScheduleCreateInput, ScheduleData, ScheduleInput,
     ScheduleExceptionCreate, ScheduleExceptionData, ScheduleExceptionUpdate,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ScheduleController:
@@ -113,12 +115,10 @@ class ScheduleController:
 
         except HTTPException:
             raise
-        except SQLAlchemyError:
+        except Exception:
             self.db.rollback()
-            raise HTTPException(status_code=500, detail="Database error")
-        except Exception as e:
-            self.db.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to create schedules: {str(e)}")
+            logger.exception("Failed to create_schedules (entity_id=%s)", payload.entity_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def get_schedules(
         self, entity_id: UUID, entity_type: str
@@ -129,8 +129,11 @@ class ScheduleController:
             return [ScheduleData.from_schedule(s) for s in schedules]
         except KeyError:
             raise HTTPException(status_code=400, detail="Invalid entity_type")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to get schedules: {str(e)}")
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_schedules (entity_id=%s)", entity_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     # ──────────────────────────────────────────────────────────────────────────
     # Schedule Exception CRUD
@@ -142,8 +145,11 @@ class ScheduleController:
         try:
             excs = self.schedule_service.get_exceptions_for_schedule(schedule_id)
             return [ScheduleExceptionData.from_orm(e) for e in excs]
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to get exceptions: {str(e)}")
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_schedule_exceptions (schedule_id=%s)", schedule_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def create_schedule_exception(
         self, payload: ScheduleExceptionCreate
@@ -151,12 +157,13 @@ class ScheduleController:
         try:
             exc = self.schedule_service.create_schedule_exception(payload)
             return ScheduleExceptionData.from_orm(exc)
+        except HTTPException:
+            raise
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Database error")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to create exception: {str(e)}")
+            raise HTTPException(status_code=400, detail={"message": str(e)})
+        except Exception:
+            logger.exception("Failed to create_schedule_exception (schedule_id=%s)", payload.schedule_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def update_schedule_exception(
         self, schedule_id: UUID, exception_date: date_type, payload: ScheduleExceptionUpdate
@@ -166,12 +173,13 @@ class ScheduleController:
                 schedule_id, exception_date, payload
             )
             return ScheduleExceptionData.from_orm(exc)
+        except HTTPException:
+            raise
         except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e))
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Database error")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to update exception: {str(e)}")
+            raise HTTPException(status_code=404, detail={"message": str(e)})
+        except Exception:
+            logger.exception("Failed to update_schedule_exception (schedule_id=%s date=%s)", schedule_id, exception_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def delete_schedule_exception(
         self, schedule_id: UUID, exception_date: date_type
@@ -186,7 +194,6 @@ class ScheduleController:
             return {"success": True}
         except HTTPException:
             raise
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Database error")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to delete exception: {str(e)}")
+        except Exception:
+            logger.exception("Failed to delete_schedule_exception (schedule_id=%s date=%s)", schedule_id, exception_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useLayoutContext } from "../../layouts/general-layout";
 import { RouterConstant } from "../../routers/index";
@@ -52,8 +52,8 @@ export default function VerifyOTP() {
     return `${m}:${s}`;
   };
 
-  const handleBackClick = () => {
-    navigate(ROUTERS_PATH.SENDOTP);
+  const handleChangeNumber = () => {
+    navigate(ROUTERS_PATH.SENDOTP, { state: location.state });
   };
 
   const handleVerifyOTP = async () => {
@@ -253,9 +253,6 @@ export default function VerifyOTP() {
   return (
     <div className="verify-otp-page">
       <div className="verify-otp-header">
-        <button className="back-button" onClick={handleBackClick}>
-          ←
-        </button>
         <div className="header-content">
           <h1 className="verify-otp-title">{t("verifyOtp")}</h1>
           <p className="verify-otp-subtitle">{t("otpSentToPhone")}</p>
@@ -266,6 +263,9 @@ export default function VerifyOTP() {
         <div className="verify-otp-form-fields">
           <div className="phone-info-container">
             <p className="phone-display">{phone}</p>
+            <button type="button" className="change-number-btn" onClick={handleChangeNumber}>
+              {t("changeNumber")}
+            </button>
           </div>
 
           <div className="otp-input-section">

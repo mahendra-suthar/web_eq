@@ -3,9 +3,11 @@ import logging
 import uvicorn
 from contextlib import asynccontextmanager
 from datetime import date
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from apscheduler.schedulers.background import BackgroundScheduler
+from sqlalchemy.exc import IntegrityError
 
 from app.routers.routers import routers
 from app.db.database import engine, Base, SessionLocal
@@ -82,6 +84,31 @@ app.add_middleware(
 
 app.add_middleware(AuthMiddleware)
 app.include_router(routers, prefix="/api")
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
+    logger.warning("IntegrityError on %s: %s", request.url.path, exc.orig)
+    orig = str(exc.orig).lower()
+    if "email" in orig:
+        msg = "This email is already registered to another account."
+    elif "phone" in orig:
+        msg = "This phone number is already registered to another account."
+    else:
+        msg = "A record with this information already exists."
+    return JSONResponse(
+        status_code=409,
+        content={"detail": {"message": msg}},
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled error on %s", request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": {"message": "An unexpected error occurred. Please try again."}},
+    )
 
 @app.get("/healthz")
 def healthz():

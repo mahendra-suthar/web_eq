@@ -152,10 +152,17 @@ export const useBusinessRegistrationStore = create(
         {
             name: "web-eq-business-registration",
             storage: createJSONStorage(() => localStorage),
-            // We might need to handle File objects specially if we want them to persist, 
-            // but for now we'll stick to basic persistence. File objects will be lost on reload 
-            // if not handled separately (e.g. converting to base64), but that's a known limitation 
-            // for localStorage.
+            // File objects are not JSON-serialisable — strip them before persisting so
+            // localStorage never stores a corrupt {} placeholder.
+            partialize: (state) => ({
+                ...state,
+                registrationData: {
+                    ...state.registrationData,
+                    profile_picture: undefined,
+                    employees: state.registrationData.employees?.map(({ profile_picture: _pp, ...rest }) => rest),
+                    services: state.registrationData.services?.map(({ image: _img, ...rest }) => rest),
+                },
+            }),
         }
     )
 );

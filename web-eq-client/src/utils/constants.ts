@@ -95,6 +95,15 @@ export const BUSINESS_REGISTRATION_MIN_STEP = 1;
 export const BUSINESS_REGISTRATION_MAX_STEP = 5;
 
 // ============================================================================
+// Phone & Auth Constants
+// ============================================================================
+
+export const DEFAULT_COUNTRY_CODE = "+91";
+export const PHONE_LENGTH = 10;
+/** Indian mobile numbers start with 6, 7, 8, or 9 */
+export const VALID_PHONE_START = /^[6-9]/;
+
+// ============================================================================
 // OTP Constants
 // ============================================================================
 
@@ -103,9 +112,6 @@ export const BUSINESS_REGISTRATION_MAX_STEP = 5;
  */
 export const OTP_COUNTDOWN_SECONDS = 300;
 
-/**
- * OTP length
- */
 export const OTP_LENGTH = 5;
 
 // ============================================================================

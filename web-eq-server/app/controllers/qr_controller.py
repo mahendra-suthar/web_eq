@@ -1,13 +1,15 @@
+import logging
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.qr import business_qr_png, employee_qr_png
 from app.models.user import User
 from app.services.business_service import BusinessService
 from app.services.employee_service import EmployeeService
+
+logger = logging.getLogger(__name__)
 
 
 class QRController:
@@ -24,10 +26,9 @@ class QRController:
             return business_qr_png(str(business.uuid))
         except HTTPException:
             raise
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Database error.")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to generate QR code: {str(e)}")
+        except Exception:
+            logger.exception("Failed to get_business_qr (user_id=%s)", user.uuid)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_my_employee_qr(self, user: User) -> bytes:
         """QR for the authenticated employee's own booking page."""
@@ -43,10 +44,9 @@ class QRController:
             return employee_qr_png(str(employee.business_id), str(employee.queue_id))
         except HTTPException:
             raise
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Database error.")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to generate QR code: {str(e)}")
+        except Exception:
+            logger.exception("Failed to get_my_employee_qr (user_id=%s)", user.uuid)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_employee_qr(self, employee_uuid: UUID, user: User) -> bytes:
         """QR for a specific employee — scoped to the authenticated business owner."""
@@ -69,7 +69,6 @@ class QRController:
             return employee_qr_png(str(business.uuid), str(employee.queue_id))
         except HTTPException:
             raise
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Database error.")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to generate QR code: {str(e)}")
+        except Exception:
+            logger.exception("Failed to get_employee_qr (employee_uuid=%s user_id=%s)", employee_uuid, user.uuid)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})

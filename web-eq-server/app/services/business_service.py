@@ -1,9 +1,14 @@
+import logging
 from sqlalchemy.orm import Session, joinedload, contains_eager
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func, case, and_, true
 from uuid import UUID
 from typing import Optional, List, Tuple, Dict
 from collections import defaultdict
+
+from app.core.exceptions import handle_integrity_error
+
+logger = logging.getLogger(__name__)
 
 from app.models.business import Business
 from app.models.queue import QueueService as QueueServiceModel
@@ -41,6 +46,9 @@ class BusinessService:
             self.db.commit()
             self.db.refresh(new_business)
             return new_business
+        except IntegrityError as e:
+            self.db.rollback()
+            handle_integrity_error(e, f"create_business owner_id={data.owner_id}")
         except Exception:
             self.db.rollback()
             raise

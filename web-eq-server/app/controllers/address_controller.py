@@ -1,13 +1,15 @@
+import logging
 from uuid import UUID
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from sqlalchemy.exc import SQLAlchemyError
 from app.models.address import EntityType
 from app.models.user import User
 from app.schemas.address import AddressCreate
 from app.services.address_service import AddressService
 from app.services.business_service import BusinessService
 from app.services.employee_service import EmployeeService
+
+logger = logging.getLogger(__name__)
 
 
 class AddressController:
@@ -25,24 +27,19 @@ class AddressController:
             return created_address
         except HTTPException:
             raise
-        except SQLAlchemyError:
+        except Exception:
             self.db.rollback()
-            raise HTTPException(status_code=500, detail="Database error")
-        except Exception as e:
-            self.db.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to create address: {str(e)}")
+            logger.exception("Failed to create_entity_address (entity_type=%s entity_id=%s)", entity_type, entity_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_entity_addresses(self, entity_type: EntityType, entity_id: UUID):
         try:
             return self.address_service.get_addresses_by_entity(entity_type, entity_id)
         except HTTPException:
             raise
-        except SQLAlchemyError:
-            self.db.rollback()
-            raise HTTPException(status_code=500, detail="Database error")
-        except Exception as e:
-            self.db.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to fetch addresses: {str(e)}")
+        except Exception:
+            logger.exception("Failed to get_entity_addresses (entity_type=%s entity_id=%s)", entity_type, entity_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def can_edit_entity_address(self, user: User, entity_type: EntityType, entity_id: UUID) -> bool:
         if entity_type == EntityType.BUSINESS:
@@ -61,9 +58,7 @@ class AddressController:
             return self.address_service.upsert_address(data, entity_type, entity_id)
         except HTTPException:
             raise
-        except SQLAlchemyError:
+        except Exception:
             self.db.rollback()
-            raise HTTPException(status_code=500, detail="Database error")
-        except Exception as e:
-            self.db.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to save address: {str(e)}")
+            logger.exception("Failed to upsert_entity_address (entity_type=%s entity_id=%s)", entity_type, entity_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})

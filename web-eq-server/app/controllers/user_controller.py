@@ -1,7 +1,7 @@
+import logging
 from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import Optional
-from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
 
 from app.services.user_service import UserService
@@ -14,6 +14,8 @@ from app.schemas.user import (
     UserDetailUserInfo,
     QueueSummaryItem,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class UserController:
@@ -30,10 +32,11 @@ class UserController:
         try:
             users = self.service.get_users(page, limit, search)
             return [UserData.from_user(user) for user in users]
-        except SQLAlchemyError as e:
-            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to get users: {str(e)}")
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_users")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_users_appointments(
         self,
@@ -60,39 +63,48 @@ class UserController:
                 limit=limit,
             )
             return UsersAppointmentsResponse(items=items, total=total, page=page, limit=limit)
-        except SQLAlchemyError as e:
-            raise HTTPException(status_code=500, detail={"message": f"Database error: {str(e)}"})
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_users_appointments (business_id=%s queue_id=%s)", business_id, queue_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_user_detail(self, user_id: UUID) -> UserDetailResponse:
-        result = self.service.get_user_detail(user_id)
-        if not result:
-            raise HTTPException(status_code=404, detail={"message": "User not found"})
-        user, queue_rows = result
+        try:
+            result = self.service.get_user_detail(user_id)
+            if not result:
+                raise HTTPException(status_code=404, detail={"message": "User not found"})
+            user, queue_rows = result
 
-        phone_number = (user.phone_number or "").strip()
-        if user.country_code and phone_number:
-            phone_display = f"{user.country_code} {phone_number}"
-        else:
-            phone_display = phone_number
+            phone_number = (user.phone_number or "").strip()
+            if user.country_code and phone_number:
+                phone_display = f"{user.country_code} {phone_number}"
+            else:
+                phone_display = phone_number
 
-        user_info = UserDetailUserInfo(
-            user_id=str(user.uuid),
-            full_name=user.full_name,
-            email=user.email,
-            country_code=user.country_code,
-            phone_number=phone_display,
-            profile_picture=user.profile_picture,
-            date_of_birth=user.date_of_birth,
-            gender=user.gender,
-            member_since=user.created_at,
-        )
-        queue_summary = [
-            QueueSummaryItem(
-                queue_id=str(row.queue_id),
-                queue_name=row.queue_name or "",
-                total_appointments=row.total_appointments or 0,
-                last_visit=row.last_visit,
+            user_info = UserDetailUserInfo(
+                user_id=str(user.uuid),
+                full_name=user.full_name,
+                email=user.email,
+                country_code=user.country_code,
+                phone_number=phone_display,
+                profile_picture=user.profile_picture,
+                date_of_birth=user.date_of_birth,
+                gender=user.gender,
+                member_since=user.created_at,
             )
-            for row in queue_rows
-        ]
-        return UserDetailResponse(user_info=user_info, queue_summary=queue_summary)
+            queue_summary = [
+                QueueSummaryItem(
+                    queue_id=str(row.queue_id),
+                    queue_name=row.queue_name or "",
+                    total_appointments=row.total_appointments or 0,
+                    last_visit=row.last_visit,
+                )
+                for row in queue_rows
+            ]
+            return UserDetailResponse(user_info=user_info, queue_summary=queue_summary)
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_user_detail (user_id=%s)", user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})

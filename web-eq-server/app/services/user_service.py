@@ -1,9 +1,10 @@
+import logging
 from sqlalchemy.orm import Session, load_only
 from sqlalchemy import and_, or_, asc, func
 from uuid import UUID
 from datetime import datetime
 from typing import Optional, Tuple, List, Any
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 from app.models.user import User
 from app.models.role import UserRoles, Role
@@ -11,7 +12,10 @@ from app.models.queue import Queue, QueueUser
 from app.schemas.auth import UserRegistrationInput
 from app.schemas.user import AppointmentUserItem
 from app.core.context import RequestContext
+from app.core.exceptions import handle_integrity_error
 from app.utils.pagination import paginate_query
+
+logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -71,7 +75,7 @@ class UserService:
         dob_datetime = None
         if data.date_of_birth:
             dob_datetime = datetime.strptime(data.date_of_birth, '%Y-%m-%d')
-        
+
         new_user = User(
             country_code=data.country_code,
             phone_number=data.phone_number,
@@ -81,11 +85,14 @@ class UserService:
             gender=data.gender,
             email_verify=False
         )
-        
-        self.db.add(new_user)
-        self.db.commit()
-        self.db.refresh(new_user)
-        return new_user
+        try:
+            self.db.add(new_user)
+            self.db.commit()
+            self.db.refresh(new_user)
+            return new_user
+        except IntegrityError as e:
+            self.db.rollback()
+            handle_integrity_error(e, f"create_user phone={data.country_code}{data.phone_number}")
 
     def find_or_create_guest_user(
         self, phone_number: str, country_code: str, full_name: Optional[str] = None
@@ -104,10 +111,16 @@ class UserService:
             full_name=full_name or "",
             email_verify=False,
         )
-        self.db.add(guest)
-        self.db.commit()
-        self.db.refresh(guest)
-        return guest
+        try:
+            self.db.add(guest)
+            self.db.commit()
+            self.db.refresh(guest)
+            return guest
+        except IntegrityError:
+            # Race condition: another request created the user between our check and insert
+            self.db.rollback()
+            logger.warning("Race condition in find_or_create_guest_user phone=%s%s — returning existing", country_code, phone_number)
+            return self.get_user_by_phone(country_code, phone_number)  # type: ignore[return-value]
 
     def update_user_profile(self, user: User, data: UserRegistrationInput) -> User:
         """Partial update: only set fields that are present in the payload."""
@@ -127,6 +140,9 @@ class UserService:
             self.db.commit()
             self.db.refresh(user_obj)
             return user_obj
+        except IntegrityError as e:
+            self.db.rollback()
+            handle_integrity_error(e, f"update_user_profile user={user_obj.uuid}")
         except SQLAlchemyError:
             self.db.rollback()
             raise

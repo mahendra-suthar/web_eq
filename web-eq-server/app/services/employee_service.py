@@ -1,16 +1,21 @@
+import logging
 from uuid import UUID
 from datetime import timedelta
 from typing import List, Optional, Tuple
 from sqlalchemy import asc, or_
 from sqlalchemy.orm import Session, load_only, joinedload, selectinload
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError
+from fastapi import HTTPException
 
 from app.models.employee import Employee
 from app.models.business import Business
 from app.models.queue import Queue, QueueService
 from app.schemas.employee import BusinessEmployeesInput, EmployeeUpdate
 from app.core.utils import generate_invitation_code, now_utc
+from app.core.exceptions import handle_integrity_error
 from app.services.schedule_service import ScheduleService
+
+logger = logging.getLogger(__name__)
 
 
 class EmployeeService:
@@ -65,25 +70,35 @@ class EmployeeService:
                 self.db.refresh(s)
             return employees, invitation_codes
 
-        except SQLAlchemyError:
+        except IntegrityError as e:
             self.db.rollback()
-            raise
+            handle_integrity_error(e, f"add_employees business_id={data.business_id}")
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to add_employees (business_id=%s)", data.business_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def update_employee(self, employee_id: UUID, data: EmployeeUpdate) -> Employee:
-        employee = self.db.query(Employee).filter(Employee.uuid == employee_id).first()
-        if not employee:
-            raise ValueError(f"Employee with id {employee_id} not found")
-        update_data = data.model_dump(exclude_unset=True)
-        for field, value in update_data.items():
-            if hasattr(employee, field):
-                setattr(employee, field, value)
         try:
+            employee = self.db.query(Employee).filter(Employee.uuid == employee_id).first()
+            if not employee:
+                raise ValueError(f"Employee with id {employee_id} not found")
+            update_data = data.model_dump(exclude_unset=True)
+            for field, value in update_data.items():
+                if hasattr(employee, field):
+                    setattr(employee, field, value)
             self.db.commit()
             self.db.refresh(employee)
             return employee
-        except SQLAlchemyError:
-            self.db.rollback()
+        except (HTTPException, ValueError):
             raise
+        except IntegrityError as e:
+            self.db.rollback()
+            handle_integrity_error(e, f"update_employee employee_id={employee_id}")
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to update_employee (employee_id=%s)", employee_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_employees(self, business_id: UUID, page: int, limit: int, search: str | None):
         try:
@@ -111,18 +126,18 @@ class EmployeeService:
             query = query.order_by(asc(Employee.created_at))
             return query.offset(offset).limit(limit).all()
 
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_employees (business_id=%s)", business_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_employee_by_id(self, employee_id: UUID) -> Optional[Employee]:
         try:
             return self.db.query(Employee).filter(Employee.uuid == employee_id).first()
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_employee_by_id (employee_id=%s)", employee_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
-    def get_employee_by_id_with_relations(
-        self, employee_id: UUID
-    ) -> Optional[Employee]:
+    def get_employee_by_id_with_relations(self, employee_id: UUID) -> Optional[Employee]:
         try:
             return (
                 self.db.query(Employee)
@@ -135,14 +150,16 @@ class EmployeeService:
                 .filter(Employee.uuid == employee_id)
                 .first()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_employee_by_id_with_relations (employee_id=%s)", employee_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_employee_by_user_id(self, user_id: UUID) -> Optional[Employee]:
         try:
             return self.db.query(Employee).filter(Employee.user_id == user_id).first()
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_employee_by_user_id (user_id=%s)", user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_employee_by_user_id_with_relations(self, user_id: UUID) -> Optional[Employee]:
         try:
@@ -155,8 +172,9 @@ class EmployeeService:
                 .filter(Employee.user_id == user_id)
                 .first()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_employee_by_user_id_with_relations (user_id=%s)", user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_employee_by_uuid_and_business(self, employee_uuid: UUID, business_id: UUID) -> Optional[Employee]:
         """Fetch an employee only if they belong to the given business (ownership check)."""
@@ -166,8 +184,9 @@ class EmployeeService:
                 .filter(Employee.uuid == employee_uuid, Employee.business_id == business_id)
                 .first()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_employee_by_uuid_and_business (employee_uuid=%s)", employee_uuid)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_verified_employee_by_queue(self, queue_id: UUID, business_id: UUID) -> Optional[Employee]:
         try:
@@ -180,8 +199,9 @@ class EmployeeService:
                 )
                 .first()
             )
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_verified_employee_by_queue (queue_id=%s)", queue_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_employee_by_phone(self, country_code: str, phone_number: str) -> Optional[Employee]:
         try:
@@ -189,41 +209,44 @@ class EmployeeService:
                 Employee.country_code == country_code,
                 Employee.phone_number == phone_number
             ).first()
-        except SQLAlchemyError:
-            raise
+        except Exception:
+            logger.exception("Failed to get_employee_by_phone (country_code=%s)", country_code)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_employee_by_invitation_code(self, code: str) -> Optional[Employee]:
-        normalized = (code or "").strip().upper()
-        if not normalized:
-            return None
-        return (
-            self.db.query(Employee)
-            .filter(
-                Employee.invitation_code == normalized,
-                Employee.invitation_code_expires_at.isnot(None),
-                Employee.invitation_code_expires_at > now_utc(),
-                Employee.user_id.is_(None),
+        try:
+            normalized = (code or "").strip().upper()
+            if not normalized:
+                return None
+            return (
+                self.db.query(Employee)
+                .filter(
+                    Employee.invitation_code == normalized,
+                    Employee.invitation_code_expires_at.isnot(None),
+                    Employee.invitation_code_expires_at > now_utc(),
+                    Employee.user_id.is_(None),
+                )
+                .first()
             )
-            .first()
-        )
+        except Exception:
+            logger.exception("Failed to get_employee_by_invitation_code")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def activate_employee(self, employee_id: UUID, user_id: UUID) -> Employee:
         try:
             employee = self.db.query(Employee).filter(Employee.uuid == employee_id).first()
-            
             if not employee:
                 raise ValueError(f"Employee with id {employee_id} not found")
-            
             employee.user_id = user_id
             employee.is_verified = True
             employee.invitation_code = None
             employee.invitation_code_expires_at = None
-
             self.db.commit()
             self.db.refresh(employee)
-            
             return employee
-        except SQLAlchemyError:
-            self.db.rollback()
+        except (HTTPException, ValueError):
             raise
-    
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to activate_employee (employee_id=%s)", employee_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
