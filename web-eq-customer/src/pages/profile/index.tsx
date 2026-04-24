@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/auth.store";
@@ -262,8 +262,6 @@ function getMonthYear(dateStr: string): string {
   }
 }
 
-const POLL_INTERVAL_MS = 30_000;
-
 function AppointmentsSection() {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -318,27 +316,6 @@ function AppointmentsSection() {
 
   useEffect(() => { loadPage(0, false); }, [loadPage]);
   const refreshList = useCallback(() => { loadPage(0, false); }, [loadPage]);
-
-  // Visibility-aware polling — refreshes both lists every 30 s when tab is in
-  // foreground and the customer has at least one active/upcoming appointment.
-  const hasActiveRef = useRef(false);
-  hasActiveRef.current =
-    list.some((i) => getRichStatusClass(i.status) === "upcoming") || todayAppts.length > 0;
-
-  useEffect(() => {
-    const poll = () => {
-      if (document.visibilityState === "visible" && hasActiveRef.current) {
-        loadPage(0, false);
-        fetchTodayAppts();
-      }
-    };
-    const id = setInterval(poll, POLL_INTERVAL_MS);
-    document.addEventListener("visibilitychange", poll);
-    return () => {
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", poll);
-    };
-  }, [loadPage, fetchTodayAppts]);
 
   // Stats derived from full list
   const stats = {
