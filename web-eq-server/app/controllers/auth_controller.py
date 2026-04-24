@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, Response, Request
+from jose import jwt as jose_jwt, JWTError
 
 from app.core.utils import hash_otp, generate_otp, is_full_day, now_utc
 from app.services.otp_service import OTPService
@@ -14,8 +15,8 @@ from app.services.employee_service import EmployeeService
 from app.services.address_service import AddressService
 from app.services.schedule_service import ScheduleService
 from app.controllers.role_controller import RoleController
-from app.middleware.auth import detect_client_type
-from app.core.config import RATE_LIMIT_PER_HOUR, OTP_EXPIRY_MINUTES, DEFAULT_OTP
+from app.middleware.auth import detect_client_type, create_access_token, get_access_token_expires_time
+from app.core.config import RATE_LIMIT_PER_HOUR, OTP_EXPIRY_MINUTES, DEFAULT_OTP, SECRET_KEY, ALGORITHM
 from app.core.constants import BUSINESS_REGISTERED
 from app.models.user import User
 from app.models.address import EntityType
@@ -154,6 +155,81 @@ class AuthController:
         except Exception:
             logger.exception("Failed to verify_otp_customer (country_code=%s)", data.country_code)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    async def refresh_customer_token(self, request: Request, response: Response) -> LoginResponse:
+        """
+        Silent token refresh for the customer web app.
+
+        The endpoint is unprotected (no AuthMiddleware). It reads the
+        `customer_access_token` httpOnly cookie, validates the JWT signature
+        (allowing expired tokens within the cookie's 24-hour window), then
+        issues a fresh token and rotates the cookie.
+        """
+        try:
+            raw_token = request.cookies.get("customer_access_token")
+            if not raw_token:
+                raise HTTPException(
+                    status_code=401,
+                    detail={"message": "No session found. Please log in."},
+                )
+
+            try:
+                payload = jose_jwt.decode(
+                    raw_token,
+                    SECRET_KEY,
+                    algorithms=[ALGORITHM],
+                    options={"verify_exp": False},
+                )
+            except JWTError:
+                raise HTTPException(
+                    status_code=401,
+                    detail={"message": "Invalid session. Please log in again."},
+                )
+
+            # Reject tokens older than 24 h (matches cookie max_age)
+            iat = payload.get("iat")
+            if iat:
+                issued_at = datetime.fromtimestamp(iat, tz=timezone.utc)
+                if datetime.now(timezone.utc) - issued_at > timedelta(hours=24):
+                    raise HTTPException(
+                        status_code=401,
+                        detail={"message": "Session expired. Please log in again."},
+                    )
+
+            user_id = payload.get("sub")
+            user_type = payload.get("user_type")
+
+            if not user_id or user_type != "CUSTOMER":
+                raise HTTPException(
+                    status_code=401,
+                    detail={"message": "Invalid session. Please log in again."},
+                )
+
+            try:
+                user = self.user_service.get_user_by_id(UUID(user_id))
+            except ValueError:
+                raise HTTPException(
+                    status_code=401,
+                    detail={"message": "Invalid session. Please log in again."},
+                )
+
+            if not user:
+                raise HTTPException(
+                    status_code=401,
+                    detail={"message": "User not found. Please log in again."},
+                )
+
+            return await self.auth_service.generate_auth_response(
+                user, response, "web", user_type="CUSTOMER", profile_type="CUSTOMER"
+            )
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to refresh_customer_token")
+            raise HTTPException(
+                status_code=500,
+                detail={"message": "An unexpected error occurred. Please try again."},
+            )
 
     def get_or_create_user_for_business_flow(
         self, country_code: str, phone_number: str, client_type: Optional[str]

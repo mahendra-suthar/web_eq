@@ -343,9 +343,9 @@ export default function BusinessBasicInfo({
                 placeholder={t("enterBusinessEmail")}
                 value={businessEmail}
                 onChange={(e) => {
-                  setBusinessEmail(e.target.value);
+                  setBusinessEmail(e.target.value.toLowerCase());
                   if (touched.business_email) {
-                    validateField("business_email", e.target.value);
+                    validateField("business_email", e.target.value.toLowerCase());
                   }
                 }}
                 onBlur={() => handleBlur("business_email")}

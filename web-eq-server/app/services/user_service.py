@@ -13,6 +13,7 @@ from app.schemas.auth import UserRegistrationInput
 from app.schemas.user import AppointmentUserItem
 from app.core.context import RequestContext
 from app.core.exceptions import handle_integrity_error
+from app.core.utils import normalize_email
 from app.utils.pagination import paginate_query
 
 logger = logging.getLogger(__name__)
@@ -80,7 +81,7 @@ class UserService:
             country_code=data.country_code,
             phone_number=data.phone_number,
             full_name=data.full_name,
-            email=data.email,
+            email=normalize_email(data.email),
             date_of_birth=dob_datetime,
             gender=data.gender,
             email_verify=False
@@ -135,6 +136,8 @@ class UserService:
                 continue
             if field == "date_of_birth" and value is not None:
                 value = datetime.strptime(value, "%Y-%m-%d")
+            elif field == "email":
+                value = normalize_email(value)
             setattr(user_obj, field, value)
         try:
             self.db.commit()

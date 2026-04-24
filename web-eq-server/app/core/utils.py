@@ -25,6 +25,14 @@ APP_TZ = _APP_TZ  # public alias — import this in services that need the timez
 _UTC_MIN = datetime.min.replace(tzinfo=timezone.utc)
 
 
+def normalize_email(email: Optional[str]) -> Optional[str]:
+    """Normalize email to lowercase and strip whitespace. Returns None for empty/None input."""
+    if not email:
+        return None
+    normalized = email.strip().lower()
+    return normalized if normalized else None
+
+
 def now_utc() -> datetime:
     """Return current UTC time (timezone-aware)."""
     return datetime.now(timezone.utc)

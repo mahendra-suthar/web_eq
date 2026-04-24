@@ -307,7 +307,7 @@ export default function UserProfile() {
                 type="email"
                 placeholder={t("enterEmail")}
                 value={email}
-                onChange={(e) => handleInputChange("email", e.target.value)}
+                onChange={(e) => handleInputChange("email", e.target.value.toLowerCase())}
                 onBlur={() => handleBlur("email")}
               />
               {touched.email && errors.email && (

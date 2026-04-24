@@ -380,7 +380,7 @@ const EmployeeProfile = () => {
                                             <label className="info-label">{t("email")}</label>
                                             {isEditing ? (
                                                 <input type="email" className="info-input" value={userData.email}
-                                                    onChange={e => setUserData(prev => ({ ...prev, email: e.target.value }))}
+                                                    onChange={e => setUserData(prev => ({ ...prev, email: e.target.value.toLowerCase() }))}
                                                     placeholder={t("enterEmail")} />
                                             ) : (
                                                 <div className="info-value">{userData.email || t("notAvailable")}</div>
@@ -419,7 +419,7 @@ const EmployeeProfile = () => {
                                                 <label className="info-label">{t("email")}</label>
                                                 {isEditing ? (
                                                     <input type="email" className="info-input" value={employeeData.email}
-                                                        onChange={e => setEmployeeData(prev => ({ ...prev, email: e.target.value }))}
+                                                        onChange={e => setEmployeeData(prev => ({ ...prev, email: e.target.value.toLowerCase() }))}
                                                         placeholder={t("enterEmail")} />
                                                 ) : (
                                                     <div className="info-value">{employeeData.email || t("notAvailable")}</div>

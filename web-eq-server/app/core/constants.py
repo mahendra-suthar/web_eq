@@ -10,6 +10,7 @@ UNPROTECTED_ROUTE_PATHS = [
     "/api/auth/business-verify-otp",
     "/api/auth/admin-verify-otp",         # Admin OTP login — unprotected so unauthenticated admins can log in
     "/api/auth/logout",                   # Cookie clear — must work even when session is expired
+    "/api/auth/token/refresh",            # Silent token refresh — validates cookie, returns new token
     # ── Public catalogue reads ────────────────────────────────────────────────
     "/api/category/",                     # get_categories, tree
     "/api/service/get_services",          # services by category (no trailing slash)

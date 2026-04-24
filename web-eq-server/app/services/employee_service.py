@@ -11,7 +11,7 @@ from app.models.employee import Employee
 from app.models.business import Business
 from app.models.queue import Queue, QueueService
 from app.schemas.employee import BusinessEmployeesInput, EmployeeUpdate
-from app.core.utils import generate_invitation_code, now_utc
+from app.core.utils import generate_invitation_code, now_utc, normalize_email
 from app.core.exceptions import handle_integrity_error
 from app.services.schedule_service import ScheduleService
 
@@ -27,7 +27,7 @@ class EmployeeService:
             Employee(
                 business_id=data.business_id,
                 full_name=emp.full_name,
-                email=emp.email,
+                email=normalize_email(emp.email),
                 phone_number=emp.phone_number,
                 country_code=emp.country_code,
                 profile_picture=emp.profile_picture,
@@ -86,6 +86,8 @@ class EmployeeService:
             update_data = data.model_dump(exclude_unset=True)
             for field, value in update_data.items():
                 if hasattr(employee, field):
+                    if field == "email":
+                        value = normalize_email(value)
                     setattr(employee, field, value)
             self.db.commit()
             self.db.refresh(employee)

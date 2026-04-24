@@ -103,6 +103,13 @@ async def admin_verify_otp(payload: OTPVerifyInput, response: Response, request:
     return await controller.admin_verify_otp(payload, response, request)
 
 
+@auth_router.post("/token/refresh", response_model=LoginResponse)
+async def refresh_token(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Silently refresh the customer access token using the httpOnly cookie."""
+    controller = AuthController(db)
+    return await controller.refresh_customer_token(request, response)
+
+
 @auth_router.post("/logout", status_code=204)
 async def logout(request: Request, response: Response):
     """Clear the auth cookie for whichever app type is calling (customer or business/employee)."""

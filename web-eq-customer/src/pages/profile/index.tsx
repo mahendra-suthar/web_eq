@@ -181,7 +181,7 @@ function ProfileInfoSection({ onSaved }: { onSaved: (msg: string) => void }) {
                   type="email"
                   className="ac-form-input"
                   value={form.email ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value || undefined }))}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value.toLowerCase() || undefined }))}
                   placeholder="you@example.com"
                   autoComplete="email"
                 />
@@ -268,12 +268,13 @@ function AppointmentsSection() {
 
   // Today's active appointments — shown as live queue cards at the top
   const [todayAppts, setTodayAppts] = useState<TodayAppointmentResponse[]>([]);
-  useEffect(() => {
-    const svc = new AppointmentService();
-    svc.getTodayAppointments()
+  const fetchTodayAppts = useCallback(() => {
+    new AppointmentService()
+      .getTodayAppointments()
       .then((items) => setTodayAppts(items.filter((a) => a.status === 1 || a.status === 2)))
       .catch(() => {});
   }, []);
+  useEffect(() => { fetchTodayAppts(); }, [fetchTodayAppts]);
 
   const STATUS_LABELS = useMemo<Record<number, string>>(() => ({
     1: t("profile.statusWaiting"),

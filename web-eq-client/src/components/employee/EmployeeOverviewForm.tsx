@@ -75,7 +75,7 @@ export function EmployeeOverviewForm({
                             type="email"
                             className={`info-input ${errors.email ? "input-error" : ""}`}
                             value={values.email}
-                            onChange={(e) => onChange("email", e.target.value)}
+                            onChange={(e) => onChange("email", e.target.value.toLowerCase())}
                             placeholder={t("enterEmail")}
                             disabled={disabled}
                         />

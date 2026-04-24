@@ -375,7 +375,7 @@ const BusinessProfile = () => {
                                                     type="email"
                                                     className="info-input"
                                                     value={ownerData.email}
-                                                    onChange={e => setOwnerData(prev => ({ ...prev, email: e.target.value }))}
+                                                    onChange={e => setOwnerData(prev => ({ ...prev, email: e.target.value.toLowerCase() }))}
                                                     placeholder={t("enterEmail")}
                                                 />
                                             ) : (
@@ -423,7 +423,7 @@ const BusinessProfile = () => {
                                                         type="email"
                                                         className="info-input"
                                                         value={businessData.businessEmail}
-                                                        onChange={e => setBusinessData(prev => ({ ...prev, businessEmail: e.target.value }))}
+                                                        onChange={e => setBusinessData(prev => ({ ...prev, businessEmail: e.target.value.toLowerCase() }))}
                                                         placeholder={t("enterBusinessEmail")}
                                                     />
                                                 ) : (
