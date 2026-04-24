@@ -49,11 +49,22 @@ function patchScannerStyles(containerId: string) {
   }
 }
 
+/** Stop a scanner instance exactly once, swallowing both sync throws and async rejections. */
+async function safeStop(scanner: Html5Qrcode): Promise<void> {
+  try {
+    await scanner.stop();
+  } catch {
+    // scanner was never started, already stopped, or DOM was removed — all safe to ignore
+  }
+}
+
 export default function QRScanner({ onClose, onNavigate }: QRScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [error, setError] = useState<string>("");
   const [cameraReady, setCameraReady] = useState(false);
   const scannedRef = useRef(false);
+  const mountedRef = useRef(true);   // guards setState after unmount
+  const stoppedRef = useRef(false);  // prevents double stop
 
   // Lock body scroll
   useEffect(() => {
@@ -63,9 +74,20 @@ export default function QRScanner({ onClose, onNavigate }: QRScannerProps) {
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
+    stoppedRef.current = false;
+
     const SCANNER_ID = "qr-fs-region";
     const scanner = new Html5Qrcode(SCANNER_ID, { verbose: false });
     scannerRef.current = scanner;
+
+    let rafId: number | null = null;
+
+    const stopOnce = async () => {
+      if (stoppedRef.current) return;
+      stoppedRef.current = true;
+      await safeStop(scanner);
+    };
 
     scanner
       .start(
@@ -77,12 +99,12 @@ export default function QRScanner({ onClose, onNavigate }: QRScannerProps) {
 
           const path = resolveInternalPath(decodedText);
           if (!path) {
-            setError("Not an EaseQueue QR code. Please try again.");
             scannedRef.current = false;
+            if (mountedRef.current) setError("Not an EaseQueue QR code. Please try again.");
             return;
           }
 
-          scanner.stop().catch(() => {}).finally(() => {
+          stopOnce().finally(() => {
             onNavigate(path);
             onClose();
           });
@@ -90,18 +112,22 @@ export default function QRScanner({ onClose, onNavigate }: QRScannerProps) {
         () => { /* ignore per-frame failures */ }
       )
       .then(() => {
-        // html5-qrcode sets inline px dimensions — override them
+        if (!mountedRef.current) return;
         patchScannerStyles(SCANNER_ID);
-        // Re-patch after a tick in case library re-applies styles
-        requestAnimationFrame(() => patchScannerStyles(SCANNER_ID));
+        rafId = requestAnimationFrame(() => {
+          if (mountedRef.current) patchScannerStyles(SCANNER_ID);
+          rafId = null;
+        });
         setCameraReady(true);
       })
       .catch(() => {
-        setError("Camera access denied. Please allow camera permission and try again.");
+        if (mountedRef.current) setError("Camera access denied. Please allow camera permission and try again.");
       });
 
     return () => {
-      scanner.stop().catch(() => {});
+      mountedRef.current = false;
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      stopOnce();
     };
   }, []);
 

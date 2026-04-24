@@ -363,7 +363,7 @@ export default function BusinessEmployees({
                         type="email"
                         placeholder={t("enterEmployeeEmail")}
                         value={employee.email ?? ""}
-                        onChange={(e) => updateEmployee(index, "email", e.target.value)}
+                        onChange={(e) => updateEmployee(index, "email", e.target.value.toLowerCase())}
                         readOnly={isOwner}
                       />
                       {errors[index]?.email && (

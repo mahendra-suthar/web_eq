@@ -8,6 +8,9 @@ import axios, {
 import { getApiUrl } from '../../configs/config';
 import { useAuthStore } from '../../store/auth.store';
 
+// Module-level: all HttpClient instances share one in-flight refresh promise.
+// Concurrent 401s wait for the same promise instead of firing parallel refresh calls.
+let refreshPromise: Promise<string | null> | null = null;
 
 class HttpClient {
   private instance: AxiosInstance;
@@ -44,8 +47,43 @@ class HttpClient {
 
     this.instance.interceptors.response.use(
       this.handleSuccess,
-      (error: any) => {
+      async (error: any) => {
         const status = error?.response?.status;
+        const originalRequest = error?.config as any;
+
+        // Silent refresh: attempt once on 401 (not 403 — wrong role, refresh won't help).
+        // Skip if this IS the refresh call itself (prevents infinite loop).
+        if (
+          status === 401 &&
+          originalRequest &&
+          !originalRequest._refreshAttempted &&
+          !String(originalRequest.url ?? "").includes("/auth/token/refresh")
+        ) {
+          originalRequest._refreshAttempted = true;
+
+          // Reuse an in-flight refresh — concurrent 401s share one promise.
+          if (!refreshPromise) {
+            refreshPromise = axios
+              .post(`${baseURL}/auth/token/refresh`, {}, { withCredentials: true })
+              .then((res) => (res.data?.access_token as string) ?? null)
+              .catch(() => null)
+              .finally(() => { refreshPromise = null; });
+          }
+
+          const newToken = await refreshPromise;
+          if (newToken) {
+            useAuthStore.getState().setToken(newToken);
+            originalRequest.headers = {
+              ...originalRequest.headers,
+              Authorization: `Bearer ${newToken}`,
+            };
+            return await this.instance(originalRequest);
+          }
+
+          window.dispatchEvent(new Event("auth:unauthorized"));
+          return Promise.reject(error);
+        }
+
         if (status === 401 || status === 403) {
           window.dispatchEvent(new Event("auth:unauthorized"));
         }

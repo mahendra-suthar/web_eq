@@ -122,6 +122,20 @@ export class AuthService extends HttpClient {
     }
   }
 
+  /**
+   * Silent token refresh — sends the httpOnly cookie, returns a fresh access token.
+   * Called on app init (when userInfo exists but in-memory token is gone after reload)
+   * and by the axios 401 interceptor before giving up.
+   */
+  async refresh(): Promise<Token> {
+    try {
+      const res = await this.post<{ access_token: string; token_type: string }>('/auth/token/refresh', {});
+      return res as Token;
+    } catch (error: any) {
+      throw error;
+    }
+  }
+
   async logout(): Promise<void> {
     try {
       await this.post("/auth/logout", {});

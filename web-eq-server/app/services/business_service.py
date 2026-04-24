@@ -7,6 +7,7 @@ from typing import Optional, List, Tuple, Dict
 from collections import defaultdict
 
 from app.core.exceptions import handle_integrity_error
+from app.core.utils import normalize_email
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class BusinessService:
     def create_business_basic_info(self, data: BusinessBasicInfoInput) -> Business:
         new_business = Business(
             name=data.name,
-            email=data.email,
+            email=normalize_email(data.email),
             about_business=data.about_business,
             category_id=data.category_id,
             profile_picture=data.profile_picture,
@@ -55,7 +56,7 @@ class BusinessService:
 
     def update_business_basic_info(self, business: Business, data: BusinessBasicInfoInput) -> Business:
         business.name = data.name  # type: ignore[assignment]
-        business.email = data.email  # type: ignore[assignment]
+        business.email = normalize_email(data.email)  # type: ignore[assignment]
         business.about_business = data.about_business  # type: ignore[assignment]
         business.category_id = data.category_id  # type: ignore[assignment]
         if data.profile_picture:

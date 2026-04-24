@@ -37,7 +37,7 @@ if MOBILE_TOKEN_EXPIRE_DAYS:
 else:
     MOBILE_TOKEN_EXPIRE_DAYS = None  # Never expires by default for mobile
 
-WEB_TOKEN_EXPIRE_MINUTES = int(os.getenv("WEB_TOKEN_EXPIRE_MINUTES", "60"))
+WEB_TOKEN_EXPIRE_MINUTES = int(os.getenv("WEB_TOKEN_EXPIRE_MINUTES", "1440"))  # 24 h — matches cookie max_age
 
 # Redis configuration
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")

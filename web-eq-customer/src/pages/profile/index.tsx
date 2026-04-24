@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/auth.store";
@@ -181,7 +181,7 @@ function ProfileInfoSection({ onSaved }: { onSaved: (msg: string) => void }) {
                   type="email"
                   className="ac-form-input"
                   value={form.email ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value || undefined }))}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value.toLowerCase() || undefined }))}
                   placeholder="you@example.com"
                   autoComplete="email"
                 />
@@ -262,18 +262,21 @@ function getMonthYear(dateStr: string): string {
   }
 }
 
+const POLL_INTERVAL_MS = 30_000;
+
 function AppointmentsSection() {
   const navigate = useNavigate();
   const { t } = useTranslation();
 
   // Today's active appointments — shown as live queue cards at the top
   const [todayAppts, setTodayAppts] = useState<TodayAppointmentResponse[]>([]);
-  useEffect(() => {
-    const svc = new AppointmentService();
-    svc.getTodayAppointments()
+  const fetchTodayAppts = useCallback(() => {
+    new AppointmentService()
+      .getTodayAppointments()
       .then((items) => setTodayAppts(items.filter((a) => a.status === 1 || a.status === 2)))
       .catch(() => {});
   }, []);
+  useEffect(() => { fetchTodayAppts(); }, [fetchTodayAppts]);
 
   const STATUS_LABELS = useMemo<Record<number, string>>(() => ({
     1: t("profile.statusWaiting"),
@@ -315,6 +318,27 @@ function AppointmentsSection() {
 
   useEffect(() => { loadPage(0, false); }, [loadPage]);
   const refreshList = useCallback(() => { loadPage(0, false); }, [loadPage]);
+
+  // Visibility-aware polling — refreshes both lists every 30 s when tab is in
+  // foreground and the customer has at least one active/upcoming appointment.
+  const hasActiveRef = useRef(false);
+  hasActiveRef.current =
+    list.some((i) => getRichStatusClass(i.status) === "upcoming") || todayAppts.length > 0;
+
+  useEffect(() => {
+    const poll = () => {
+      if (document.visibilityState === "visible" && hasActiveRef.current) {
+        loadPage(0, false);
+        fetchTodayAppts();
+      }
+    };
+    const id = setInterval(poll, POLL_INTERVAL_MS);
+    document.addEventListener("visibilitychange", poll);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", poll);
+    };
+  }, [loadPage, fetchTodayAppts]);
 
   // Stats derived from full list
   const stats = {

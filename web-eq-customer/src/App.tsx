@@ -3,6 +3,7 @@ import CustomerLayout from "./layouts/customer-layout";
 import AuthLayout from "./layouts/auth-layout";
 import { AuthFailureHandler } from "./components/AuthFailureHandler";
 import ScrollToTop from "./components/ScrollToTop";
+import { useSessionRestore } from "./hooks/useSessionRestore";
 import { GuestOnlyRoute } from "./components/GuestOnlyRoute";
 import LandingPage from "./pages/landing";
 import BusinessListPage from "./pages/business-list";
@@ -14,6 +15,7 @@ import ProfilePage from "./pages/profile";
 import SearchPage from "./pages/search";
 
 function App() {
+  useSessionRestore();
   return (
     <BrowserRouter>
       <ScrollToTop />
