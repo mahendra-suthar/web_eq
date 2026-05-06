@@ -1,6 +1,6 @@
 from pydantic import BaseModel, field_validator
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, date
 from uuid import UUID
 
 from app.models.user import User
@@ -17,7 +17,7 @@ class UserData(BaseModel):
     phone_number: str
     full_name: Optional[str] = None
     email: Optional[str] = None
-    date_of_birth: Optional[datetime] = None
+    date_of_birth: Optional[date] = None
     gender: Optional[int] = None
 
     @field_validator('uuid', mode='before')
@@ -76,7 +76,7 @@ class UserDetailUserInfo(BaseModel):
     country_code: Optional[str] = None
     phone_number: str  # display string (may include country_code)
     profile_picture: Optional[str] = None
-    date_of_birth: Optional[datetime] = None
+    date_of_birth: Optional[date] = None
     gender: Optional[int] = None
     member_since: Optional[datetime] = None
 

@@ -130,9 +130,7 @@ export default function VerifyOTPPage() {
       if (response.token && response.user) {
         const toUserData = (u: typeof response.user) => ({
           ...u,
-          date_of_birth: u.date_of_birth
-            ? (typeof u.date_of_birth === "string" ? u.date_of_birth : new Date(u.date_of_birth).toISOString())
-            : null,
+          date_of_birth: u.date_of_birth ? String(u.date_of_birth).slice(0, 10) : null,
         });
         setUserInfo(toUserData(response.user));
         setProfileType(response.profile_type ?? "CUSTOMER");

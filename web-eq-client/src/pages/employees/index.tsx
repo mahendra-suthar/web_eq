@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { EmployeeService, EmployeeResponse } from '../../services/employee/employee.service';
@@ -126,9 +126,6 @@ const Employees = () => {
                     }
                     actions={
                         <>
-                            <button className="btn btn-secondary" disabled={loading || employees.length === 0}>
-                                {t("export")}
-                            </button>
                             <button
                                 type="button"
                                 className="btn btn-primary"

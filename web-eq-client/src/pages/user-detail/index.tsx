@@ -8,7 +8,8 @@ import './user-detail.scss';
 const formatDate = (value?: string | null) => {
     if (value == null || value === '') return null;
     try {
-        const d = new Date(value);
+        const iso = String(value).length === 10 ? `${value}T00:00:00` : String(value);
+        const d = new Date(iso);
         return isNaN(d.getTime()) ? value : d.toLocaleDateString();
     } catch {
         return value;

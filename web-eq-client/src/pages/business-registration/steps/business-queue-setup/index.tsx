@@ -110,8 +110,12 @@ export default function BusinessQueueSetup({
     return [createEmptyQueueBlock("q-0")];
   });
 
-  const [errors, setErrors] = useState<Record<string, { name?: string; employee?: string; services?: string }>>({});
-  const [touched, setTouched] = useState<Record<string, { name: boolean; employee: boolean; services: boolean }>>({});
+  type SvcFieldErrors = Record<string, { avg_service_time?: string; fee?: string }>;
+  type BlockErrors = { name?: string; employee?: string; services?: string; serviceSettings?: SvcFieldErrors };
+  type BlockTouched = { name: boolean; employee: boolean; services: boolean; serviceSettings: boolean };
+
+  const [errors, setErrors] = useState<Record<string, BlockErrors>>({});
+  const [touched, setTouched] = useState<Record<string, BlockTouched>>({});
 
   const addQueue = useCallback(() => {
     setQueues((prev) => [...prev, createEmptyQueueBlock(`q-${Date.now()}`)]);
@@ -139,11 +143,28 @@ export default function BusinessQueueSetup({
   }, []);
 
   const validateQueue = useCallback(
-    (block: QueueBlockState): { name?: string; employee?: string; services?: string } => {
-      const errs: { name?: string; employee?: string; services?: string } = {};
+    (block: QueueBlockState): BlockErrors => {
+      const errs: BlockErrors = {};
       if (!block.name?.trim()) errs.name = t("enterQueueName");
       if (!block.employee_id) errs.employee = t("selectEmployee");
       if (!block.selectedServices?.length) errs.services = t("selectAtLeastOneService");
+
+      const svcErrs: SvcFieldErrors = {};
+      block.selectedServices.forEach((serviceId) => {
+        const s = block.serviceSettings[serviceId];
+        const fieldErrs: { avg_service_time?: string; fee?: string } = {};
+        const avgTime = parseInt(s?.avg_service_time ?? "", 10);
+        if (!s?.avg_service_time?.trim() || isNaN(avgTime) || avgTime < 1) {
+          fieldErrs.avg_service_time = t("serviceAvgTimeRequired");
+        }
+        const fee = parseFloat(s?.fee ?? "");
+        if (s?.fee?.trim() === "" || s?.fee == null || isNaN(fee) || fee < 0) {
+          fieldErrs.fee = t("serviceFeeRequired");
+        }
+        if (Object.keys(fieldErrs).length) svcErrs[serviceId] = fieldErrs;
+      });
+      if (Object.keys(svcErrs).length) errs.serviceSettings = svcErrs;
+
       return errs;
     },
     [t]
@@ -151,13 +172,13 @@ export default function BusinessQueueSetup({
 
   const validateAll = useCallback((): boolean => {
     let valid = true;
-    const newErrors: Record<string, { name?: string; employee?: string; services?: string }> = {};
-    const newTouched: Record<string, { name: boolean; employee: boolean; services: boolean }> = {};
+    const newErrors: Record<string, BlockErrors> = {};
+    const newTouched: Record<string, BlockTouched> = {};
     queues.forEach((q) => {
       const errs = validateQueue(q);
       if (Object.keys(errs).length) valid = false;
       newErrors[q.id] = errs;
-      newTouched[q.id] = { name: true, employee: true, services: true };
+      newTouched[q.id] = { name: true, employee: true, services: true, serviceSettings: true };
     });
     setErrors(newErrors);
     setTouched(newTouched);
@@ -333,10 +354,10 @@ export default function BusinessQueueSetup({
                       value={block.name}
                       onChange={(e) => updateQueue(block.id, { name: e.target.value })}
                       onBlur={() =>
-                        setTouched((p) => ({
-                          ...p,
-                          [block.id]: { ...p[block.id], name: true },
-                        }))
+                        setTouched((p) => {
+                          const prev = p[block.id] ?? { name: false, employee: false, services: false, serviceSettings: false };
+                          return { ...p, [block.id]: { ...prev, name: true } };
+                        })
                       }
                       maxLength={100}
                     />
@@ -355,10 +376,10 @@ export default function BusinessQueueSetup({
                       value={block.employee_id}
                       onChange={(e) => updateQueue(block.id, { employee_id: e.target.value })}
                       onBlur={() =>
-                        setTouched((p) => ({
-                          ...p,
-                          [block.id]: { ...p[block.id], employee: true },
-                        }))
+                        setTouched((p) => {
+                          const prev = p[block.id] ?? { name: false, employee: false, services: false, serviceSettings: false };
+                          return { ...p, [block.id]: { ...prev, employee: true } };
+                        })
                       }
                     >
                       <option value="">{t("selectEmployee")}</option>
@@ -430,10 +451,10 @@ export default function BusinessQueueSetup({
                                 checked={block.selectedServices.includes(sid)}
                                 onChange={() => handleServiceToggle(block.id, sid)}
                                 onBlur={() =>
-                                  setTouched((p) => ({
-                                    ...p,
-                                    [block.id]: { ...p[block.id], services: true },
-                                  }))
+                                  setTouched((p) => {
+                                    const prev = p[block.id] ?? { name: false, employee: false, services: false, serviceSettings: false };
+                                    return { ...p, [block.id]: { ...prev, services: true } };
+                                  })
                                 }
                               />
                               <span>{service.name}</span>
@@ -466,32 +487,74 @@ export default function BusinessQueueSetup({
                             <div className="service-setting-fields">
                               <div className="form-field-wrapper">
                                 <label className="form-label">
-                                  {t("averageServiceTime")} ({t("minutes")})
+                                  {t("averageServiceTime")} ({t("minutes")}) *
                                 </label>
-                                <input
-                                  type="number"
-                                  placeholder="15"
-                                  value={block.serviceSettings[serviceId]?.avg_service_time || ""}
-                                  onChange={(e) =>
-                                    updateServiceSetting(block.id, serviceId, "avg_service_time", e.target.value)
-                                  }
-                                  min={1}
-                                />
+                                <div
+                                  className={`form-field${
+                                    touched[block.id]?.serviceSettings &&
+                                    errors[block.id]?.serviceSettings?.[serviceId]?.avg_service_time
+                                      ? " error"
+                                      : ""
+                                  }`}
+                                >
+                                  <input
+                                    type="number"
+                                    placeholder="15"
+                                    value={block.serviceSettings[serviceId]?.avg_service_time || ""}
+                                    onChange={(e) =>
+                                      updateServiceSetting(block.id, serviceId, "avg_service_time", e.target.value)
+                                    }
+                                    onBlur={() =>
+                                      setTouched((p) => {
+                                        const prev = p[block.id] ?? { name: false, employee: false, services: false, serviceSettings: false };
+                                        return { ...p, [block.id]: { ...prev, serviceSettings: true } };
+                                      })
+                                    }
+                                    min={1}
+                                  />
+                                  {touched[block.id]?.serviceSettings &&
+                                    errors[block.id]?.serviceSettings?.[serviceId]?.avg_service_time && (
+                                      <div className="error-text">
+                                        {errors[block.id]?.serviceSettings?.[serviceId]?.avg_service_time}
+                                      </div>
+                                    )}
+                                </div>
                               </div>
                               <div className="form-field-wrapper">
                                 <label className="form-label">
-                                  {t("fee")} ({t("currency")})
+                                  {t("fee")} ({t("currency")}) *
                                 </label>
-                                <input
-                                  type="number"
-                                  placeholder="0.00"
-                                  value={block.serviceSettings[serviceId]?.fee || ""}
-                                  onChange={(e) =>
-                                    updateServiceSetting(block.id, serviceId, "fee", e.target.value)
-                                  }
-                                  min={0}
-                                  step="0.01"
-                                />
+                                <div
+                                  className={`form-field${
+                                    touched[block.id]?.serviceSettings &&
+                                    errors[block.id]?.serviceSettings?.[serviceId]?.fee
+                                      ? " error"
+                                      : ""
+                                  }`}
+                                >
+                                  <input
+                                    type="number"
+                                    placeholder="0.00"
+                                    value={block.serviceSettings[serviceId]?.fee || ""}
+                                    onChange={(e) =>
+                                      updateServiceSetting(block.id, serviceId, "fee", e.target.value)
+                                    }
+                                    onBlur={() =>
+                                      setTouched((p) => {
+                                        const prev = p[block.id] ?? { name: false, employee: false, services: false, serviceSettings: false };
+                                        return { ...p, [block.id]: { ...prev, serviceSettings: true } };
+                                      })
+                                    }
+                                    min={0}
+                                    step="0.01"
+                                  />
+                                  {touched[block.id]?.serviceSettings &&
+                                    errors[block.id]?.serviceSettings?.[serviceId]?.fee && (
+                                      <div className="error-text">
+                                        {errors[block.id]?.serviceSettings?.[serviceId]?.fee}
+                                      </div>
+                                    )}
+                                </div>
                               </div>
                             </div>
                           </div>

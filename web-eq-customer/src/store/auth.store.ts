@@ -42,12 +42,7 @@ export const useAuthStore = create<AuthState>()(
         set({
           userInfo: {
             ...info,
-            // Ensure date_of_birth is stored as ISO string
-            date_of_birth: info.date_of_birth
-              ? (typeof info.date_of_birth === 'string'
-                  ? info.date_of_birth
-                  : new Date(info.date_of_birth).toISOString())
-              : null,
+            date_of_birth: info.date_of_birth ? String(info.date_of_birth).slice(0, 10) : null,
           },
         }),
 

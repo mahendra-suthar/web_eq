@@ -49,6 +49,7 @@ export interface CustomerAppointmentListItem {
   enqueue_time?: string | null;
   dequeue_time?: string | null;
   cancellation_reason?: string | null;
+  total_fee?: number | null;
 }
 
 export interface CustomerAppointmentListResponse {

@@ -20,7 +20,7 @@ export default function UserProfile() {
 
   const [fullName, setFullName] = useState<string>(profile?.user?.full_name ?? "");
   const [email, setEmail] = useState<string>(profile?.user?.email ?? "");
-  const [birthdate, setBirthdate] = useState<string>(profile?.user?.date_of_birth ?? "");
+  const [birthdate, setBirthdate] = useState<string>((profile?.user?.date_of_birth ?? "").slice(0, 10));
   const [gender, setGender] = useState<string>(
     profile?.user?.gender === 1 ? "male" : profile?.user?.gender === 2 ? "female" : ""
   );
@@ -43,11 +43,25 @@ export default function UserProfile() {
   
   const otpService = new OTPService();
 
-  const normalizeDateOfBirth = (dateOfBirth: any): string | null => {
-    if (!dateOfBirth) return null;
-    return typeof dateOfBirth === 'string'
-      ? dateOfBirth
-      : new Date(dateOfBirth).toISOString();
+  const normalizeDateOfBirth = (dateOfBirth: string | null | undefined): string | null =>
+    dateOfBirth ? dateOfBirth.slice(0, 10) : null;
+
+  const validateDOB = (value: string): string => {
+    if (!value) return "";
+    const birth = new Date(value + "T00:00:00");
+    const today = new Date();
+    const year = birth.getFullYear();
+    if (year < 1900) return t("birthdateTooOld");
+    if (birth > today) return t("birthdateInvalid");
+    if (userType === "business") {
+      const age =
+        today.getFullYear() - year -
+        ((today.getMonth() < birth.getMonth() ||
+          (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate()))
+          ? 1 : 0);
+      if (age < 18) return t("birthdateMinAge");
+    }
+    return "";
   };
 
   const validateField = (field: string, value: string) => {
@@ -73,17 +87,7 @@ export default function UserProfile() {
         break;
 
       case "birthdate":
-        if (value) {
-          const birthDate = new Date(value);
-          const today = new Date();
-          if (birthDate > today) {
-            newErrors.birthdate = t("birthdateInvalid");
-          } else {
-            newErrors.birthdate = "";
-          }
-        } else {
-          newErrors.birthdate = "";
-        }
+        newErrors.birthdate = validateDOB(value);
         break;
 
       case "gender":
@@ -147,15 +151,10 @@ export default function UserProfile() {
     }
 
     // Validate birthdate (optional, but must be valid if provided)
-    if (birthdate) {
-      const birthDate = new Date(birthdate);
-      const today = new Date();
-      if (birthDate > today) {
-        newErrors.birthdate = t("birthdateInvalid");
-        isValid = false;
-      } else {
-        newErrors.birthdate = "";
-      }
+    const dobError = validateDOB(birthdate);
+    if (dobError) {
+      newErrors.birthdate = dobError;
+      isValid = false;
     } else {
       newErrors.birthdate = "";
     }
@@ -325,6 +324,7 @@ export default function UserProfile() {
                 value={birthdate}
                 onChange={(e) => handleInputChange("birthdate", e.target.value)}
                 onBlur={() => handleBlur("birthdate")}
+                min="1900-01-01"
                 max={new Date().toISOString().split('T')[0]}
               />
               {touched.birthdate && errors.birthdate && (

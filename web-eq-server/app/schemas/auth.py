@@ -1,6 +1,6 @@
 import re
-from datetime import datetime
-from pydantic import BaseModel, field_validator
+from datetime import date
+from pydantic import BaseModel, field_validator, model_validator
 from enum import Enum
 from typing import Optional, Literal
 
@@ -148,14 +148,27 @@ class UserRegistrationInput(BaseModel):
     @classmethod
     def validate_date_of_birth(cls, v: Optional[str]) -> Optional[str]:
         if v:
+            if len(v) != 10:
+                raise ValueError("Invalid date format. Use YYYY-MM-DD")
             try:
-                birth_date = datetime.strptime(v, '%Y-%m-%d')
-                if birth_date > datetime.now():
-                    raise ValueError("Date of birth cannot be in the future")
-                return v
-            except ValueError as e:
-                if "time data" in str(e):
-                    raise ValueError("Invalid date format. Use YYYY-MM-DD")
-                raise e
+                birth_date = date.fromisoformat(v)
+            except ValueError:
+                raise ValueError("Invalid date format. Use YYYY-MM-DD")
+            if birth_date.year < 1900:
+                raise ValueError("Date of birth must be after year 1900")
+            if birth_date > date.today():
+                raise ValueError("Date of birth cannot be in the future")
         return v
+
+    @model_validator(mode="after")
+    def validate_business_owner_age(self) -> "UserRegistrationInput":
+        if self.date_of_birth and self.user_type == "business":
+            birth = date.fromisoformat(self.date_of_birth)
+            today = date.today()
+            age = today.year - birth.year - (
+                1 if (today.month, today.day) < (birth.month, birth.day) else 0
+            )
+            if age < 18:
+                raise ValueError("Business owner must be at least 18 years old")
+        return self
 

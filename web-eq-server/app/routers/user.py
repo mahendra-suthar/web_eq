@@ -1,5 +1,7 @@
+from typing import Literal
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.schemas.user import UserData, UsersAppointmentsResponse, UserDetailResponse
@@ -39,6 +41,29 @@ def get_users_appointments(
         queue_id=queue_id,
         page=page,
         limit=limit,
+    )
+
+
+@users_router.get(
+    "/appointments/export",
+    dependencies=[Depends(require_roles(["ADMIN", "BUSINESS", "EMPLOYEE"]))],
+)
+def export_users_appointments(
+    format: Literal["pdf", "xlsx"] = Query(..., description="Export format: pdf or xlsx"),
+    business_id: UUID | None = Query(None, description="Filter by business UUID"),
+    queue_id: UUID | None = Query(None, description="Filter by queue UUID"),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    controller = UserController(db)
+    buf, media_type, filename = controller.export_users_appointments(
+        fmt=format,
+        business_id=business_id,
+        queue_id=queue_id,
+    )
+    return StreamingResponse(
+        buf,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

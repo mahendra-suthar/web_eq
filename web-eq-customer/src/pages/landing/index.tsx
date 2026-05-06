@@ -25,6 +25,7 @@ import {
   formatAppointmentTimeSummary,
   formatDelayMessage,
   getApiErrorMessage,
+  getAvatarBackground,
 } from "../../utils/util";
 import "./landing.scss";
 
@@ -678,7 +679,11 @@ export default function LandingPage() {
                   <StarRating rating={review.rating} size="sm" />
                   <p className="lp-testi-text">{review.comment}</p>
                   <div className="lp-testi-author">
-                    <div className="lp-testi-avatar" aria-hidden="true">
+                    <div
+                      className="lp-testi-avatar"
+                      style={{ background: getAvatarBackground(review.user_name) }}
+                      aria-hidden="true"
+                    >
                       {(review.user_name ?? "?")[0].toUpperCase()}
                     </div>
                     <div>

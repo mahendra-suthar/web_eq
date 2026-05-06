@@ -59,8 +59,8 @@ class CustomerController:
             if not payload:
                 return self.get_profile(user)
             dob = payload.get("date_of_birth")
-            if dob is None and getattr(user, "date_of_birth", None):
-                dob = user.date_of_birth.strftime("%Y-%m-%d") if hasattr(user.date_of_birth, "strftime") else str(user.date_of_birth)
+            if dob is None and user.date_of_birth is not None:
+                dob = user.date_of_birth.strftime("%Y-%m-%d")
             input_data = UserRegistrationInput(
                 country_code=user.country_code or "",
                 phone_number=user.phone_number or "",

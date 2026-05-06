@@ -175,6 +175,26 @@ export function getInitials(name?: string | null, phone?: string | null): string
   return "?";
 }
 
+/**
+ * Deterministic avatar background gradient from a name string.
+ * Uses the full name's char-code sum so different names starting with the
+ * same letter still receive distinct colours.
+ */
+export function getAvatarBackground(name: string | null | undefined): string {
+  const GRADIENTS = [
+    "linear-gradient(135deg, #00695C 0%, #004D40 100%)", // teal (brand)
+    "linear-gradient(135deg, #5b4fcf 0%, #7c3aed 100%)", // indigo-violet
+    "linear-gradient(135deg, #c97c1a 0%, #b45309 100%)", // amber
+    "linear-gradient(135deg, #1d6fa4 0%, #1e40af 100%)", // ocean-blue
+    "linear-gradient(135deg, #b84a6e 0%, #9d174d 100%)", // rose
+    "linear-gradient(135deg, #1a7a56 0%, #0e4a35 100%)", // jade (brand variant)
+  ];
+  const str = name?.trim() || "?";
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash += str.charCodeAt(i);
+  return GRADIENTS[hash % GRADIENTS.length];
+}
+
 /** Delay message for APPROXIMATE when delay_minutes > 0. */
 export function formatDelayMessage(delayMinutes: number | null | undefined): string {
   if (delayMinutes == null || delayMinutes <= 0 || !Number.isFinite(delayMinutes)) return "";

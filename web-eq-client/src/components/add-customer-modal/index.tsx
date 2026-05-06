@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   QueueService,
   QueueDetailData,
@@ -31,6 +32,7 @@ export default function AddCustomerModal({
   onClose,
   onSuccess,
 }: Props) {
+  const { t } = useTranslation();
   const initialQueueId = queueId ?? (queues.length === 1 ? queues[0].id : "");
 
   const [selectedQueueId, setSelectedQueueId] = useState(initialQueueId);
@@ -78,18 +80,18 @@ export default function AddCustomerModal({
     const errs: Record<string, string> = {};
     const digits = phone.replace(/\D/g, "");
     if (!digits) {
-      errs.phone = "Phone number is required";
+      errs.phone = t("phoneNumberRequired");
     } else if (digits.length !== 10 || !/^[6789]/.test(digits)) {
-      errs.phone = "Enter a valid 10-digit mobile number";
+      errs.phone = t("validPhoneNumber");
     }
     if (!countryCode.trim()) {
-      errs.countryCode = "Country code is required";
+      errs.countryCode = t("countryCodeRequired");
     }
     if (!selectedQueueId) {
-      errs.queue = "Please select a queue";
+      errs.queue = t("pleaseSelectQueue");
     }
     if (selectedServiceIds.length === 0) {
-      errs.services = "Select at least one service";
+      errs.services = t("noServicesSelected");
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -118,22 +120,22 @@ export default function AddCustomerModal({
       onSuccess();
       onClose();
     } catch (err: any) {
-      setSubmitError(err?.message || "Failed to add customer. Please try again.");
+      setSubmitError(err?.response?.data?.detail?.message || err?.message || t("failedToAddCustomer"));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="acm-overlay" role="dialog" aria-modal="true" aria-label="Add Customer">
+    <div className="acm-overlay" role="dialog" aria-modal="true" aria-label={t("addCustomer")}>
       <div className="acm-modal">
         <div className="acm-header">
-          <h2 className="acm-title">Add Walk-in Customer</h2>
+          <h2 className="acm-title">{t("addWalkInCustomer")}</h2>
           <button
             type="button"
             className="acm-close"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("cancel")}
           >
             ×
           </button>
@@ -143,13 +145,13 @@ export default function AddCustomerModal({
           {/* Queue selector */}
           {showQueueSelector && (
             <div className="acm-field">
-              <label className="acm-label">Queue *</label>
+              <label className="acm-label">{t("queue")} *</label>
               <select
                 className={`acm-select${errors.queue ? " acm-input--error" : ""}`}
                 value={selectedQueueId}
                 onChange={(e) => setSelectedQueueId(e.target.value)}
               >
-                <option value="">Select a queue…</option>
+                <option value="">{t("selectQueuePlaceholder")}</option>
                 {queues.map((q) => (
                   <option key={q.id} value={q.id}>
                     {q.name}
@@ -162,7 +164,7 @@ export default function AddCustomerModal({
 
           {/* Phone */}
           <div className="acm-field">
-            <label className="acm-label">Phone Number *</label>
+            <label className="acm-label">{t("phoneNumber")} *</label>
             <div className="acm-phone-row">
               <input
                 type="text"
@@ -176,7 +178,7 @@ export default function AddCustomerModal({
                 <input
                   type="tel"
                   className={`acm-input${errors.phone ? " acm-input--error" : ""}`}
-                  placeholder="10-digit number"
+                  placeholder={t("tenDigitNumberPlaceholder")}
                   value={phone}
                   onChange={(e) => {
                     setPhone(e.target.value.replace(/\D/g, "").slice(0, 10));
@@ -192,11 +194,13 @@ export default function AddCustomerModal({
 
           {/* Name (optional) */}
           <div className="acm-field">
-            <label className="acm-label">Customer Name <span className="acm-optional">(optional)</span></label>
+            <label className="acm-label">
+              {t("customerName")} <span className="acm-optional">({t("optional")})</span>
+            </label>
             <input
               type="text"
               className="acm-input"
-              placeholder="e.g. Rajesh Kumar"
+              placeholder={t("customerNamePlaceholder")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={100}
@@ -205,9 +209,9 @@ export default function AddCustomerModal({
 
           {/* Services */}
           <div className="acm-field">
-            <label className="acm-label">Services *</label>
+            <label className="acm-label">{t("services")} *</label>
             {detailLoading ? (
-              <p className="acm-hint">Loading services…</p>
+              <p className="acm-hint">{t("loadingServices")}</p>
             ) : queueDetail && queueDetail.services.length > 0 ? (
               <div className={`acm-services${errors.services ? " acm-services--error" : ""}`}>
                 {queueDetail.services.map((s) => (
@@ -217,28 +221,30 @@ export default function AddCustomerModal({
                       checked={selectedServiceIds.includes(s.uuid)}
                       onChange={() => toggleService(s.uuid)}
                     />
-                    <span className="acm-service-name">{s.service_name || "Service"}</span>
+                    <span className="acm-service-name">{s.service_name || t("service")}</span>
                     {s.avg_service_time && (
-                      <span className="acm-service-meta">~{s.avg_service_time} min</span>
+                      <span className="acm-service-meta">~{s.avg_service_time} {t("minutes")}</span>
                     )}
                     {s.service_fee != null && s.service_fee > 0 && (
-                      <span className="acm-service-meta">₹{s.service_fee}</span>
+                      <span className="acm-service-meta">{t("currency")}{s.service_fee}</span>
                     )}
                   </label>
                 ))}
               </div>
             ) : queueDetail ? (
-              <p className="acm-hint">No services configured for this queue.</p>
+              <p className="acm-hint">{t("noServicesConfigured")}</p>
             ) : null}
             {errors.services && <span className="acm-error">{errors.services}</span>}
           </div>
 
           {/* Notes (optional) */}
           <div className="acm-field">
-            <label className="acm-label">Notes <span className="acm-optional">(optional)</span></label>
+            <label className="acm-label">
+              {t("notes")} <span className="acm-optional">({t("optional")})</span>
+            </label>
             <textarea
               className="acm-textarea"
-              placeholder="Any special instructions…"
+              placeholder={t("specialInstructionsPlaceholder")}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
@@ -259,14 +265,14 @@ export default function AddCustomerModal({
               onClick={onClose}
               disabled={submitting}
             >
-              Cancel
+              {t("cancel")}
             </button>
             <button
               type="submit"
               className="acm-btn acm-btn--submit"
               disabled={submitting || detailLoading || !selectedQueueId}
             >
-              {submitting ? "Adding…" : "Add to Queue"}
+              {submitting ? t("adding") : t("addToQueue")}
             </button>
           </div>
         </form>

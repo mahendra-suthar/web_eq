@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { QueueService, LiveQueueData, QueueData } from "../../services/queue/queue.service";
 import { useUserStore } from "../../utils/userStore";
@@ -12,12 +12,11 @@ import "./live-queue.scss";
 const queueService = new QueueService();
 
 /** Human-readable appointment type for display. */
-function appointmentTypeLabel(type: string | null | undefined): string {
-  if (!type) return "Queue";
-  const upper = type.toUpperCase();
-  if (upper === "FIXED") return "Fixed";
-  if (upper === "APPROXIMATE") return "Approximate";
-  return "Queue";
+function appointmentTypeLabel(type: string | null | undefined, t: (k: string) => string): string {
+  const upper = (type || "").toUpperCase();
+  if (upper === "FIXED") return t("apptTypeFixed");
+  if (upper === "APPROXIMATE") return t("apptTypeApproximate");
+  return t("apptTypeQueue");
 }
 
 /** Scheduled time for FIXED/APPROXIMATE: { labelKey, value } or null. */
@@ -59,7 +58,7 @@ type UIUser = {
 
 type CurrentUser = UIUser & { position: number | null; estimated_token: string };
 
-function mapLiveData(data: LiveQueueData): {
+function mapLiveData(data: LiveQueueData, t: (k: string) => string): {
   completed: UIUser[];
   current: CurrentUser | null;
   waiting: UIUser[];
@@ -92,8 +91,8 @@ function mapLiveData(data: LiveQueueData): {
     if (u.status === QueueUserStatus.IN_PROGRESS && u.expected_at_ts != null) {
       const remainingMs = u.expected_at_ts - now;
       estRemainingLabel = remainingMs <= 0
-        ? "Any moment now"
-        : `~${formatDurationMinutes(Math.ceil(remainingMs / 60_000))} remaining`;
+        ? t("finishingSoon")
+        : `~${formatDurationMinutes(Math.ceil(remainingMs / 60_000))} ${t("remainingTime")}`;
     }
 
     const base: UIUser = {
@@ -191,7 +190,7 @@ const LiveQueue: React.FC = () => {
       const data = await queueService.getLiveQueue(queueId);
       setLiveData(data);
     } catch (e: any) {
-      setError(e?.response?.data?.detail || "Failed to load live queue");
+      setError(e?.response?.data?.detail || t("failedToLoadLiveQueue"));
     } finally {
       setLoading(false);
     }
@@ -241,7 +240,7 @@ const LiveQueue: React.FC = () => {
   // Derived UI state — recalculates on new server data OR every 30s tick
   const { completed, current, waiting } = useMemo(() => {
     if (!liveData) return { completed: [], current: null, waiting: [] };
-    return mapLiveData(liveData);
+    return mapLiveData(liveData, t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveData, tick]);
 
@@ -260,7 +259,7 @@ const LiveQueue: React.FC = () => {
       const updated = await queueService.advanceQueue(selectedQueueId);
       setLiveData(updated);
     } catch (e: any) {
-      setActionError(e?.response?.data?.detail || "Failed to advance queue");
+      setActionError(e?.response?.data?.detail || t("failedToAdvanceQueue"));
     } finally {
       setNextLoading(false);
     }
@@ -278,7 +277,7 @@ const LiveQueue: React.FC = () => {
       await queueService.startQueue(selectedQueueId, businessId);
       setLiveData((prev) => (prev ? { ...prev, queue_status: 2 } : prev));
     } catch (e: any) {
-      setActionError(e?.response?.data?.detail || "Failed to start queue");
+      setActionError(e?.response?.data?.detail || t("failedToStartQueue"));
     } finally {
       setActionLoading(false);
     }
@@ -292,7 +291,7 @@ const LiveQueue: React.FC = () => {
       await queueService.stopQueue(selectedQueueId, businessId);
       setLiveData((prev) => (prev ? { ...prev, queue_status: 3 } : prev));
     } catch (e: any) {
-      setActionError(e?.response?.data?.detail || "Failed to stop queue");
+      setActionError(e?.response?.data?.detail || t("failedToStopQueue"));
     } finally {
       setActionLoading(false);
     }
@@ -324,7 +323,7 @@ const LiveQueue: React.FC = () => {
     return (
       <div className="live-queue-page">
         <div className="lq-shell lq-shell--empty">
-          <p className="lq-empty-msg">No queue found. Please assign a queue to continue.</p>
+          <p className="lq-empty-msg">{t("noQueueFound")}</p>
         </div>
       </div>
     );
@@ -351,11 +350,11 @@ const LiveQueue: React.FC = () => {
                 </select>
               ) : (
                 <div className="lq-header__title">
-                  {loading && !liveData ? "Loading…" : queueName}
+                  {loading && !liveData ? t("loading") : queueName}
                 </div>
               )}
-              {isStopped && <span className="lq-badge lq-badge--stopped">Stopped</span>}
-              {isRunning && <span className="lq-badge lq-badge--running">Running</span>}
+              {isStopped && <span className="lq-badge lq-badge--stopped">{t("queueStatusStopped")}</span>}
+              {isRunning && <span className="lq-badge lq-badge--running">{t("queueStatusRunning")}</span>}
               {isQueueRunningLate && (
                 <span className="lq-badge lq-badge--late">
                   {t("runningLateQueue") || "Running late"}
@@ -432,7 +431,7 @@ const LiveQueue: React.FC = () => {
 
         {/* Loading / Error states */}
         {loading && !liveData && (
-          <div className="lq-state-msg">Loading live queue…</div>
+          <div className="lq-state-msg">{t("loadingLiveQueue")}</div>
         )}
         {error && !liveData && (
           <div className="lq-state-msg lq-state-msg--error">{error}</div>
@@ -491,7 +490,7 @@ const LiveQueue: React.FC = () => {
                     <div className="lq-currentCard__topRow">
                       <div className="lq-currentCard__name">{current.full_name}</div>
                       <span className="lq-badge lq-badge--apptType" data-type={current.appointment_type || "QUEUE"}>
-                        {appointmentTypeLabel(current.appointment_type)}
+                        {appointmentTypeLabel(current.appointment_type, t)}
                       </span>
                       <span className="lq-badge lq-badge--progress">
                         {t("inProgress") || "In Progress"}
@@ -658,7 +657,7 @@ const LiveQueue: React.FC = () => {
                               <span className="lq-tokenChip">{item.user.token}</span>
                             )}
                             <span className="lq-badge lq-badge--apptType" data-type={item.user.appointment_type || "QUEUE"}>
-                              {appointmentTypeLabel(item.user.appointment_type)}
+                              {appointmentTypeLabel(item.user.appointment_type, t)}
                             </span>
                             <span className={`lq-badge lq-badge--${item.status}`}>
                               {item.status === "done"

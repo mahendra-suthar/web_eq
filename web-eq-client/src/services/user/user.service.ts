@@ -75,4 +75,15 @@ export class UserService extends HttpClient {
     async getUserDetail(userId: string): Promise<UserDetailResponse> {
         return await this.get<UserDetailResponse>(`/users/${userId}`);
     }
+
+    async exportUsers(params: {
+        business_id?: string;
+        queue_id?: string;
+        format: "pdf" | "xlsx";
+    }): Promise<Blob> {
+        return this.get("/users/appointments/export", {
+            params,
+            responseType: "blob",
+        });
+    }
 }
