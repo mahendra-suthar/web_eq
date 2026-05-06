@@ -1,14 +1,45 @@
 import logging
+from io import BytesIO
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
-from typing import List, Optional, Any, Dict, Tuple
+from typing import List, Literal, Optional, Any, Dict, Tuple
 from datetime import date, datetime, time, timedelta, timezone
 import pytz
 
-from app.core.constants import TIMEZONE
+from app.core.constants import (
+    TIMEZONE,
+    BUSINESS_REGISTERED,
+    QUEUE_RUNNING, QUEUE_STOPPED,
+    QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_COMPLETED,
+    QUEUE_USER_FAILED, QUEUE_USER_CANCELLED,
+    QUEUE_USER_PRIORITY_REQUESTED, QUEUE_USER_EXPIRED,
+    QUEUE_USER_STATUS_LABELS,
+    TIME_FORMAT, DEFAULT_AVG_TIME,
+    BOOKING_MODE_FIXED, BOOKING_MODE_APPROXIMATE, BOOKING_MODE_HYBRID,
+    APPOINTMENT_TYPE_QUEUE, APPOINTMENT_TYPE_FIXED, APPOINTMENT_TYPE_APPROXIMATE,
+)
+from app.core.utils import (
+    build_live_queue_users_raw,
+    today_app_date,
+    current_time_app_tz,
+    format_date_iso,
+    appointment_time_to_enqueue_dequeue,
+)
 from app.services.queue_service import QueueService
 from app.services.business_service import BusinessService
+from app.services.booking_calculation_service import BookingCalculationService
+from app.services.slot_generation_service import SlotGenerationService
+from app.services.export_service import MAX_EXPORT_ROWS, build_xlsx, build_pdf
+from app.services.user_service import UserService
+from app.services.employee_service import EmployeeService
+from app.services.notification_triggers import (
+    notify_booking_confirmed,
+    notify_new_customer,
+    notify_in_service,
+    notify_called_next,
+    notify_service_completed,
+)
 from app.services.realtime.queue_manager import queue_manager
 from app.services.realtime.live_queue_manager import live_queue_manager, calculate_queue_waits
 from app.services.realtime.customer_queue_manager import customer_queue_manager
@@ -26,39 +57,6 @@ from app.schemas.queue import (
 )
 from app.schemas.user import UserData
 from app.schemas.service import ServiceData
-from app.core.constants import (
-    BUSINESS_REGISTERED, QUEUE_USER_REGISTERED,
-    QUEUE_RUNNING, QUEUE_STOPPED,
-    QUEUE_USER_IN_PROGRESS, QUEUE_USER_COMPLETED,
-    TIME_FORMAT,
-    DEFAULT_AVG_TIME,
-)
-from app.core.utils import (
-    build_live_queue_users_raw,
-    today_app_date,
-    current_time_app_tz,
-    format_date_iso,
-    appointment_time_to_enqueue_dequeue,
-)
-from app.services.booking_calculation_service import BookingCalculationService
-from app.services.slot_generation_service import SlotGenerationService
-from app.services.user_service import UserService
-from app.services.employee_service import EmployeeService
-from app.services.notification_triggers import (
-    notify_booking_confirmed,
-    notify_new_customer,
-    notify_in_service,
-    notify_called_next,
-    notify_service_completed,
-)
-from app.core.constants import (
-    BOOKING_MODE_FIXED,
-    BOOKING_MODE_APPROXIMATE,
-    BOOKING_MODE_HYBRID,
-    APPOINTMENT_TYPE_FIXED,
-    APPOINTMENT_TYPE_QUEUE,
-    APPOINTMENT_TYPE_APPROXIMATE,
-)
 
 
 logger = logging.getLogger(__name__)
@@ -247,6 +245,53 @@ class QueueController:
         except Exception:
             logger.exception("Failed to get_users (business_id=%s queue_id=%s)", business_id, queue_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    async def export_queue_users(
+        self,
+        *,
+        fmt: Literal["pdf", "xlsx"],
+        business_id: UUID | None,
+        queue_id: UUID | None,
+        employee_id: UUID | None,
+        search: str | None,
+    ) -> tuple[BytesIO, str, str]:
+        try:
+            rows_raw = self.queue_service.get_queue_users(
+                business_id=business_id,
+                queue_id=queue_id,
+                employee_id=employee_id,
+                page=1,
+                limit=MAX_EXPORT_ROWS,
+                search=search,
+            )
+            columns = ["Name", "Email", "Phone", "Token No.", "Queue Date", "Enqueue Time", "Status", "Priority"]
+            rows = [
+                [
+                    getattr(user, "full_name", "") or "",
+                    getattr(user, "email", "") or "",
+                    f"{getattr(user, 'country_code', '') or ''} {getattr(user, 'phone_number', '') or ''}".strip(),
+                    queue_user.token_number or "",
+                    queue_user.queue_date.strftime("%Y-%m-%d") if queue_user.queue_date else "",
+                    queue_user.enqueue_time,
+                    QUEUE_USER_STATUS_LABELS.get(queue_user.status, "Unknown"),
+                    "Yes" if getattr(queue_user, "priority", False) else "No",
+                ]
+                for queue_user, user in rows_raw
+            ]
+            today = date.today().strftime("%Y-%m-%d")
+            filename = f"queue-users-{today}.{fmt}"
+            if fmt == "xlsx":
+                buf = build_xlsx(columns, rows)
+                media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            else:
+                buf = build_pdf("Queue Users Report", columns, rows)
+                media_type = "application/pdf"
+            return buf, media_type, filename
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to export_queue_users (business_id=%s queue_id=%s)", business_id, queue_id)
+            raise HTTPException(status_code=500, detail={"message": "Export failed. Please try again."})
 
     # ─────────────────────────────────────────────────────────────────────────
     # Customer Booking APIs

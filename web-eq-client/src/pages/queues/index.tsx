@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { QueueService, QueueData } from "../../services/queue/queue.service";
@@ -90,7 +90,7 @@ const Queues = () => {
                             onChange={(e) => setStatusFilter(e.target.value)}
                             disabled={loading}
                         >
-                            <option value="">{t("allStatuses") || "All statuses"}</option>
+                            <option value="">{t("allStatuses")}</option>
                             <option value={String(QueueStatus.REGISTERED)}>{t("registered") || "Registered"}</option>
                             <option value={String(QueueStatus.RUNNING)}>{t("running") || "Running"}</option>
                             <option value={String(QueueStatus.STOPPED)}>{t("stopped") || "Stopped"}</option>

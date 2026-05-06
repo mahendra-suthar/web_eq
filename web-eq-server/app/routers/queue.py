@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from typing import List, Literal, Optional
 from uuid import UUID
-from typing import List, Optional
 from datetime import date
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.controllers.queue_controller import QueueController
@@ -107,6 +108,30 @@ async def get_queue_users(
         page=page,
         limit=limit,
         search=search,
+    )
+
+
+@queue_router.get("/get_users/export")
+async def export_queue_users(
+    format: Literal["pdf", "xlsx"] = Query(..., description="Export format: pdf or xlsx"),
+    business_id: UUID | None = None,
+    queue_id: UUID | None = None,
+    employee_id: UUID | None = None,
+    search: str | None = None,
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    controller = QueueController(db)
+    buf, media_type, filename = await controller.export_queue_users(
+        fmt=format,
+        business_id=business_id,
+        queue_id=queue_id,
+        employee_id=employee_id,
+        search=search,
+    )
+    return StreamingResponse(
+        buf,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

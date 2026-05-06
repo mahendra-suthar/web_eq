@@ -442,4 +442,17 @@ export class QueueService extends HttpClient {
             throw customError;
         }
     }
+
+    async exportQueueUsers(params: {
+        business_id?: string;
+        queue_id?: string;
+        employee_id?: string;
+        search?: string;
+        format: "pdf" | "xlsx";
+    }): Promise<Blob> {
+        return this.get("/queue/get_users/export", {
+            params,
+            responseType: "blob",
+        });
+    }
 }

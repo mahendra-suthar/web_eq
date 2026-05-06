@@ -98,9 +98,7 @@ export default function VerifyOTP() {
         full_name: response.user.full_name ?? undefined,
         email: response.user.email ?? undefined,
         date_of_birth: response.user.date_of_birth
-          ? (typeof response.user.date_of_birth === "string"
-            ? response.user.date_of_birth
-            : new Date(response.user.date_of_birth).toISOString())
+          ? String(response.user.date_of_birth).slice(0, 10)
           : undefined,
         gender: response.user.gender ?? undefined,
       };

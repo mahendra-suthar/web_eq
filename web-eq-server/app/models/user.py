@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Integer, TIMESTAMP, Boolean
+from sqlalchemy import Column, String, Integer, TIMESTAMP, Boolean, Date
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -16,7 +16,7 @@ class User(Base):
     phone_number = Column(String, unique=True, nullable=False)
     full_name = Column(String, nullable=True)
     email = Column(String, unique=True, nullable=True)
-    date_of_birth = Column(TIMESTAMP(timezone=True), nullable=True)
+    date_of_birth = Column(Date, nullable=True)
     gender = Column(Integer, nullable=True)
     email_verify = Column(Boolean, default=False, nullable=False)
     profile_picture = Column(String, nullable=True)

@@ -23,7 +23,7 @@ class OwnerInfo(BaseModel):
             phone_number=str(user.phone_number),  # type: ignore
             country_code=str(user.country_code),  # type: ignore
             profile_picture=str(user.profile_picture) if user.profile_picture else None,  # type: ignore
-            date_of_birth=user.date_of_birth.isoformat() if user.date_of_birth else None,  # type: ignore
+            date_of_birth=user.date_of_birth.strftime("%Y-%m-%d") if user.date_of_birth else None,  # type: ignore
             gender=int(user.gender) if user.gender is not None else None  # type: ignore
         )
 

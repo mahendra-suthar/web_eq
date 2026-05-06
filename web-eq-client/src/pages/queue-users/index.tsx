@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { QueueService, QueueUserData, QueueData } from '../../services/queue/queue.service';
@@ -8,6 +8,9 @@ import { getInitials, getAvatarBackground } from '../../utils/utils';
 import { QueueUserStatus, DEFAULT_PAGE_LIMIT, DEFAULT_PAGE, DEFAULT_DEBOUNCE_DELAY_MS, ProfileType } from '../../utils/constants';
 import Pagination from '../../components/pagination';
 import PageToolbar from '../../components/page-toolbar';
+import { ExportModal } from '../../components/export-modal';
+import { downloadBlob, todayFilename } from '../../utils/downloadUtils';
+import { toast } from 'react-toastify';
 import "./queue-users.scss";
 
 const QueueUsers = () => {
@@ -32,6 +35,8 @@ const QueueUsers = () => {
     const isEmployee = !!employeeId;
     const [queueId, setQueueId] = useState<string>("");
     const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exporting, setExporting] = useState<'pdf' | 'xlsx' | null>(null);
     
 
     useEffect(() => {
@@ -125,6 +130,25 @@ const QueueUsers = () => {
         setCurrentPage(page);
     };
 
+    const handleExport = async (format: 'pdf' | 'xlsx') => {
+        setExporting(format);
+        try {
+            const blob = await queueService.exportQueueUsers({
+                business_id: businessId || undefined,
+                queue_id: queueId || undefined,
+                employee_id: employeeId || undefined,
+                search: debouncedSearch || undefined,
+                format,
+            });
+            downloadBlob(blob, todayFilename('queue-users', format));
+            setShowExportModal(false);
+        } catch {
+            toast.error(t('exportFailed'));
+        } finally {
+            setExporting(null);
+        }
+    };
+
     const formatDate = (dateString?: string) => {
         if (!dateString) return t("notAvailable");
         try {
@@ -156,6 +180,7 @@ const QueueUsers = () => {
     };
 
     return (
+        <>
         <div className="queue-users-page">
             <div className="content-card">
                 <PageToolbar
@@ -188,7 +213,11 @@ const QueueUsers = () => {
                         </>
                     }
                     actions={
-                        <button className="btn btn-secondary" disabled={loading || queueUsers.length === 0}>
+                        <button
+                            className="btn btn-secondary"
+                            disabled={loading || queueUsers.length === 0}
+                            onClick={() => setShowExportModal(true)}
+                        >
                             {t("export")}
                         </button>
                     }
@@ -290,6 +319,15 @@ const QueueUsers = () => {
                 )}
             </div>
         </div>
+
+        {showExportModal && (
+            <ExportModal
+                onExport={handleExport}
+                onClose={() => setShowExportModal(false)}
+                exporting={exporting}
+            />
+        )}
+        </>
     );
 };
 

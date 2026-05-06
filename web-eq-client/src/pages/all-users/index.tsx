@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { UserService, AppointmentUserItem } from '../../services/user/user.service';
@@ -9,6 +9,9 @@ import { getInitials, getAvatarBackground } from '../../utils/utils';
 import { DEFAULT_PAGE, ProfileType } from '../../utils/constants';
 import Pagination from '../../components/common/Pagination';
 import PageToolbar from '../../components/page-toolbar';
+import { ExportModal } from '../../components/export-modal';
+import { downloadBlob, todayFilename } from '../../utils/downloadUtils';
+import { toast } from 'react-toastify';
 import './all-users.scss';
 
 /** Role-based fetch params: business sees all or filtered by queue; employee sees only their queue. */
@@ -59,6 +62,8 @@ const AllUsers = () => {
     const [loadingProfile, setLoadingProfile] = useState(true);
     const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
     const [filterEmployeeId, setFilterEmployeeId] = useState<string>('');
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exporting, setExporting] = useState<'pdf' | 'xlsx' | null>(null);
 
     const businessId = getBusinessId() || '';
     const employeeId = getEmployeeId() || '';
@@ -137,6 +142,23 @@ const AllUsers = () => {
             .finally(() => setLoading(false));
     }, [params.businessId, params.queueId, params.hasContext, isEmployee, page, limit, userService, t]);
 
+    const handleExport = async (format: 'pdf' | 'xlsx') => {
+        setExporting(format);
+        try {
+            const blob = await userService.exportUsers({
+                business_id: params.businessId,
+                queue_id: params.queueId,
+                format,
+            });
+            downloadBlob(blob, todayFilename('users', format));
+            setShowExportModal(false);
+        } catch {
+            toast.error(t('exportFailed'));
+        } finally {
+            setExporting(null);
+        }
+    };
+
     const formatLastVisit = (dateStr?: string | null) => {
         if (!dateStr) return t('notAvailable');
         try {
@@ -148,6 +170,7 @@ const AllUsers = () => {
 
 
     return (
+        <>
         <div className="all-users-page">
             <div className="content-card">
                 <PageToolbar
@@ -172,7 +195,11 @@ const AllUsers = () => {
                         ) : undefined
                     }
                     actions={
-                        <button className="btn btn-secondary" disabled>
+                        <button
+                            className="btn btn-secondary"
+                            disabled={loading || !params.hasContext || items.length === 0}
+                            onClick={() => setShowExportModal(true)}
+                        >
                             {t('export')}
                         </button>
                     }
@@ -304,6 +331,16 @@ const AllUsers = () => {
                 )}
             </div>
         </div>
+
+        {showExportModal && (
+            <ExportModal
+                onExport={handleExport}
+                onClose={() => setShowExportModal(false)}
+                exporting={exporting}
+                title={t('exportUsers')}
+            />
+        )}
+        </>
     );
 };
 

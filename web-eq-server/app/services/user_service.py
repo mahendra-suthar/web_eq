@@ -2,7 +2,7 @@ import logging
 from sqlalchemy.orm import Session, load_only
 from sqlalchemy import and_, or_, asc, func
 from uuid import UUID
-from datetime import datetime
+from datetime import date
 from typing import Optional, Tuple, List, Any
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
@@ -75,7 +75,7 @@ class UserService:
     def create_user(self, data: UserRegistrationInput) -> User:
         dob_datetime = None
         if data.date_of_birth:
-            dob_datetime = datetime.strptime(data.date_of_birth, '%Y-%m-%d')
+            dob_datetime = date.fromisoformat(data.date_of_birth)
 
         new_user = User(
             country_code=data.country_code,
@@ -135,7 +135,7 @@ class UserService:
             if not hasattr(user_obj, field):
                 continue
             if field == "date_of_birth" and value is not None:
-                value = datetime.strptime(value, "%Y-%m-%d")
+                value = date.fromisoformat(value)
             elif field == "email":
                 value = normalize_email(value)
             setattr(user_obj, field, value)

@@ -118,6 +118,17 @@ BUSINESS_STATUS_LABELS = {
     BUSINESS_TERMINATED: "Terminated",
 }
 
+# Queue user status label map (int → display string)
+QUEUE_USER_STATUS_LABELS = {
+    QUEUE_USER_REGISTERED: "Registered",
+    QUEUE_USER_IN_PROGRESS: "In Progress",
+    QUEUE_USER_COMPLETED: "Completed",
+    QUEUE_USER_FAILED: "Failed",
+    QUEUE_USER_CANCELLED: "Cancelled",
+    QUEUE_USER_PRIORITY_REQUESTED: "Priority Requested",
+    QUEUE_USER_EXPIRED: "Expired",
+}
+
 # Application roles
 class AppRole(str, Enum):
     ADMIN = "ADMIN"

@@ -47,6 +47,7 @@ class CustomerAppointmentListItem(BaseModel):
     enqueue_time: Optional[datetime] = None       # actual serve-start time (completed)
     dequeue_time: Optional[datetime] = None       # actual serve-end time (completed)
     cancellation_reason: Optional[str] = None    # set when cancelled
+    total_fee: Optional[float] = None            # sum of service fees for all booked services
 
     @classmethod
     def from_orm_row(
@@ -62,6 +63,13 @@ class CustomerAppointmentListItem(BaseModel):
         business_id = str(queue.merchant_id) if queue else ""
         st = getattr(queue_user, "scheduled_start", None)
         se = getattr(queue_user, "scheduled_end", None)
+        fees = [
+            getattr(qus.queue_service, "service_fee", None)
+            for qus in (getattr(queue_user, "queue_user_services", None) or [])
+            if getattr(qus, "queue_service", None) is not None
+        ]
+        non_null_fees = [f for f in fees if f is not None]
+        total_fee = round(sum(non_null_fees), 2) if non_null_fees else None
         return cls(
             queue_user_id=str(queue_user.uuid),
             queue_id=str(queue.uuid),
@@ -85,6 +93,7 @@ class CustomerAppointmentListItem(BaseModel):
             enqueue_time=getattr(queue_user, "enqueue_time", None),
             dequeue_time=getattr(queue_user, "dequeue_time", None),
             cancellation_reason=getattr(queue_user, "cancellation_reason", None),
+            total_fee=total_fee,
         )
 
 

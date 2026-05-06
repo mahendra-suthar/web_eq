@@ -49,10 +49,12 @@ function useToast() {
 
 function ProfileInfoSection({ onSaved }: { onSaved: (msg: string) => void }) {
   const { t } = useTranslation();
+  const { setUserInfo } = useAuthStore();
   const [data, setData] = useState<CustomerProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dobError, setDobError] = useState<string | null>(null);
   const [form, setForm] = useState<CustomerProfileUpdateInput>({});
 
   const load = useCallback(async () => {
@@ -80,12 +82,26 @@ function ProfileInfoSection({ onSaved }: { onSaved: (msg: string) => void }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!data) return;
+    if (form.date_of_birth) {
+      const birth = new Date(form.date_of_birth + "T00:00:00");
+      const today = new Date();
+      if (birth.getFullYear() < 1900) {
+        setDobError(t("profile.birthdateTooOld"));
+        return;
+      }
+      if (birth > today) {
+        setDobError(t("profile.birthdateInvalid"));
+        return;
+      }
+    }
+    setDobError(null);
     setSaving(true);
     setError(null);
     try {
       const svc = new AuthService();
       const updated = await svc.updateCustomerProfile(form);
       setData(updated);
+      setUserInfo(updated.user);
       onSaved(t("profile.profileUpdated"));
     } catch (e) {
       setError(getApiErrorMessage(e, "Failed to update profile"));
@@ -193,10 +209,16 @@ function ProfileInfoSection({ onSaved }: { onSaved: (msg: string) => void }) {
                 <input
                   id="ac-dob"
                   type="date"
-                  className="ac-form-input"
+                  className={`ac-form-input${dobError ? " ac-form-input--error" : ""}`}
                   value={form.date_of_birth ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, date_of_birth: e.target.value || undefined }))}
+                  min="1900-01-01"
+                  max={new Date().toISOString().split("T")[0]}
+                  onChange={(e) => {
+                    setDobError(null);
+                    setForm((f) => ({ ...f, date_of_birth: e.target.value || undefined }));
+                  }}
                 />
+                {dobError && <div className="ac-form-error">{dobError}</div>}
               </div>
 
               <div className="ac-form-group">
@@ -494,6 +516,18 @@ function AppointmentsSection() {
                         </div>
                       )}
 
+                      {item.total_fee != null && item.total_fee > 0 && (
+                        <div className="ac-appt-fee-chip">
+                          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M16 8h-6a2 2 0 000 4h4a2 2 0 010 4H8" />
+                            <line x1="12" y1="6" x2="12" y2="8" />
+                            <line x1="12" y1="16" x2="12" y2="18" />
+                          </svg>
+                          {t("profile.totalFee")} ₹{item.total_fee.toFixed(2)}
+                        </div>
+                      )}
+
                       {/* Appointment type chip — shown for all statuses */}
                       <div className="ac-appt-type-chip" data-type={item.appointment_type || "QUEUE"}>
                         {apptTypeLabel}
@@ -746,6 +780,19 @@ export default function ProfilePage() {
 
   return (
     <div className="ac-page">
+      <div className="ac-back-row">
+        <button
+          className="ac-back-btn"
+          onClick={() => navigate(-1)}
+          aria-label={t("back")}
+        >
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          {t("back")}
+        </button>
+      </div>
+
       <div className="ac-shell">
 
         <aside className="ac-sidebar">

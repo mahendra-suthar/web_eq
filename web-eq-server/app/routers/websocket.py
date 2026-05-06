@@ -359,7 +359,7 @@ async def notifications_websocket(
     # Send initial state on connect
     try:
         svc = NotificationService(db)
-        uid = _UUID(user_id)
+        uid = UUID(user_id)
         rows, total = svc.get_for_user(uid, limit=20, offset=0)
         unread = svc.get_unread_count(uid)
         initial_data = NotificationListResponse(
