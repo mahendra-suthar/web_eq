@@ -1,4 +1,5 @@
 @use "../../variables.scss" as *;
+@use "../../styles/admin-shared.scss" as sh;
 
 $teal-700: #00695C;
 $teal-800: #00574B;
@@ -297,6 +298,8 @@ $teal-500: #009688;
             &:disabled { cursor: not-allowed; opacity: 0.5; }
         }
     }
+
+    @include sh.toggle-switch-styles;
 }
 
 .schedule-list {

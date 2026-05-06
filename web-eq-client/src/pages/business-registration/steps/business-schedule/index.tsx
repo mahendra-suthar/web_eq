@@ -200,31 +200,28 @@ export default function BusinessSchedule({
         <div className="business-schedule-form-fields">
           {/* Always Open Toggle */}
           <div className="form-field-wrapper">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={isAlwaysOpen}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setIsAlwaysOpen(checked);
-                  
-                  if (checked) {
-                    const alwaysOpenSchedule: DaySchedule[] = getDefaultSchedule().map((day) => ({
-                      ...day,
-                      is_open: true,
-                    }));
-                    setSchedule(alwaysOpenSchedule);
-                    setErrors({});
-                  } else {
-                    setSchedule(getDefaultSchedule());
-                    if (touched) {
-                      validateSchedule(getDefaultSchedule());
+            <div className="always-open-row">
+              <label className="form-label" htmlFor="reg-always-open-toggle">{t("alwaysOpen")}</label>
+              <label className="toggle-switch">
+                <input
+                  id="reg-always-open-toggle"
+                  type="checkbox"
+                  checked={isAlwaysOpen}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsAlwaysOpen(checked);
+                    if (checked) {
+                      setSchedule(getDefaultSchedule().map((day) => ({ ...day, is_open: true })));
+                      setErrors({});
+                    } else {
+                      setSchedule(getDefaultSchedule());
+                      if (touched) validateSchedule(getDefaultSchedule());
                     }
-                  }
-                }}
-              />
-              <span>{t("alwaysOpen")}</span>
-            </label>
+                  }}
+                />
+                <span className="toggle-track" />
+              </label>
+            </div>
           </div>
 
           {!isAlwaysOpen && (

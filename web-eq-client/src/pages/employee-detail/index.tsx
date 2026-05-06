@@ -353,8 +353,8 @@ const EmployeeDetail = () => {
             <div className="employee-detail-page">
                 <div className="content-card">
                     <div className="error-message" style={{ padding: "1rem", color: "red" }}>{error}</div>
-                    <button type="button" className="btn btn-secondary" onClick={() => navigate(RouterConstant.ROUTERS_PATH.EMPLOYEES)}>
-                        {t("backToEmployees")}
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(RouterConstant.ROUTERS_PATH.EMPLOYEES)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t("back")}
                     </button>
                 </div>
             </div>
@@ -365,8 +365,8 @@ const EmployeeDetail = () => {
         <div className="employee-detail-page">
             <div className="content-card">
                 <div className="card-header section-header-actions">
-                    <button type="button" className="btn btn-secondary" onClick={() => navigate(RouterConstant.ROUTERS_PATH.EMPLOYEES)}>
-                        {t("backToEmployees")}
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(RouterConstant.ROUTERS_PATH.EMPLOYEES)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t("back")}
                     </button>
                 </div>
 
@@ -549,29 +549,28 @@ const EmployeeDetail = () => {
                             </div>
                             <div className="section-content">
                                 <div className="schedule-header">
-                                    <div className="info-field">
-                                        <label className="info-label">{t("alwaysOpen")}</label>
-                                        {editingSchedule ? (
-                                            <label className="schedule-toggle-label">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={scheduleData.isAlwaysOpen}
-                                                    onChange={e => {
-                                                        const checked = e.target.checked;
-                                                        setScheduleData(prev => ({
-                                                            ...prev,
-                                                            isAlwaysOpen: checked,
-                                                            schedule: checked
-                                                                ? prev.schedule.map(d => ({ ...d, is_open: true, opening_time: "00:00", closing_time: "23:59" }))
-                                                                : prev.schedule.map(d => ({ ...d, is_open: false, opening_time: "", closing_time: "" })),
-                                                        }));
-                                                    }}
-                                                />
-                                                <span>{scheduleData.isAlwaysOpen ? t("yes") : t("no")}</span>
-                                            </label>
-                                        ) : (
-                                            <div className="info-value">{scheduleData.isAlwaysOpen ? t("yes") : t("no")}</div>
-                                        )}
+                                    <div className="always-open-row">
+                                        <label className="info-label" htmlFor="always-open-toggle">{t("alwaysOpen")}</label>
+                                        <label className={`toggle-switch${!editingSchedule ? " toggle-switch--disabled" : ""}`}>
+                                            <input
+                                                id="always-open-toggle"
+                                                type="checkbox"
+                                                checked={scheduleData.isAlwaysOpen}
+                                                disabled={!editingSchedule}
+                                                onChange={e => {
+                                                    if (!editingSchedule) return;
+                                                    const checked = e.target.checked;
+                                                    setScheduleData(prev => ({
+                                                        ...prev,
+                                                        isAlwaysOpen: checked,
+                                                        schedule: checked
+                                                            ? prev.schedule.map(d => ({ ...d, is_open: true, opening_time: "00:00", closing_time: "23:59" }))
+                                                            : prev.schedule.map(d => ({ ...d, is_open: false, opening_time: "", closing_time: "" })),
+                                                    }));
+                                                }}
+                                            />
+                                            <span className="toggle-track" />
+                                        </label>
                                     </div>
                                 </div>
                                 {!scheduleData.isAlwaysOpen && (

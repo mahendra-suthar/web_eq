@@ -269,6 +269,8 @@
   "enqueueTime": "Enqueue Time",
   "status": "Status",
   "registered": "Registered",
+  "running": "Running",
+  "stopped": "Stopped",
   "inProgress": "In Progress",
   "completed": "Completed",
   "failed": "Failed",

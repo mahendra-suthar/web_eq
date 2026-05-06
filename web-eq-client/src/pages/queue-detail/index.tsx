@@ -195,8 +195,8 @@ const QueueDetail = () => {
             <div className="queue-detail-page">
                 <div className="content-card">
                     <div className="error-message">{t("notAvailable")}</div>
-                    <button type="button" className="btn btn-secondary" onClick={() => navigate(RouterConstant.ROUTERS_PATH.QUEUES)}>
-                        {t("back")}
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(RouterConstant.ROUTERS_PATH.QUEUES)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t("back")}
                     </button>
                 </div>
             </div>
@@ -218,8 +218,8 @@ const QueueDetail = () => {
             <div className="queue-detail-page">
                 <div className="content-card">
                     <div className="error-message">{error || t("notAvailable")}</div>
-                    <button type="button" className="btn btn-secondary" onClick={() => navigate(RouterConstant.ROUTERS_PATH.QUEUES)}>
-                        {t("back")}
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(RouterConstant.ROUTERS_PATH.QUEUES)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t("back")}
                     </button>
                 </div>
             </div>
@@ -233,6 +233,9 @@ const QueueDetail = () => {
         <div className="queue-detail-page">
             <div className="content-card">
                 <div className="section-header section-header-actions">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(RouterConstant.ROUTERS_PATH.QUEUES)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t("back")}
+                    </button>
                     <div className="header-buttons">
                         {editingQueue ? (
                             <>
@@ -248,9 +251,6 @@ const QueueDetail = () => {
                                 {t("edit")}
                             </button>
                         )}
-                        <button type="button" className="btn btn-secondary" onClick={() => navigate(RouterConstant.ROUTERS_PATH.QUEUES)}>
-                            {t("back")}
-                        </button>
                     </div>
                 </div>
 
@@ -506,12 +506,14 @@ const QueueDetail = () => {
                                                             />
                                                         </td>
                                                         <td>
-                                                            <button type="button" className="btn btn-primary btn-sm" onClick={() => handleUpdateService(svc)} disabled={savingService}>
-                                                                {t("save")}
-                                                            </button>
-                                                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setEditingServiceId(null); setEditServiceError(""); }} disabled={savingService}>
-                                                                {t("cancel")}
-                                                            </button>
+                                                            <div className="svc-edit-actions">
+                                                                <button type="button" className="btn btn-primary btn-sm" onClick={() => handleUpdateService(svc)} disabled={savingService}>
+                                                                    {t("save")}
+                                                                </button>
+                                                                <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setEditingServiceId(null); setEditServiceError(""); }} disabled={savingService}>
+                                                                    {t("cancel")}
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                     </>
                                                 ) : (

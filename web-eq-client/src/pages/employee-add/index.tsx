@@ -113,8 +113,8 @@ const EmployeeAdd = () => {
                     <div className="error-message">
                         {t("businessIdRequired") || "Business ID is required to add an employee."}
                     </div>
-                    <button type="button" className="btn btn-secondary" onClick={handleCancel}>
-                        {t("backToEmployees") || "Back to employees"}
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={handleCancel}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t("back")}
                     </button>
                 </div>
             </div>
@@ -125,8 +125,8 @@ const EmployeeAdd = () => {
         <div className="employee-add-page">
             <div className="content-card">
                 <div className="card-header section-header-actions">
-                    <button type="button" className="btn btn-secondary" onClick={handleCancel}>
-                        {t("backToEmployees") || "Back to employees"}
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={handleCancel}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t("back")}
                     </button>
                 </div>
 
