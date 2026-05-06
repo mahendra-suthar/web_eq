@@ -263,6 +263,12 @@
         }
     }
 
+    .svc-edit-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
     .loading-state,
     .error-message {
         padding: 2rem;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { QueueService, QueueUserDetailResponse } from '../../services/queue/queue.service';
@@ -84,8 +84,8 @@ const QueueUserDetail = () => {
             <div className="queue-user-detail-page">
                 <div className="content-card">
                     <div className="error-message">{error || t("notAvailable")}</div>
-                    <button type="button" className="btn btn-secondary" onClick={() => navigate(RouterConstant.ROUTERS_PATH.QUEUEUSERS)}>
-                        {t("back")}
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(RouterConstant.ROUTERS_PATH.QUEUEUSERS)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t("back")}
                     </button>
                 </div>
             </div>
@@ -100,10 +100,9 @@ const QueueUserDetail = () => {
     return (
         <div className="queue-user-detail-page">
             <div className="content-card">
-                <div className="card-header section-header-actions">
-                    <h2 className="card-title">{t("queueUserDetail")}</h2>
-                    <button type="button" className="btn btn-secondary" onClick={() => navigate(RouterConstant.ROUTERS_PATH.QUEUEUSERS)}>
-                        {t("back")}
+                <div className="card-header">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(RouterConstant.ROUTERS_PATH.QUEUEUSERS)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t("back")}
                     </button>
                 </div>
 

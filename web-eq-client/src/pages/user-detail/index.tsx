@@ -62,8 +62,8 @@ const UserDetail = () => {
             <div className="user-detail-page">
                 <div className="content-card">
                     <div className="error-message">{t('notAvailable')}</div>
-                    <button type="button" className="btn btn-secondary" onClick={handleBack}>
-                        {t('back')}
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={handleBack}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t('back')}
                     </button>
                 </div>
             </div>
@@ -85,8 +85,8 @@ const UserDetail = () => {
             <div className="user-detail-page">
                 <div className="content-card">
                     <div className="error-message">{error || t('notAvailable')}</div>
-                    <button type="button" className="btn btn-secondary" onClick={handleBack}>
-                        {t('back')}
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={handleBack}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t('back')}
                     </button>
                 </div>
             </div>
@@ -107,11 +107,13 @@ const UserDetail = () => {
     return (
         <div className="user-detail-page">
             <div className="content-card">
-                <div className="card-header section-header-actions">
-                    <h2 className="card-title">{t('userDetail') || 'User Detail'}</h2>
-                    <button type="button" className="btn btn-secondary" onClick={handleBack}>
-                        {t('back')}
+                <div className="card-header">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={handleBack}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t('back')}
                     </button>
+                </div>
+                <div className="page-header" style={{ padding: "0 20px 16px" }}>
+                    <h2>{t('userDetail') || 'User Detail'}</h2>
                 </div>
 
                 <div className="detail-sections">

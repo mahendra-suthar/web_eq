@@ -6,9 +6,8 @@ import { useNotificationStore } from "../../store/notification.store";
 import { AuthService } from "../../services/auth/auth.service";
 import type { CustomerProfileResponse, CustomerProfileUpdateInput } from "../../services/auth/auth.service";
 import { AppointmentService } from "../../services/appointment/appointment.service";
-import type { CustomerAppointmentListItem, TodayAppointmentResponse } from "../../services/appointment/appointment.service";
+import type { CustomerAppointmentListItem } from "../../services/appointment/appointment.service";
 import AppointmentActions from "../../components/appointment-actions";
-import MyQueueCard from "../../components/my-queue-card";
 import LoadingSpinner from "../../components/loading-spinner";
 import ErrorMessage from "../../components/error-message";
 import { formatAppointmentTimeSummary, formatDelayMessage, formatTimeToDisplay, formatApptType, getInitials, getApiErrorMessage } from "../../utils/util";
@@ -288,15 +287,6 @@ function AppointmentsSection() {
   const navigate = useNavigate();
   const { t } = useTranslation();
 
-  // Today's active appointments — shown as live queue cards at the top
-  const [todayAppts, setTodayAppts] = useState<TodayAppointmentResponse[]>([]);
-  const fetchTodayAppts = useCallback(() => {
-    new AppointmentService()
-      .getTodayAppointments()
-      .then((items) => setTodayAppts(items.filter((a) => a.status === 1 || a.status === 2)))
-      .catch(() => {});
-  }, []);
-  useEffect(() => { fetchTodayAppts(); }, [fetchTodayAppts]);
 
   const STATUS_LABELS = useMemo<Record<number, string>>(() => ({
     1: t("profile.statusWaiting"),
@@ -375,15 +365,6 @@ function AppointmentsSection() {
 
   return (
     <>
-      {/* Live queue cards — shown when customer has active appointment today */}
-      {todayAppts.length > 0 && (
-        <div className="ac-today-queue">
-          <div className="ac-today-queue__label">{t("profile.todayQueue") || "Today's Queue"}</div>
-          {todayAppts.map((appt) => (
-            <MyQueueCard key={appt.queue_user_id} appointment={appt} />
-          ))}
-        </div>
-      )}
 
       {/* Stats strip */}
       {!loading && list.length > 0 && (
@@ -524,7 +505,7 @@ function AppointmentsSection() {
                             <line x1="12" y1="6" x2="12" y2="8" />
                             <line x1="12" y1="16" x2="12" y2="18" />
                           </svg>
-                          {t("profile.totalFee")} ₹{item.total_fee.toFixed(2)}
+                          ₹{item.total_fee.toFixed(2)}
                         </div>
                       )}
 

@@ -95,7 +95,7 @@
   cursor: pointer;
   transition: background-color 0.12s ease, border-color 0.12s ease;
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 500;
 }
 .lq-iconAction:hover {
   background: #f8fafc;
@@ -106,7 +106,7 @@
   border: 1px solid transparent;
   border-radius: 12px;
   padding: 10px 14px;
-  font-weight: 900;
+  font-weight: 500;
   font-size: 14px;
   cursor: pointer;
   display: inline-flex;
@@ -258,7 +258,7 @@
   border: none;
   background: #2563eb;
   color: white;
-  font-weight: 900;
+  font-weight: 500;
   font-size: 15px;
   cursor: pointer;
   transition: transform 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease;
@@ -517,7 +517,7 @@
 /* ─── 4) Queue selector (business owner) ─── */
 .lq-queue-select {
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 700;
   color: #0f172a;
   border: 1px solid #e2e8f0;
   border-radius: 10px;

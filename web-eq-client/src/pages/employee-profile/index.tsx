@@ -482,29 +482,27 @@ const EmployeeProfile = () => {
                             </div>
                             <div className="section-content">
                                 <div className="schedule-header">
-                                    <div className="info-field">
-                                        <label className="info-label">{t("alwaysOpen")}</label>
-                                        {isEditing ? (
-                                            <label className="schedule-toggle-label">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={scheduleData.isAlwaysOpen}
-                                                    onChange={e => {
-                                                        const checked = e.target.checked;
-                                                        setScheduleData(prev => ({
-                                                            ...prev,
-                                                            isAlwaysOpen: checked,
-                                                            schedule: checked
-                                                                ? prev.schedule.map(d => ({ ...d, is_open: true, opening_time: "00:00", closing_time: "23:59" }))
-                                                                : prev.schedule.map(d => ({ ...d, is_open: false, opening_time: "", closing_time: "" })),
-                                                        }));
-                                                    }}
-                                                />
-                                                <span>{scheduleData.isAlwaysOpen ? t("yes") : t("no")}</span>
-                                            </label>
-                                        ) : (
-                                            <div className="info-value">{scheduleData.isAlwaysOpen ? t("yes") : t("no")}</div>
-                                        )}
+                                    <div className="always-open-row">
+                                        <label className="info-label" htmlFor="ep-always-open-toggle">{t("alwaysOpen")}</label>
+                                        <label className={`toggle-switch${!isEditing ? " toggle-switch--disabled" : ""}`}>
+                                            <input
+                                                id="ep-always-open-toggle"
+                                                type="checkbox"
+                                                checked={scheduleData.isAlwaysOpen}
+                                                disabled={!isEditing}
+                                                onChange={e => {
+                                                    const checked = e.target.checked;
+                                                    setScheduleData(prev => ({
+                                                        ...prev,
+                                                        isAlwaysOpen: checked,
+                                                        schedule: checked
+                                                            ? prev.schedule.map(d => ({ ...d, is_open: true, opening_time: "00:00", closing_time: "23:59" }))
+                                                            : prev.schedule.map(d => ({ ...d, is_open: false, opening_time: "", closing_time: "" })),
+                                                    }));
+                                                }}
+                                            />
+                                            <span className="toggle-track" />
+                                        </label>
                                     </div>
                                 </div>
                                 {!scheduleData.isAlwaysOpen && (

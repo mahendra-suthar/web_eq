@@ -172,8 +172,8 @@ export default function CustomerLayout() {
         }
       />
 
-      {/* Sticky queue banner — shown on all pages when customer has an active appointment */}
-      {activeAppt && (
+      {/* Sticky queue banner */}
+      {activeAppt && !(location.pathname === "/profile" && new URLSearchParams(location.search).get("tab") === "appointments") && (
         <div
           className={`cl-queue-banner${activeAppt.status === 2 ? " cl-queue-banner--serving" : ""}`}
           role="status"

@@ -91,9 +91,9 @@ const Queues = () => {
                             disabled={loading}
                         >
                             <option value="">{t("allStatuses")}</option>
-                            <option value={String(QueueStatus.REGISTERED)}>{t("registered") || "Registered"}</option>
-                            <option value={String(QueueStatus.RUNNING)}>{t("running") || "Running"}</option>
-                            <option value={String(QueueStatus.STOPPED)}>{t("stopped") || "Stopped"}</option>
+                            <option value={String(QueueStatus.REGISTERED)}>{t("registered")}</option>
+                            <option value={String(QueueStatus.RUNNING)}>{t("running")}</option>
+                            <option value={String(QueueStatus.STOPPED)}>{t("stopped")}</option>
                         </select>
                     }
                     actions={
