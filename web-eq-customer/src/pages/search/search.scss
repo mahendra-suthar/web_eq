@@ -103,6 +103,9 @@
 }
 
 .sp-search-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 8px 18px;
   background: $forest;
   color: #fff;
@@ -116,6 +119,15 @@
   transition: background 0.2s;
 
   &:hover { background: $jade; }
+
+  &__icon { display: none; }
+
+  @media (max-width: $breakpoint-sm) {
+    padding: 8px 10px;
+
+    &__text { display: none; }
+    &__icon { display: block; }
+  }
 }
 
 // ─── Content ──────────────────────────────────────────────────────────────────

@@ -25,8 +25,13 @@ export function useSessionRestore(): void {
       .then(({ access_token }) => {
         if (access_token) useAuthStore.getState().setToken(access_token);
       })
-      .catch(() => {
-        useAuthStore.getState().resetUser();
+      .catch((err) => {
+        const status = (err as any)?.response?.status;
+        if (status === 401 || status === 403) {
+          // Session truly expired — delegate logout + redirect to AuthFailureHandler
+          window.dispatchEvent(new Event("auth:unauthorized"));
+        }
+        // Network/server errors: leave userInfo intact; cookie fallback keeps API calls alive
       });
   }, []); // only on mount
 }

@@ -128,12 +128,9 @@ export class AuthService extends HttpClient {
    * and by the axios 401 interceptor before giving up.
    */
   async refresh(): Promise<Token> {
-    try {
-      const res = await this.post<{ access_token: string; token_type: string }>('/auth/token/refresh', {});
-      return res as Token;
-    } catch (error: any) {
-      throw error;
-    }
+    const res: LoginResponse = await this.post<LoginResponse>('/auth/token/refresh', {});
+    if (!res?.token?.access_token) throw new Error("No token in refresh response");
+    return res.token as Token;
   }
 
   async logout(): Promise<void> {

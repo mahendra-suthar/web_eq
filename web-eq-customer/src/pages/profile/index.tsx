@@ -551,8 +551,19 @@ function AppointmentsSection() {
                           )}
                           {item.status === 2 ? (
                             <div className="ac-appt-queue-chip ac-appt-queue-chip--serving">
-                              🔔 {t("youreBeingServed") || "You're being served"}
+                              🔔 {t("youreBeingServed")}
                             </div>
+                          ) : item.position === 1 ? (
+                            <>
+                              <div className="ac-appt-queue-chip ac-appt-queue-chip--next">
+                                ⚡ {t("youreNext")}
+                              </div>
+                              {item.estimated_appointment_time && (
+                                <div className="ac-appt-queue-chip">
+                                  {t("expectedAt")} {item.estimated_appointment_time}
+                                </div>
+                              )}
+                            </>
                           ) : (
                             <>
                               {item.position != null && (
@@ -561,14 +572,18 @@ function AppointmentsSection() {
                                     <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" />
                                     <line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" />
                                   </svg>
-                                  Position #{item.position}
+                                  #{item.position} {t("inLine")}
                                 </div>
                               )}
-                              {item.estimated_wait_minutes != null && (
+                              {item.estimated_appointment_time ? (
                                 <div className="ac-appt-queue-chip">
-                                  ~{item.estimated_wait_minutes} min wait
+                                  {t("expectedAt")} {item.estimated_appointment_time}
                                 </div>
-                              )}
+                              ) : item.estimated_wait_minutes != null && item.estimated_wait_minutes > 0 ? (
+                                <div className="ac-appt-queue-chip">
+                                  ~{item.estimated_wait_minutes} {t("minWait")}
+                                </div>
+                              ) : null}
                             </>
                           )}
                         </>

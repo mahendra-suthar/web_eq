@@ -14,6 +14,7 @@ from app.db.database import engine, Base, SessionLocal
 from app.middleware.auth_middleware import AuthMiddleware
 from app.services.queue_service import QueueService
 from app.core.config import CORS_ORIGINS
+from app.core.utils import today_app_date, current_time_app_tz
 
 # Import all models to ensure they're registered with SQLAlchemy
 from app.models import (
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 def run_expiry_job() -> None:
     db = SessionLocal()
     try:
-        today = date.today()
+        today = today_app_date()
         updated = QueueService(db).expire_past_day_appointments(today)
         if updated:
             logger.info("Expiry job: marked %d appointment(s) as expired (before %s)", updated, today)
@@ -42,13 +43,29 @@ def run_expiry_job() -> None:
         db.close()
 
 
+def run_activate_scheduled_job() -> None:
+    db = SessionLocal()
+    try:
+        today = today_app_date()
+        now_time = current_time_app_tz()
+        updated = QueueService(db).activate_due_scheduled_appointments(today, now_time)
+        if updated:
+            logger.info("Activate job: started %d scheduled appointment(s) at %s", updated, now_time)
+    except Exception:
+        logger.exception("Activate scheduled appointments job failed")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     run_expiry_job()
+    run_activate_scheduled_job()
     scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
     scheduler.add_job(run_expiry_job, "cron", hour=0, minute=5, id="expire_appointments")
+    scheduler.add_job(run_activate_scheduled_job, "interval", minutes=1, id="activate_scheduled")
     scheduler.start()
-    logger.info("APScheduler started: daily expiry job at 00:05 IST")
+    logger.info("APScheduler started: expiry job at 00:05 IST, activate-scheduled job every 1 min")
     yield
     scheduler.shutdown(wait=False)
     logger.info("APScheduler shut down")

@@ -65,7 +65,7 @@ class HttpClient {
           if (!refreshPromise) {
             refreshPromise = axios
               .post(`${baseURL}/auth/token/refresh`, {}, { withCredentials: true })
-              .then((res) => (res.data?.access_token as string) ?? null)
+              .then((res) => (res.data?.token?.access_token as string) ?? null)
               .catch(() => null)
               .finally(() => { refreshPromise = null; });
           }
@@ -84,7 +84,10 @@ class HttpClient {
           return Promise.reject(error);
         }
 
-        if (status === 401 || status === 403) {
+        // Don't fire auth:unauthorized for the refresh endpoint itself —
+        // useSessionRestore handles that case and decides whether to redirect.
+        const isRefreshUrl = String(originalRequest?.url ?? "").includes("/auth/token/refresh");
+        if ((status === 401 || status === 403) && !isRefreshUrl) {
           window.dispatchEvent(new Event("auth:unauthorized"));
         }
         return Promise.reject(error);

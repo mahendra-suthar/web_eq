@@ -179,18 +179,32 @@ export default function CustomerLayout() {
           role="status"
           onClick={() => navigate("/profile?tab=appointments")}
         >
-          <span className="cl-queue-banner__icon">{activeAppt.status === 2 ? "🔔" : "⏳"}</span>
+          <span className="cl-queue-banner__icon">{activeAppt.status === 2 ? "🔔" : activeAppt.position === 1 ? "⚡" : "⏳"}</span>
           <span className="cl-queue-banner__text">
             <strong>{activeAppt.queue_name}</strong>
             {activeAppt.status === 2 ? (
-              <> · {t("youreBeingServed") || "You're being served"}</>
+              <> · {t("youreBeingServed")}</>
+            ) : activeAppt.position === 1 ? (
+              <>
+                {" · "}{t("youreNext")}
+                {activeAppt.expected_at_ts != null &&
+                  activeAppt.expected_at_ts > Date.now() &&
+                  activeAppt.estimated_appointment_time && (
+                  <> · {t("expectedAt")} {activeAppt.estimated_appointment_time}</>
+                )}
+              </>
             ) : (
               <>
                 {activeAppt.position != null && (
-                  <> · #{activeAppt.position} {t("inLine") || "in line"}</>
+                  <> · #{activeAppt.position} {t("inLine")}</>
                 )}
                 {activeAppt.expected_at_ts != null && activeAppt.expected_at_ts > Date.now() && activeAppt.estimated_appointment_time && (
-                  <> · {t("expectedAt") || "Expected at"} {activeAppt.estimated_appointment_time}</>
+                  <> · {t("expectedAt")} {activeAppt.estimated_appointment_time}</>
+                )}
+                {(activeAppt.expected_at_ts == null || activeAppt.expected_at_ts <= Date.now()) &&
+                  activeAppt.estimated_wait_minutes != null &&
+                  activeAppt.estimated_wait_minutes > 0 && (
+                  <> · ~{activeAppt.estimated_wait_minutes} {t("minWait")}</>
                 )}
               </>
             )}
