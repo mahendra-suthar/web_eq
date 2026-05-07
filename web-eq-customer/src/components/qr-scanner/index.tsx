@@ -58,13 +58,73 @@ async function safeStop(scanner: Html5Qrcode): Promise<void> {
   }
 }
 
+/**
+ * Try back camera first, then fall back to any available camera.
+ * Only retries on OverconstrainedError (constraint can't be satisfied) —
+ * permission denial, missing device, busy camera etc. are thrown immediately.
+ */
+async function startWithFallback(
+  scanner: Html5Qrcode,
+  onSuccess: (text: string) => void
+): Promise<void> {
+  const constraints: MediaTrackConstraints[] = [
+    { facingMode: "environment" }, // back camera (preferred for QR)
+    {},                             // any available camera
+  ];
+
+  let lastErr: unknown;
+  for (const constraint of constraints) {
+    try {
+      await scanner.start(
+        constraint,
+        { fps: 10, qrbox: { width: 240, height: 240 } },
+        onSuccess,
+        () => { /* per-frame decode failures are normal — ignore */ }
+      );
+      return; // started successfully
+    } catch (err) {
+      lastErr = err;
+      const name = (err as any)?.name ?? "";
+      // Only fall back on constraint errors — anything else is a hard failure
+      if (name !== "OverconstrainedError" && name !== "ConstraintNotSatisfiedError") {
+        throw err;
+      }
+    }
+  }
+  throw lastErr; // all constraints exhausted
+}
+
+/** Map browser/device camera errors to clear, actionable messages. */
+function cameraErrorMessage(err: unknown): string {
+  const name = (err as any)?.name ?? "";
+  switch (name) {
+    case "NotAllowedError":
+    case "PermissionDeniedError":
+      return "Camera access denied. Go to Chrome Settings → Site Settings → Camera and allow this site.";
+    case "NotFoundError":
+    case "DevicesNotFoundError":
+      return "No camera found on this device.";
+    case "NotReadableError":
+    case "TrackStartError":
+      return "Camera is in use by another app. Close other apps using the camera and try again.";
+    case "SecurityError":
+      return "Camera requires a secure (HTTPS) connection.";
+    case "OverconstrainedError":
+    case "ConstraintNotSatisfiedError":
+      return "No suitable camera found on this device.";
+    default:
+      return "Could not start camera. Please try again.";
+  }
+}
+
 export default function QRScanner({ onClose, onNavigate }: QRScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [error, setError] = useState<string>("");
   const [cameraReady, setCameraReady] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const scannedRef = useRef(false);
-  const mountedRef = useRef(true);   // guards setState after unmount
-  const stoppedRef = useRef(false);  // prevents double stop
+  const mountedRef = useRef(true);
+  const stoppedRef = useRef(false);
 
   // Lock body scroll
   useEffect(() => {
@@ -76,6 +136,8 @@ export default function QRScanner({ onClose, onNavigate }: QRScannerProps) {
   useEffect(() => {
     mountedRef.current = true;
     stoppedRef.current = false;
+    scannedRef.current = false;
+    setCameraReady(false);
 
     const SCANNER_ID = "qr-fs-region";
     const scanner = new Html5Qrcode(SCANNER_ID, { verbose: false });
@@ -89,28 +151,24 @@ export default function QRScanner({ onClose, onNavigate }: QRScannerProps) {
       await safeStop(scanner);
     };
 
-    scanner
-      .start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 240, height: 240 } },
-        (decodedText) => {
-          if (scannedRef.current) return;
-          scannedRef.current = true;
+    const onSuccess = (decodedText: string) => {
+      if (scannedRef.current) return;
+      scannedRef.current = true;
 
-          const path = resolveInternalPath(decodedText);
-          if (!path) {
-            scannedRef.current = false;
-            if (mountedRef.current) setError("Not an EaseQueue QR code. Please try again.");
-            return;
-          }
+      const path = resolveInternalPath(decodedText);
+      if (!path) {
+        scannedRef.current = false;
+        if (mountedRef.current) setError("Not an EaseQueue QR code. Please try again.");
+        return;
+      }
 
-          stopOnce().finally(() => {
-            onNavigate(path);
-            onClose();
-          });
-        },
-        () => { /* ignore per-frame failures */ }
-      )
+      stopOnce().finally(() => {
+        onNavigate(path);
+        onClose();
+      });
+    };
+
+    startWithFallback(scanner, onSuccess)
       .then(() => {
         if (!mountedRef.current) return;
         patchScannerStyles(SCANNER_ID);
@@ -120,8 +178,8 @@ export default function QRScanner({ onClose, onNavigate }: QRScannerProps) {
         });
         setCameraReady(true);
       })
-      .catch(() => {
-        if (mountedRef.current) setError("Camera access denied. Please allow camera permission and try again.");
+      .catch((err) => {
+        if (mountedRef.current) setError(cameraErrorMessage(err));
       });
 
     return () => {
@@ -129,7 +187,7 @@ export default function QRScanner({ onClose, onNavigate }: QRScannerProps) {
       if (rafId !== null) cancelAnimationFrame(rafId);
       stopOnce();
     };
-  }, []);
+  }, [retryKey]); // retryKey re-runs the whole start sequence
 
   // Close on Escape
   useEffect(() => {
@@ -137,6 +195,11 @@ export default function QRScanner({ onClose, onNavigate }: QRScannerProps) {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  const handleRetry = () => {
+    setError("");
+    setRetryKey((k) => k + 1);
+  };
 
   return (
     <div className="qr-fs-overlay" role="dialog" aria-modal aria-label="Scan QR Code">
@@ -172,13 +235,14 @@ export default function QRScanner({ onClose, onNavigate }: QRScannerProps) {
         </div>
       )}
 
-      {/* Error banner */}
+      {/* Error banner with retry */}
       {error && (
         <div className="qr-fs-error" role="alert">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
-          {error}
+          <span>{error}</span>
+          <button className="qr-fs-retry" onClick={handleRetry}>Try again</button>
         </div>
       )}
     </div>

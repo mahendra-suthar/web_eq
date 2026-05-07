@@ -37,7 +37,7 @@
 
 .lq-header__title {
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 700;
   color: #0f172a;
   line-height: 1.2;
 }
@@ -56,7 +56,7 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .lq-counter {
@@ -173,7 +173,7 @@
   border-radius: 14px;
   display: grid;
   place-items: center;
-  font-weight: 900;
+  font-weight: 700;
   color: white;
   background: linear-gradient(135deg, #00695C 0%, #009688 100%);
   flex-shrink: 0;
@@ -192,7 +192,7 @@
 
 .lq-currentCard__name {
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 700;
   color: #0f172a;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -216,7 +216,7 @@
   margin-top: 6px;
   font-size: 13px;
   color: #334155;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .lq-currentCard__actions {
@@ -243,7 +243,7 @@
 
 .lq-currentCard__name--idle {
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 500;
   color: #475569;
 }
 
@@ -334,7 +334,7 @@
   display: grid;
   place-items: center;
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 600;
   z-index: 1;
   flex-shrink: 0;
 }
@@ -379,14 +379,14 @@
 }
 .lq-row--done .lq-row__name,
 .lq-row--done .lq-row__sub {
-  font-weight: 600;
+  font-weight: 400;
   color: #64748b;
 }
 
 .lq-row--progress {
   background: rgba(37, 99, 235, 0.06);
   border: 1px solid rgba(37, 99, 235, 0.2);
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .lq-row--waiting {
@@ -411,7 +411,7 @@
   border-radius: 10px;
   display: grid;
   place-items: center;
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
   color: #0f172a;
   background: #eef2ff;
@@ -437,13 +437,13 @@
 
 .lq-row__name {
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 600;
   color: #0f172a;
 }
 
 .lq-tokenChip {
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 600;
   padding: 3px 8px;
   border-radius: 8px;
   background: #f1f5f9;
@@ -452,7 +452,7 @@
 
 .lq-badge {
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 600;
   padding: 4px 8px;
   border-radius: 999px;
   border: 1px solid transparent;
@@ -500,13 +500,13 @@
 .lq-row__position,
 .lq-row__est,
 .lq-row__expected {
-  font-weight: 600;
+  font-weight: 500;
   color: #0f172a;
 }
 
 .lq-time {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
   color: #64748b;
   padding: 4px 8px;
   border-radius: 8px;
@@ -517,7 +517,7 @@
 /* ─── 4) Queue selector (business owner) ─── */
 .lq-queue-select {
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
   color: #0f172a;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
@@ -625,7 +625,7 @@
 .lq-currentCard__delay {
   margin-top: 4px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   color: #b45309;
 }
 
@@ -634,7 +634,7 @@
   font-size: 12px;
   color: #475569;
   .lq-currentCard__scheduledLabel {
-    font-weight: 600;
+    font-weight: 500;
     color: #64748b;
   }
   strong {
@@ -643,13 +643,13 @@
 }
 
 .lq-row__delay {
-  font-weight: 600;
+  font-weight: 500;
   color: #b45309;
 }
 
 .lq-row__scheduled {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   color: #475569;
   white-space: nowrap;
 }

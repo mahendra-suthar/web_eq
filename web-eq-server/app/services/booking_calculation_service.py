@@ -465,12 +465,24 @@ class BookingCalculationService:
             float(DEFAULT_AVG_TIME),
         )
         position = ahead_count + 1
-        base_wait = int(total_wait_minutes) if total_wait_minutes > 0 else int(position * percentile_wait)
-        buffer = int(base_wait * 0.15)
-        wait_minutes = base_wait + buffer
-        wait_min = max(0, wait_minutes - buffer)
-        wait_max = wait_minutes + buffer
-        wait_range = f"{wait_min}-{wait_max} min"
+
+        if total_wait_minutes > 0:
+            base_wait = int(total_wait_minutes)
+        elif ahead_count == 0:
+            # User is next — no one is ahead.
+            base_wait = 0
+        else:
+            # Fallback: ahead_count people, no DB-accumulated time.
+            base_wait = int(ahead_count * percentile_wait)
+
+        if base_wait == 0:
+            wait_minutes, wait_range = 0, ""
+        else:
+            buffer = max(1, int(base_wait * 0.15))
+            wait_minutes = base_wait + buffer
+            wait_min = max(0, wait_minutes - buffer)
+            wait_max = wait_minutes + buffer
+            wait_range = f"{wait_min}–{wait_max} min"
 
         current_time = now_app_tz()
         queue = self.queue.get_queue_by_id_with_employees(existing_queue_user.queue_id)
@@ -503,14 +515,34 @@ class BookingCalculationService:
         percentile_wait: float,
         buffer_pct: float,
     ) -> Tuple[int, int, str]:
-        """Compute (position, wait_minutes, wait_range) for a live (today) queue."""
+        """Compute (position, wait_minutes, wait_range) for a live (today) queue.
+
+        Position is 1-based rank of the next person who would join.
+        wait_range is empty when the user should be served immediately.
+        """
         position = registered + in_progress + 1
-        base_wait = int(total_wait) if total_wait > 0 else int(position * percentile_wait)
-        buffer = int(base_wait * buffer_pct)
-        wait_minutes = base_wait + buffer
-        wait_min = max(0, wait_minutes - buffer)
-        wait_max = wait_minutes + buffer
-        return position, wait_minutes, f"{wait_min}-{wait_max} min"
+
+        if total_wait > 0:
+            # Real accumulated wait from DB — most accurate.
+            base_wait = int(total_wait)
+        elif in_progress == 0 and registered == 0:
+            # Queue is empty: next joiner is served immediately.
+            base_wait = 0
+        else:
+            # No DB-accumulated time yet. Estimate from headcount:
+            # in-progress person is ~50% through their slot; each
+            # registered person ahead takes one full avg service time.
+            in_progress_remaining = int(in_progress * percentile_wait * 0.5)
+            base_wait = in_progress_remaining + int(registered * percentile_wait)
+
+        if base_wait == 0:
+            return position, 0, ""
+
+        buffer = max(1, int(base_wait * buffer_pct))
+        wait_minutes = base_wait + buffer          # central estimate (slightly conservative)
+        wait_min = max(0, wait_minutes - buffer)   # symmetric lower bound
+        wait_max = wait_minutes + buffer           # symmetric upper bound
+        return position, wait_minutes, f"{wait_min}–{wait_max} min"
 
     @staticmethod
     def compute_future_wait(

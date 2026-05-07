@@ -95,7 +95,7 @@ export default function SearchPage() {
             <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
               <path d="m15 18-6-6 6-6" />
             </svg>
-            {t("search.backHome")}
+            <span>{t("search.backHome")}</span>
           </button>
 
           <div className="sp-search-bar">
@@ -119,8 +119,11 @@ export default function SearchPage() {
                 </svg>
               </button>
             )}
-            <button className="sp-search-btn" onClick={handleSearch}>
-              {t("search.searchBtn")}
+            <button className="sp-search-btn" onClick={handleSearch} aria-label={t("search.searchBtn")}>
+              <span className="sp-search-btn__text">{t("search.searchBtn")}</span>
+              <svg className="sp-search-btn__icon" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+              </svg>
             </button>
           </div>
         </div>

@@ -365,6 +365,30 @@ class QueueService:
             logger.exception("Failed to get_booking_at_time (user_id=%s date=%s)", user_id, queue_date)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
+    def activate_due_scheduled_appointments(self, today: date, now_time: time) -> int:
+        """Transition scheduled appointments whose slot has started to IN_PROGRESS."""
+        try:
+            updated = (
+                self.db.query(QueueUser)
+                .filter(
+                    QueueUser.is_scheduled == True,  # noqa: E712
+                    QueueUser.status == QUEUE_USER_REGISTERED,
+                    QueueUser.queue_date == today,
+                    QueueUser.scheduled_start.isnot(None),
+                    QueueUser.scheduled_start <= now_time,
+                )
+                .update(
+                    {QueueUser.status: QUEUE_USER_IN_PROGRESS},
+                    synchronize_session=False,
+                )
+            )
+            self.db.commit()
+            return updated
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to activate_due_scheduled_appointments")
+            raise
+
     def expire_past_day_appointments(self, before_date: date) -> int:
         try:
             updated = (

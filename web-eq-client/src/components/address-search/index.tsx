@@ -9,20 +9,21 @@ interface AddressFeature {
   type: string;
   place_type: string[];
   relevance: number;
-  properties: {
-    accuracy?: string;
-    address?: string;
-    category?: string;
-    maki?: string;
-    wikidata?: string;
-    short_code?: string;
-  };
+  address?: string; // house number for address-type results (top-level field)
   text: string;
   place_name: string;
   center: [number, number]; // [longitude, latitude]
   geometry: {
     type: string;
     coordinates: [number, number];
+  };
+  properties: {
+    accuracy?: string;
+    address?: string; // street address for POI-type results
+    category?: string;
+    maki?: string;
+    wikidata?: string;
+    short_code?: string;
   };
   context?: Array<{
     id: string;
@@ -32,18 +33,99 @@ interface AddressFeature {
   }>;
 }
 
+interface ParsedAddress {
+  street_1: string;
+  city: string;
+  district?: string;
+  state: string;
+  postal_code: string;
+  country: string;
+}
+
 interface AddressSearchProps {
-  onAddressSelect: (addressData: {
-    street_1: string;
-    city: string;
-    district?: string;
-    state: string;
-    postal_code: string;
-    country: string;
+  onAddressSelect: (addressData: ParsedAddress & {
     latitude?: number;
     longitude?: number;
   }) => void;
   initialValue?: string;
+}
+
+function parseContext(feature: AddressFeature) {
+  let city = "";
+  let district = "";
+  let state = "";
+  let postalCode = "";
+  let country = "INDIA";
+  let neighborhood = "";
+  let locality = "";
+
+  (feature.context || []).forEach((ctx) => {
+    const id = ctx.id;
+    if (id.startsWith("neighborhood")) neighborhood = ctx.text;
+    else if (id.startsWith("locality")) locality = ctx.text;
+    else if (id.startsWith("place")) city = ctx.text;
+    else if (id.startsWith("district")) district = ctx.text;
+    else if (id.startsWith("region")) state = ctx.text;
+    else if (id.startsWith("postcode")) postalCode = ctx.text;
+    else if (id.startsWith("country")) country = ctx.text.toUpperCase();
+  });
+
+  return { city, district, state, postalCode, country, neighborhood, locality };
+}
+
+function extractAddressFromFeature(feature: AddressFeature): ParsedAddress {
+  const { city, district, state, postalCode, country, neighborhood, locality } =
+    parseContext(feature);
+  const placeType = feature.place_type[0];
+  const area = locality || neighborhood;
+
+  let street_1 = "";
+
+  if (placeType === "poi") {
+    // Society / POI: feature.text is the name, properties.address is the street it's on
+    street_1 = feature.text;
+    if (feature.properties?.address) {
+      street_1 = `${street_1}, ${feature.properties.address}`;
+    }
+    if (area && !street_1.toLowerCase().includes(area.toLowerCase())) {
+      street_1 = `${street_1}, ${area}`;
+    }
+  } else if (placeType === "address") {
+    // Street address: top-level feature.address = house number, feature.text = street name
+    street_1 = feature.address
+      ? `${feature.address} ${feature.text}`
+      : feature.text;
+    if (area && !street_1.toLowerCase().includes(area.toLowerCase())) {
+      street_1 = `${street_1}, ${area}`;
+    }
+  } else if (placeType === "neighborhood" || placeType === "locality") {
+    // Area-level result — use the name as street_1
+    street_1 = feature.text;
+  } else {
+    // place / district / region — derive street from the first part(s) of place_name
+    const parts = feature.place_name.split(",").map((p) => p.trim());
+    const known = new Set([city, state, district, postalCode, country].filter(Boolean));
+    const firstUnknown = parts.find((p) => !known.has(p));
+    street_1 = firstUnknown || feature.text;
+  }
+
+  return {
+    street_1: street_1.trim(),
+    city,
+    district: district || undefined,
+    state,
+    postal_code: postalCode,
+    country,
+  };
+}
+
+// Split place_name into a bold primary and a muted secondary line
+function splitPlaceName(feature: AddressFeature): { primary: string; secondary: string } {
+  const name = feature.text;
+  const rest = feature.place_name.startsWith(name)
+    ? feature.place_name.slice(name.length).replace(/^,\s*/, "")
+    : feature.place_name;
+  return { primary: name, secondary: rest };
 }
 
 export default function AddressSearch({ onAddressSelect, initialValue = "" }: AddressSearchProps) {
@@ -71,28 +153,25 @@ export default function AddressSearch({ onAddressSelect, initialValue = "" }: Ad
     setError("");
 
     try {
-      // Mapbox Geocoding API endpoint
       const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`;
       const params = new URLSearchParams({
         access_token: token,
-        country: "in", // Restrict to India, remove this for worldwide
-        types: "address,poi,district,locality,neighborhood,place", // Search for addresses, POIs, and areas
-        limit: "5", // Limit to 5 suggestions
+        country: "in",
+        language: "en",
+        types: "address,poi,district,locality,neighborhood,place",
+        limit: "8",
         autocomplete: "true",
       });
 
       const response = await fetch(`${url}?${params.toString()}`);
-
-      if (!response.ok) {
-        throw new Error(`Mapbox API error: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Mapbox API error: ${response.status}`);
 
       const data = await response.json();
       setSuggestions(data.features || []);
       setShowSuggestions(true);
     } catch (err: any) {
       console.error("Error searching addresses:", err);
-      setError("Failed to search addresses. Please check your Mapbox token.");
+      setError(t("addressSearchFailed"));
       setSuggestions([]);
       setShowSuggestions(false);
     } finally {
@@ -105,122 +184,8 @@ export default function AddressSearch({ onAddressSelect, initialValue = "" }: Ad
     setSearchValue(value);
     setError("");
 
-    // Debounce the search
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    debounceTimerRef.current = window.setTimeout(() => {
-      searchAddresses(value);
-    }, 300); // Wait 300ms after user stops typing
-  };
-
-  // Helper function to extract full address from Mapbox feature
-  const extractAddressFromFeature = (feature: AddressFeature) => {
-    const context = feature.context || [];
-    let city = "";
-    let district = "";
-    let state = "";
-    let postalCode = "";
-    let country = "INDIA";
-    let neighborhood = "";
-    let poi = ""; // Point of Interest (building/society name)
-    let locality = "";
-
-    // Parse context array to extract all address components
-    context.forEach((ctx) => {
-      const ctxId = ctx.id;
-      if (ctxId.startsWith("place")) {
-        city = ctx.text;
-      } else if (ctxId.startsWith("neighborhood")) {
-        neighborhood = ctx.text;
-      } else if (ctxId.startsWith("locality")) {
-        locality = ctx.text;
-      } else if (ctxId.startsWith("poi")) {
-        poi = ctx.text;
-      } else if (ctxId.startsWith("district")) {
-        district = ctx.text;
-      } else if (ctxId.startsWith("region")) {
-        state = ctx.text;
-      } else if (ctxId.startsWith("postcode")) {
-        postalCode = ctx.text;
-      } else if (ctxId.startsWith("country")) {
-        country = ctx.text.toUpperCase();
-      }
-    });
-
-    // Parse place_name to extract full street address
-    // Mapbox place_name format: "Main Name, Street Address, Area, City, State Postal Code, Country"
-    const placeNameParts = feature.place_name.split(",").map((p) => p.trim());
-
-    // Determine street address: combine POI, neighborhood, and street information
-    let streetAddress = "";
-
-    // If we have POI (building/society name), include it
-    if (poi) {
-      streetAddress = poi;
-    }
-
-    // Use feature.properties.address if available (more reliable)
-    if (feature.properties?.address) {
-      if (streetAddress) {
-        streetAddress = `${streetAddress}, ${feature.properties.address}`;
-      } else {
-        streetAddress = feature.properties.address;
-      }
-    } else if (feature.text) {
-      // If no address property, use the main text (usually street name/number or POI name)
-      if (streetAddress && !streetAddress.includes(feature.text)) {
-        streetAddress = `${streetAddress}, ${feature.text}`;
-      } else if (!streetAddress) {
-        streetAddress = feature.text;
-      }
-    }
-
-    // If we have neighborhood or locality but not POI, include it
-    const areaName = neighborhood || locality;
-    if (areaName && !streetAddress.includes(areaName)) {
-      // Check if area is already part of the address
-      const parts = placeNameParts.filter(p =>
-        p !== city &&
-        p !== state &&
-        p !== postalCode &&
-        p !== country &&
-        (!district || p !== district)
-      );
-      // Add area if not already in the first parts
-      if (parts.length > 1 && !parts.slice(0, 2).some(p => p === areaName)) {
-        if (streetAddress) {
-          streetAddress = `${streetAddress}, ${areaName}`;
-        } else {
-          streetAddress = areaName;
-        }
-      }
-    }
-
-    // Fallback: if still no street address, use first part of place_name
-    if (!streetAddress || streetAddress.trim() === "") {
-      // Get all parts before city
-      const cityIndex = placeNameParts.findIndex(p =>
-        p === city ||
-        p.toLowerCase().includes(city.toLowerCase()) ||
-        p.toLowerCase().includes(state.toLowerCase())
-      );
-      if (cityIndex > 0) {
-        streetAddress = placeNameParts.slice(0, cityIndex).join(", ");
-      } else {
-        streetAddress = placeNameParts[0] || feature.text || "";
-      }
-    }
-
-    return {
-      street_1: streetAddress.trim(),
-      city: city || "",
-      district: district || undefined,
-      state: state || "",
-      postal_code: postalCode || "",
-      country: country,
-    };
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = window.setTimeout(() => searchAddresses(value), 300);
   };
 
   const handleSelectSuggestion = (feature: AddressFeature) => {
@@ -228,21 +193,10 @@ export default function AddressSearch({ onAddressSelect, initialValue = "" }: Ad
     setShowSuggestions(false);
     setSuggestions([]);
 
-    // Extract address components using the helper function
     const addressData = extractAddressFromFeature(feature);
-
-    // Get coordinates (Mapbox returns [longitude, latitude])
     const [longitude, latitude] = feature.center;
-
-    // Update selected location for map
     setSelectedLocation({ lat: latitude, lng: longitude });
-
-    // Call the callback with extracted address data
-    onAddressSelect({
-      ...addressData,
-      latitude: latitude,
-      longitude: longitude,
-    });
+    onAddressSelect({ ...addressData, latitude, longitude });
   };
 
   const handleMapLocationSelect = async (data: {
@@ -252,37 +206,28 @@ export default function AddressSearch({ onAddressSelect, initialValue = "" }: Ad
   }) => {
     setSelectedLocation({ lat: data.latitude, lng: data.longitude });
 
-    // Reverse geocode to get detailed address components
     const token = getMapboxToken();
     if (!token) return;
 
     try {
-      // Use multiple types to get better results (don't restrict to just "address")
       const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${data.longitude},${data.latitude}.json`;
       const params = new URLSearchParams({
         access_token: token,
         country: "in",
+        language: "en",
+        types: "address,poi,neighborhood,locality,place",
         limit: "1",
-        // Don't restrict to just "address" - allow POI and other types for better results
       });
 
       const response = await fetch(`${url}?${params.toString()}`);
       const geocodeData = await response.json();
 
-      if (geocodeData.features && geocodeData.features.length > 0) {
+      if (geocodeData.features?.length > 0) {
         const feature = geocodeData.features[0];
         setSearchValue(feature.place_name || data.address || "");
-
-        // Use the same helper function to extract address
         const addressData = extractAddressFromFeature(feature);
-
-        onAddressSelect({
-          ...addressData,
-          latitude: data.latitude,
-          longitude: data.longitude,
-        });
+        onAddressSelect({ ...addressData, latitude: data.latitude, longitude: data.longitude });
       } else {
-        // Fallback: use coordinates only
         onAddressSelect({
           street_1: data.address || "",
           city: "",
@@ -293,9 +238,7 @@ export default function AddressSearch({ onAddressSelect, initialValue = "" }: Ad
           longitude: data.longitude,
         });
       }
-    } catch (err) {
-      console.error("Error reverse geocoding:", err);
-      // Fallback: use coordinates only
+    } catch {
       onAddressSelect({
         street_1: data.address || "",
         city: "",
@@ -308,7 +251,6 @@ export default function AddressSearch({ onAddressSelect, initialValue = "" }: Ad
     }
   };
 
-  // Handle click outside to close suggestions
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -320,19 +262,13 @@ export default function AddressSearch({ onAddressSelect, initialValue = "" }: Ad
         setShowSuggestions(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Cleanup debounce timer
   useEffect(() => {
     return () => {
-      if (debounceTimerRef.current) {
-        window.clearTimeout(debounceTimerRef.current);
-      }
+      if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
     };
   }, []);
 
@@ -342,13 +278,17 @@ export default function AddressSearch({ onAddressSelect, initialValue = "" }: Ad
     <div className="address-search-container">
       <div className="address-search-header">
         <label className="form-label">{t("searchAddress")}</label>
-        <button
-          type="button"
-          className="toggle-map-button"
-          onClick={() => setShowMap(!showMap)}
-        >
-          {showMap ? (t("hideMap") || "Hide Map") : (t("showMap") || "Show Map")}
-        </button>
+        <div className="address-map-toggle-row">
+          <span className="address-map-toggle-label">{t("showMap")}</span>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={showMap}
+              onChange={() => setShowMap((v) => !v)}
+            />
+            <span className="toggle-track" />
+          </label>
+        </div>
       </div>
 
       {showMap && token && (
@@ -368,45 +308,53 @@ export default function AddressSearch({ onAddressSelect, initialValue = "" }: Ad
           placeholder={t("enterAddressToSearch")}
           value={searchValue}
           onChange={handleInputChange}
-          onFocus={() => {
-            if (suggestions.length > 0) {
-              setShowSuggestions(true);
-            }
-          }}
+          onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
           autoComplete="off"
           id="address-autocomplete-input"
         />
         <span className="search-icon">
-          {loading ? "⏳" : "🔍"}
+          {loading ? (
+            <svg className="search-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+            </svg>
+          )}
         </span>
+
         {showSuggestions && suggestions.length > 0 && (
           <div ref={suggestionsRef} className="address-suggestions">
-            {suggestions.map((feature) => (
-              <div
-                key={feature.id}
-                className="suggestion-item"
-                onClick={() => handleSelectSuggestion(feature)}
-              >
-                <div className="suggestion-text">{feature.place_name}</div>
-                {feature.properties.address && (
-                  <div className="suggestion-address">{feature.properties.address}</div>
-                )}
-              </div>
-            ))}
+            {suggestions.map((feature) => {
+              const { primary, secondary } = splitPlaceName(feature);
+              const placeType = feature.place_type[0];
+              return (
+                <div
+                  key={feature.id}
+                  className="suggestion-item"
+                  onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(feature); }}
+                >
+                  <span className={`suggestion-type-badge suggestion-type-badge--${placeType}`}>
+                    {placeType === "poi" ? "Place" : placeType === "address" ? "Address" : placeType === "neighborhood" || placeType === "locality" ? "Area" : "City"}
+                  </span>
+                  <div className="suggestion-content">
+                    <div className="suggestion-primary">{primary}</div>
+                    {secondary && <div className="suggestion-secondary">{secondary}</div>}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
-      <p className="address-search-hint">
-        {t("addressSearchHint")}
-      </p>
-      {!getMapboxToken() ? (
-        <p className="address-search-error">
-          Mapbox access token not configured. Please set VITE_MAPBOX_TOKEN in your .env.local file.
-        </p>
+
+      <p className="address-search-hint">{t("addressSearchHint")}</p>
+
+      {!token ? (
+        <p className="address-search-error">{t("addressSearchUnavailable")}</p>
       ) : error ? (
-        <p className="address-search-error">
-          {error}
-        </p>
+        <p className="address-search-error">{error}</p>
       ) : null}
     </div>
   );

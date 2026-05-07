@@ -298,6 +298,9 @@
 
 
 .lp-search-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 12px 24px;
   background: $forest;
   color: #fff;
@@ -312,6 +315,15 @@
   flex-shrink: 0;
 
   &:hover { background: $jade; transform: translateY(-1px); }
+
+  &__icon { display: none; }
+
+  @media (max-width: $breakpoint-sm) {
+    padding: 12px 14px;
+
+    &__text { display: none; }
+    &__icon { display: block; }
+  }
 }
 
 // Quick filter chips

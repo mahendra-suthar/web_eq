@@ -59,7 +59,9 @@
   "nowServing": "Now serving",
   "expectedAt": "Expected at",
   "inLine": "in line",
+  "minWait": "min wait",
   "youreBeingServed": "You're being served",
+  "youreNext": "You're next!",
   "employeeNotAvailable": "Not Available",
   "employeeNotAvailableOnDay": "Employee is not available on this day",
 
