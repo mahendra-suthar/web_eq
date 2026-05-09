@@ -31,7 +31,7 @@ from app.schemas.customer import (
 )
 from app.schemas.auth import UserRegistrationInput
 from app.core.constants import QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS
-from app.core.utils import today_app_date, format_date_iso
+from app.core.utils import today_app_date, format_date_iso, now_app_tz
 
 
 class CustomerController:
@@ -220,6 +220,14 @@ class CustomerController:
                         detail="One or more services do not belong to the selected queue",
                     )
 
+            new_reschedule_count = None
+            if queue_changed or date_changed:
+                new_reschedule_count = (qu.reschedule_count or 0) + 1
+
+            new_turn_time = None
+            if new_queue_services is not None:
+                new_turn_time = sum((qs.avg_service_time or 5) for qs in new_queue_services)
+
             updated = self.queue_service.update_appointment(
                 queue_user=qu,
                 new_queue_id=data.queue_id,
@@ -228,6 +236,8 @@ class CustomerController:
                 new_date=data.queue_date,
                 queue_changed=queue_changed,
                 date_changed=date_changed,
+                new_reschedule_count=new_reschedule_count,
+                new_turn_time=new_turn_time,
             )
 
             # Redis sync — failure must not block the appointment update
@@ -348,6 +358,38 @@ class CustomerController:
             raise
         except Exception:
             logger.exception("Failed to cancel_appointment (user_id=%s queue_user_id=%s)", user_id, queue_user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    async def mark_arrived(self, user_id: UUID, queue_user_id: UUID) -> dict:
+        """Mark customer as physically present (checked in). Prevents auto-hold."""
+        try:
+            qu = self.queue_service.get_queue_user_for_update(queue_user_id, user_id)
+            if not qu:
+                raise HTTPException(status_code=404, detail="Appointment not found")
+            if qu.status != QUEUE_USER_REGISTERED:
+                raise HTTPException(status_code=409, detail="Only waiting appointments can be checked in")
+
+            qu.is_checked_in = True  # type: ignore[assignment]
+            qu.check_in_time = now_app_tz()  # type: ignore[assignment]
+            self.db.commit()
+
+            # Broadcast real-time update so Live Queue and customer screens update instantly
+            queue_id = str(qu.queue_id)
+            date_str = qu.queue_date.strftime("%Y-%m-%d")
+            try:
+                await live_queue_manager.broadcast(
+                    queue_id, date_str,
+                    live_queue_manager.get_live_queue_state(self.db, queue_id, date_str)
+                )
+                await customer_queue_manager.broadcast_to_queue(self.db, queue_id, date_str)
+            except Exception:
+                logger.warning("mark_arrived: broadcast failed (non-critical)", exc_info=True)
+
+            return {"success": True, "is_checked_in": True}
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to mark_arrived (user_id=%s queue_user_id=%s)", user_id, queue_user_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_upcoming_appointments(self, user_id: UUID) -> CustomerUpcomingAppointmentsResponse:

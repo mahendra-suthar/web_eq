@@ -455,6 +455,7 @@ class BookingCalculationService:
             enqueue_time=getattr(existing_queue_user, "enqueue_time", None),
             created_at=getattr(existing_queue_user, "created_at", None),
             exclude_queue_user_id=existing_queue_user.uuid,
+            effective_join_time=getattr(existing_queue_user, "effective_join_time", None),
         )
         ahead_count = ahead["ahead_count"]
         total_wait_minutes = ahead["total_wait_minutes"]

@@ -138,3 +138,16 @@ async def cancel_appointment(
 ):
     controller = CustomerController(db)
     return await controller.cancel_appointment(current_user.uuid, queue_user_id)
+
+
+@customer_router.post(
+    "/appointments/{queue_user_id}/arrive",
+    summary="Mark customer as arrived (checked in) at the business",
+)
+async def mark_arrived(
+    queue_user_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["CUSTOMER"])),
+):
+    controller = CustomerController(db)
+    return await controller.mark_arrived(current_user.uuid, queue_user_id)

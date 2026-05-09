@@ -24,6 +24,8 @@ export interface TodayAppointmentResponse {
   delay_minutes?: number | null;
   expected_at_ts?: number | null;       // epoch ms — drift-free client countdown
   current_token?: string | null;        // token currently being served in this queue
+  is_checked_in?: boolean;              // customer has tapped "I've Arrived"
+  eta_minutes?: number | null;          // self-declared travel time
 }
 
 export interface CustomerAppointmentListItem {
@@ -50,6 +52,8 @@ export interface CustomerAppointmentListItem {
   dequeue_time?: string | null;
   cancellation_reason?: string | null;
   total_fee?: number | null;
+  is_checked_in?: boolean;
+  eta_minutes?: number | null;
 }
 
 export interface CustomerAppointmentListResponse {

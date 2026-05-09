@@ -13,6 +13,7 @@ from app.routers.routers import routers
 from app.db.database import engine, Base, SessionLocal
 from app.middleware.auth_middleware import AuthMiddleware
 from app.services.queue_service import QueueService
+from app.controllers.queue_controller import QueueController
 from app.core.config import CORS_ORIGINS
 from app.core.utils import today_app_date, current_time_app_tz
 
@@ -57,6 +58,23 @@ def run_activate_scheduled_job() -> None:
         db.close()
 
 
+def run_auto_hold_job() -> None:
+    """Every minute: push unchecked position-#1 users back by one position and notify them (once)."""
+    db = SessionLocal()
+    try:
+        controller = QueueController(db)
+        held = controller.process_auto_holds()
+        eta_notified = controller.check_and_notify_eta()
+        if held:
+            logger.info("Auto-hold job: held %d user(s)", held)
+        if eta_notified:
+            logger.info("Auto-hold job: sent %d heading-now notification(s)", eta_notified)
+    except Exception:
+        logger.exception("Auto-hold job failed")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     run_expiry_job()
@@ -64,8 +82,9 @@ async def lifespan(app: FastAPI):
     scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
     scheduler.add_job(run_expiry_job, "cron", hour=0, minute=5, id="expire_appointments")
     scheduler.add_job(run_activate_scheduled_job, "interval", minutes=1, id="activate_scheduled")
+    scheduler.add_job(run_auto_hold_job, "interval", minutes=1, id="auto_hold")
     scheduler.start()
-    logger.info("APScheduler started: expiry job at 00:05 IST, activate-scheduled job every 1 min")
+    logger.info("APScheduler started: expiry at 00:05 IST, activate-scheduled every 1 min, auto-hold every 1 min")
     yield
     scheduler.shutdown(wait=False)
     logger.info("APScheduler shut down")

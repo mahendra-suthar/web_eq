@@ -1,5 +1,5 @@
 import logging
-from sqlalchemy import func, extract, or_, select
+from sqlalchemy import func, extract, or_, and_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
@@ -20,7 +20,7 @@ from app.schemas.queue import (
     QueueServiceAddItem,
     QueueServiceUpdate,
 )
-from app.core.utils import today_app_date, parse_time_string
+from app.core.utils import today_app_date, current_time_app_tz, now_app_tz, parse_time_string
 from app.core.constants import (
     QUEUE_USER_REGISTERED,
     QUEUE_USER_IN_PROGRESS,
@@ -488,10 +488,13 @@ class QueueService:
         slot_id: Optional[UUID] = None,
         scheduled_start: Optional[time] = None,
         scheduled_end: Optional[time] = None,
+        eta_minutes: Optional[int] = None,
+        is_walk_in: bool = False,
     ) -> QueueUser:
         """Create a QueueUser and its QueueUserService links. Commits the transaction. Returns the created QueueUser."""
         try:
             appt_type = appointment_type or APPOINTMENT_TYPE_QUEUE
+            now = now_app_tz() if is_walk_in else None
             queue_user = QueueUser(
                 user_id=user_id,
                 queue_id=queue_id,
@@ -507,6 +510,9 @@ class QueueService:
                 slot_id=slot_id,
                 scheduled_start=scheduled_start,
                 scheduled_end=scheduled_end,
+                eta_minutes=eta_minutes,
+                is_checked_in=is_walk_in,
+                check_in_time=now,
             )
             self.db.add(queue_user)
             self.db.flush()
@@ -561,15 +567,18 @@ class QueueService:
         queue_changed: bool,
         new_date: Optional[date] = None,
         date_changed: bool = False,
+        new_reschedule_count: Optional[int] = None,
+        new_turn_time: Optional[int] = None,
     ) -> QueueUser:
         try:
             if queue_changed and new_queue_id is not None:
                 queue_user.queue_id = new_queue_id  # type: ignore[assignment]
-                queue_user.reschedule_count = (queue_user.reschedule_count or 0) + 1  # type: ignore[assignment]
+
+            if new_reschedule_count is not None:
+                queue_user.reschedule_count = new_reschedule_count  # type: ignore[assignment]
 
             if date_changed and new_date is not None:
                 queue_user.queue_date = new_date  # type: ignore[assignment]
-                queue_user.reschedule_count = (queue_user.reschedule_count or 0) + 1  # type: ignore[assignment]
 
             if new_notes is not None:
                 queue_user.notes = new_notes  # type: ignore[assignment]
@@ -583,7 +592,9 @@ class QueueService:
                         queue_user_id=queue_user.uuid,
                         queue_service_id=qs.uuid,
                     ))
-                queue_user.turn_time = sum((qs.avg_service_time or 5) for qs in new_queue_services)  # type: ignore[assignment]
+
+            if new_turn_time is not None:
+                queue_user.turn_time = new_turn_time  # type: ignore[assignment]
 
             self.db.commit()
             self.db.refresh(queue_user)
@@ -697,7 +708,8 @@ class QueueService:
             logger.exception("Failed to get_queue_by_id_and_business (queue_id=%s business_id=%s)", queue_id, business_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
-    def get_queue_min_slot_duration_minutes(self, queue_id: UUID) -> int:
+    def get_queue_service_avg_times(self, queue_id: UUID) -> List[int]:
+        """Return raw avg_service_time values for all services in a queue. Caller applies business bounds."""
         try:
             rows = (
                 self.db.query(QueueServiceModel.avg_service_time)
@@ -707,14 +719,10 @@ class QueueService:
                 )
                 .all()
             )
-            values = [r[0] for r in rows if r[0] is not None and r[0] > 0]
-            if not values:
-                return DEFAULT_SLOT_MINUTES
-            minutes = int(min(values))
-            return max(SLOT_DURATION_FLOOR, min(SLOT_DURATION_CEILING, minutes))
+            return [r[0] for r in rows if r[0] is not None and r[0] > 0]
         except SQLAlchemyError:
-            logger.warning("get_queue_min_slot_duration_minutes failed (queue_id=%s), using default", queue_id)
-            return DEFAULT_SLOT_MINUTES
+            logger.warning("get_queue_service_avg_times failed (queue_id=%s), returning empty", queue_id)
+            return []
 
     def reserve_slot_atomic(self, slot_id: UUID) -> Optional[AppointmentSlot]:
         try:
@@ -954,13 +962,34 @@ class QueueService:
         enqueue_time: Optional[datetime],
         created_at: Optional[datetime],
         exclude_queue_user_id: UUID,
+        effective_join_time: Optional[datetime] = None,
     ) -> Dict[str, Any]:
-        if enqueue_time is not None:
-            order_ahead = (QueueUser.enqueue_time.isnot(None)) & (QueueUser.enqueue_time < enqueue_time)
-        else:
+        # Ordering: effective_join_time ASC NULLS FIRST, enqueue_time ASC NULLS LAST, created_at ASC
+        # NULL effective_join_time = normal user (comes first); non-NULL = auto-held (pushed back)
+        if effective_join_time is not None:
+            # Current user has been auto-held: all normal users AND held users with earlier effective_join_time are ahead
             order_ahead = or_(
+                QueueUser.effective_join_time.is_(None),
+                and_(
+                    QueueUser.effective_join_time.isnot(None),
+                    QueueUser.effective_join_time < effective_join_time,
+                ),
+            )
+        elif enqueue_time is not None:
+            # Current user is normal, has enqueue_time: only other normal users with earlier enqueue_time
+            order_ahead = and_(
+                QueueUser.effective_join_time.is_(None),
                 QueueUser.enqueue_time.isnot(None),
-                (QueueUser.enqueue_time.is_(None) & (QueueUser.created_at < created_at)),
+                QueueUser.enqueue_time < enqueue_time,
+            )
+        else:
+            # Current user is normal, no enqueue_time: normal users with any enqueue_time or earlier created_at
+            order_ahead = and_(
+                QueueUser.effective_join_time.is_(None),
+                or_(
+                    QueueUser.enqueue_time.isnot(None),
+                    and_(QueueUser.enqueue_time.is_(None), QueueUser.created_at < created_at),
+                ),
             )
         try:
             ahead_count = (
@@ -1122,6 +1151,7 @@ class QueueService:
                 )
                 .with_for_update()
                 .order_by(
+                    QueueUser.effective_join_time.asc().nullsfirst(),  # held users (non-NULL) come after normal
                     QueueUser.enqueue_time.asc().nullslast(),
                     QueueUser.created_at.asc(),
                 )
@@ -1354,3 +1384,52 @@ class QueueService:
         except Exception:
             logger.exception("Failed to get_queue_users (business_id=%s page=%s)", business_id, page)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    def get_queue_ids_with_registered_users_today(self, today: date) -> List[UUID]:
+        """Return distinct queue_ids that have at least one registered user today."""
+        try:
+            rows = (
+                self.db.query(QueueUser.queue_id)
+                .filter(
+                    QueueUser.queue_date == today,
+                    QueueUser.status == QUEUE_USER_REGISTERED,
+                )
+                .distinct()
+                .all()
+            )
+            return [row[0] for row in rows]
+        except Exception:
+            logger.exception("get_queue_ids_with_registered_users_today failed (today=%s)", today)
+            return []
+
+    def apply_auto_hold(self, queue_user: QueueUser, now: datetime) -> bool:
+        """Push user back by setting effective_join_time. Sets hold_notified_at on first hold.
+        Returns True if a notification should be sent (first hold only)."""
+        queue_user.effective_join_time = now  # type: ignore[assignment]
+        send_notification = queue_user.hold_notified_at is None
+        if send_notification:
+            queue_user.hold_notified_at = now  # type: ignore[assignment]
+        self.db.flush()
+        return send_notification
+
+    def get_eta_notification_candidates(self, today: date) -> List[QueueUser]:
+        """Return registered users today who declared an ETA and have not yet been notified."""
+        try:
+            return (
+                self.db.query(QueueUser)
+                .filter(
+                    QueueUser.queue_date == today,
+                    QueueUser.status == QUEUE_USER_REGISTERED,
+                    QueueUser.eta_minutes.isnot(None),
+                    QueueUser.heading_notified_at.is_(None),
+                )
+                .all()
+            )
+        except Exception:
+            logger.exception("get_eta_notification_candidates failed (today=%s)", today)
+            return []
+
+    def mark_heading_notified(self, queue_user: QueueUser, now: datetime) -> None:
+        """Record that the heading-now notification was sent for this user."""
+        queue_user.heading_notified_at = now  # type: ignore[assignment]
+        self.db.flush()

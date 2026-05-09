@@ -48,6 +48,8 @@ class CustomerAppointmentListItem(BaseModel):
     dequeue_time: Optional[datetime] = None       # actual serve-end time (completed)
     cancellation_reason: Optional[str] = None    # set when cancelled
     total_fee: Optional[float] = None            # sum of service fees for all booked services
+    is_checked_in: bool = False
+    eta_minutes: Optional[int] = None
 
     @classmethod
     def from_orm_row(
@@ -94,6 +96,8 @@ class CustomerAppointmentListItem(BaseModel):
             dequeue_time=getattr(queue_user, "dequeue_time", None),
             cancellation_reason=getattr(queue_user, "cancellation_reason", None),
             total_fee=total_fee,
+            is_checked_in=bool(getattr(queue_user, "is_checked_in", False)),
+            eta_minutes=getattr(queue_user, "eta_minutes", None),
         )
 
 

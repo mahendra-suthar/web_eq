@@ -7,6 +7,7 @@ import { AuthService } from "../../services/auth/auth.service";
 import type { CustomerProfileResponse, CustomerProfileUpdateInput } from "../../services/auth/auth.service";
 import { AppointmentService } from "../../services/appointment/appointment.service";
 import type { CustomerAppointmentListItem } from "../../services/appointment/appointment.service";
+import { BookingService } from "../../services/booking/booking.service";
 import AppointmentActions from "../../components/appointment-actions";
 import LoadingSpinner from "../../components/loading-spinner";
 import ErrorMessage from "../../components/error-message";
@@ -329,6 +330,17 @@ function AppointmentsSection() {
   useEffect(() => { loadPage(0, false); }, [loadPage]);
   const refreshList = useCallback(() => { loadPage(0, false); }, [loadPage]);
 
+  const markArrived = useCallback(async (queueUserId: string) => {
+    try {
+      await new BookingService().arrive(queueUserId);
+      setList((prev) =>
+        prev.map((it) => it.queue_user_id === queueUserId ? { ...it, is_checked_in: true } : it)
+      );
+    } catch {
+      // non-critical
+    }
+  }, []);
+
   // Stats derived from full list
   const stats = {
     total: list.length,
@@ -460,7 +472,7 @@ function AppointmentsSection() {
                       <div className="ac-appt-info">
                         <div className="ac-appt-top">
                           <div className="ac-appt-biz">{item.business_name}</div>
-                          <div className={`ac-appt-status ac-appt-status--${cls}`}>
+                          <div className={`ac-appt-status ac-appt-status--${cls}${cls === "upcoming" ? " ac-appt-status--live" : ""}`}>
                             <div className="ac-status-dot" />
                             {getStatusLabel(item.status)}
                           </div>
@@ -485,6 +497,65 @@ function AppointmentsSection() {
                         )}
                       </div>
                     </div>
+
+                    {/* Live status bar — active appointments only */}
+                    {!isPast && (
+                      <div className={`ac-live-bar${
+                        item.status === 2 ? " ac-live-bar--serving"
+                        : item.position === 1 ? " ac-live-bar--next"
+                        : item.position != null && item.position <= 3 ? " ac-live-bar--close"
+                        : ""
+                      }`}>
+                        <div className="ac-live-bar__info">
+                          {item.status === 2 ? (
+                            <>
+                              <span className="ac-live-bar__dot" aria-hidden="true" />
+                              <span className="ac-live-bar__serving-text">{t("youreBeingServed")}</span>
+                            </>
+                          ) : item.position === 1 ? (
+                            <>
+                              <span className="ac-live-bar__next-icon">⚡</span>
+                              <span className="ac-live-bar__next-text">{t("youreNext")}</span>
+                              {item.estimated_appointment_time && (
+                                <span className="ac-live-bar__wait">{t("expectedAt")} {item.estimated_appointment_time}</span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {item.position != null && (
+                                <>
+                                  <span className="ac-live-bar__pos">#{item.position}</span>
+                                  <span className="ac-live-bar__pos-label">{t("inLine")}</span>
+                                </>
+                              )}
+                              {item.estimated_appointment_time ? (
+                                <span className="ac-live-bar__wait">{t("expectedAt")} {item.estimated_appointment_time}</span>
+                              ) : item.estimated_wait_minutes != null && item.estimated_wait_minutes > 0 ? (
+                                <span className="ac-live-bar__wait">~{item.estimated_wait_minutes} {t("minWait")}</span>
+                              ) : null}
+                            </>
+                          )}
+                        </div>
+                        {item.status === 1 && item.position != null && item.position <= 3 && (
+                          item.is_checked_in ? (
+                            <span className="appt-actions__arrived">
+                              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                              {t("arrived")}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="appt-actions__btn appt-actions__btn--arrive"
+                              onClick={(e) => { e.stopPropagation(); markArrived(item.queue_user_id); }}
+                            >
+                              {t("iveArrived")}
+                            </button>
+                          )
+                        )}
+                      </div>
+                    )}
 
                     {/* Footer */}
                     <div className="ac-appt-footer">
@@ -548,43 +619,6 @@ function AppointmentsSection() {
                               </svg>
                               {timeSummary}
                             </div>
-                          )}
-                          {item.status === 2 ? (
-                            <div className="ac-appt-queue-chip ac-appt-queue-chip--serving">
-                              🔔 {t("youreBeingServed")}
-                            </div>
-                          ) : item.position === 1 ? (
-                            <>
-                              <div className="ac-appt-queue-chip ac-appt-queue-chip--next">
-                                ⚡ {t("youreNext")}
-                              </div>
-                              {item.estimated_appointment_time && (
-                                <div className="ac-appt-queue-chip">
-                                  {t("expectedAt")} {item.estimated_appointment_time}
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              {item.position != null && (
-                                <div className="ac-appt-queue-chip">
-                                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" />
-                                    <line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" />
-                                  </svg>
-                                  #{item.position} {t("inLine")}
-                                </div>
-                              )}
-                              {item.estimated_appointment_time ? (
-                                <div className="ac-appt-queue-chip">
-                                  {t("expectedAt")} {item.estimated_appointment_time}
-                                </div>
-                              ) : item.estimated_wait_minutes != null && item.estimated_wait_minutes > 0 ? (
-                                <div className="ac-appt-queue-chip">
-                                  ~{item.estimated_wait_minutes} {t("minWait")}
-                                </div>
-                              ) : null}
-                            </>
                           )}
                         </>
                       )}

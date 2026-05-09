@@ -202,6 +202,32 @@ const QueueUserDetail = () => {
                                     <label className="info-label">{t("isScheduled")}</label>
                                     <div className="info-value">{data.is_scheduled ? t("yes") : t("no")}</div>
                                 </div>
+                                <div className="info-field">
+                                    <label className="info-label">{t("arrivalStatus")}</label>
+                                    <div className="info-value">
+                                        {data.is_checked_in ? (
+                                            <span className="status-badge completed">{t("checkedIn")}</span>
+                                        ) : data.status === QueueUserStatus.REGISTERED ? (
+                                            <span className="status-badge unknown">{t("notCheckedIn")}</span>
+                                        ) : (
+                                            <span className="info-value">—</span>
+                                        )}
+                                    </div>
+                                </div>
+                                {data.check_in_time && (
+                                    <div className="info-field">
+                                        <label className="info-label">{t("checkInTime")}</label>
+                                        <div className="info-value">{formatDateTime(data.check_in_time)}</div>
+                                    </div>
+                                )}
+                                {data.eta_minutes != null && (
+                                    <div className="info-field">
+                                        <label className="info-label">{t("etaTravel")}</label>
+                                        <div className="info-value">
+                                            {data.eta_minutes === 0 ? t("imAlreadyHere") : `~${data.eta_minutes} ${t("min")}`}
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="info-field full-width">
                                     <label className="info-label">{t("notes")}</label>
                                     <div className="info-value">{data.notes || t("notAvailable")}</div>

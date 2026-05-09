@@ -19,6 +19,10 @@ export interface BookingCreateInput {
   appointment_type?: string;
   /** Required for FIXED/APPROXIMATE — slot UUID from GET /queue/slots */
   slot_id?: string;
+  /** Customer's self-declared travel time in minutes: 0 (here), 15, 30, 60, 90 */
+  eta_minutes?: number;
+  /** True when added as a physical walk-in from admin — auto-marks as arrived */
+  is_walk_in?: boolean;
 }
 
 /**
@@ -171,5 +175,10 @@ export class BookingService extends HttpClient {
       if (import.meta.env.DEV) console.error('Failed to fetch upcoming appointments:', error);
       return []; // graceful fallback — never block the booking page
     }
+  }
+
+  /** Mark the customer as physically present (checked in). Prevents auto-hold. */
+  async arrive(queueUserId: string): Promise<{ success: boolean; is_checked_in: boolean }> {
+    return this.post(`/customer/appointments/${queueUserId}/arrive`);
   }
 }

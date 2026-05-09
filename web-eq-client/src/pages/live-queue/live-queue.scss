@@ -622,6 +622,18 @@
   }
 }
 
+.lq-badge--arrived {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #059669;
+}
+
+.lq-badge--not-arrived {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #b45309;
+}
+
 .lq-currentCard__delay {
   margin-top: 4px;
   font-size: 12px;

@@ -107,6 +107,8 @@ NOTIF_NEW_CUSTOMER = "NEW_CUSTOMER"
 NOTIF_IN_SERVICE = "IN_SERVICE"
 NOTIF_CALLED_NEXT = "CALLED_NEXT"
 NOTIF_SERVICE_COMPLETED = "SERVICE_COMPLETED"
+NOTIF_AUTO_HOLD = "AUTO_HOLD"          # customer pushed back because not checked in
+NOTIF_HEADING_NOW = "HEADING_NOW"      # "head out now" — wait ≤ eta
 
 # Business status label map (int → display string)
 BUSINESS_STATUS_LABELS = {

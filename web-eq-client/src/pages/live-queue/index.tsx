@@ -54,6 +54,7 @@ type UIUser = {
   scheduled_start?: string | null;
   scheduled_end?: string | null;
   delay_minutes?: number | null;
+  is_checked_in?: boolean;
 };
 
 type CurrentUser = UIUser & { position: number | null; estimated_token: string };
@@ -111,6 +112,7 @@ function mapLiveData(data: LiveQueueData, t: (k: string) => string): {
       scheduled_start: u.scheduled_start ?? null,
       scheduled_end: u.scheduled_end ?? null,
       delay_minutes: u.delay_minutes ?? null,
+      is_checked_in: u.is_checked_in ?? false,
     };
 
     if (u.status === QueueUserStatus.COMPLETED) {
@@ -666,6 +668,12 @@ const LiveQueue: React.FC = () => {
                                 ? t("inProgress") || "In Progress"
                                 : t("waiting") || "Waiting"}
                             </span>
+                            {item.status === "waiting" && item.user.is_checked_in && (
+                              <span className="lq-badge lq-badge--arrived">{t("checkedIn") || "Here"}</span>
+                            )}
+                            {item.status === "waiting" && !item.user.is_checked_in && item.user.position === 1 && (
+                              <span className="lq-badge lq-badge--not-arrived">{t("notCheckedIn")}</span>
+                            )}
                           </div>
                           <div className="lq-row__sub">
                             <span>{item.user.phone}</span>

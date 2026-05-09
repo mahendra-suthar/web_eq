@@ -416,6 +416,13 @@
   "enterInvitationCodeSent": "Enter the code shared by your business.",
   "invitationCode": "Invitation Code",
   "invitationCodePlaceholder": "e.g. ABC123",
-  "failedToVerifyInvitationCode": "Failed to verify invitation code"
+  "failedToVerifyInvitationCode": "Failed to verify invitation code",
+  "checkedIn": "Here",
+  "notCheckedIn": "Not checked in",
+  "arrivalStatus": "Arrival Status",
+  "checkInTime": "Checked-in At",
+  "etaTravel": "Travel ETA",
+  "imAlreadyHere": "Already here",
+  "min": "min"
 }
 

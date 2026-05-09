@@ -1,6 +1,9 @@
 /**
  * Auth store for managing authentication state.
- * Token is stored in cookies by backend, only user info is stored here.
+ * userInfo + profileType are persisted in localStorage.
+ * token is persisted in sessionStorage so it survives page reloads but is
+ * isolated per-tab and cleared on browser close (avoids the cookie-collision
+ * logout bug when both admin and customer apps are open in the same browser).
  */
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
@@ -28,14 +31,22 @@ interface AuthState {
   resetUser: () => void;
 }
 
+const TOKEN_SS_KEY = 'eq_customer_token';
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       userInfo: null,
       profileType: null,
-      token: null,
+      // Bootstrap token from sessionStorage so it survives page reloads
+      token: sessionStorage.getItem(TOKEN_SS_KEY) ?? null,
 
-      setToken: (token) => set({ token }),
+      setToken: (token) => {
+        if (token) sessionStorage.setItem(TOKEN_SS_KEY, token);
+        else sessionStorage.removeItem(TOKEN_SS_KEY);
+        set({ token });
+      },
+
       setProfileType: (type) => set({ profileType: type }),
 
       setUserInfo: (info) =>
@@ -51,12 +62,15 @@ export const useAuthStore = create<AuthState>()(
         return !!userInfo && !!userInfo.uuid;
       },
 
-      resetUser: () => set({ userInfo: null, profileType: null, token: null }),
+      resetUser: () => {
+        sessionStorage.removeItem(TOKEN_SS_KEY);
+        set({ userInfo: null, profileType: null, token: null });
+      },
     }),
     {
       name: 'web-eq-customer-user',
       storage: createJSONStorage(() => localStorage),
-      // token is memory-only; profileType is persisted for the cross-session guard
+      // token lives in sessionStorage (above); only user identity is in localStorage
       partialize: (state) => ({ userInfo: state.userInfo, profileType: state.profileType }) as AuthState,
     }
   )

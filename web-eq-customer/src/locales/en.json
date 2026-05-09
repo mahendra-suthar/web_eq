@@ -143,8 +143,17 @@
     "slotLeft_other": "{{count}} left",
     "alreadyBooked": "Already booked",
     "timeConflict": "You already have an appointment at {{time}} at {{business}}. Please choose a different date or time.",
-    "alreadyQueueDetails": "Your current queue details"
+    "alreadyQueueDetails": "Your current queue details",
+    "howFarAreYou": "How far are you from the business?",
+    "howFarAreYouSub": "We'll notify you when it's almost your turn so you can leave on time.",
+    "imHere": "I'm already here",
+    "min": "min",
+    "hour": "hour",
+    "hours": "hrs"
   },
+
+  "iveArrived": "I've Arrived",
+  "arrived": "Arrived",
 
   "auth": {
     "welcomeText": "Welcome",

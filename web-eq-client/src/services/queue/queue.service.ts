@@ -83,6 +83,10 @@ export interface QueueUserDetailResponse {
   notes?: string | null;
   cancellation_reason?: string | null;
   reschedule_count: number;
+  is_checked_in: boolean;
+  check_in_time?: string | null;
+  eta_minutes?: number | null;
+  appointment_type?: string | null;
 }
 
 export interface QueueUserData {
@@ -103,6 +107,8 @@ export interface QueueUserData {
     reschedule_count: number;
     joined_queue: boolean;
     is_scheduled: boolean;
+    is_checked_in?: boolean;
+    eta_minutes?: number | null;
     user: {
         uuid: string;
         full_name?: string;
@@ -175,6 +181,7 @@ export interface LiveQueueUserItem {
     scheduled_start?: string | null;
     scheduled_end?: string | null;
     delay_minutes?: number | null;  // for APPROXIMATE: cascaded delay
+    is_checked_in?: boolean;       // customer has physically arrived
 }
 
 export interface LiveQueueData {
@@ -430,6 +437,8 @@ export class QueueService extends HttpClient {
                 recipient_name: payload.recipient_name ?? null,
                 notes: payload.notes ?? null,
                 appointment_type: payload.appointment_type ?? "QUEUE",
+                is_walk_in: true,   // auto-mark as arrived, exempt from auto-hold
+                eta_minutes: 0,     // physically present
             });
         } catch (error: any) {
             console.error("Failed to create walk-in booking:", error);

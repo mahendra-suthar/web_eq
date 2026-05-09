@@ -20,7 +20,7 @@ export interface AppointmentActionItem {
 }
 
 const EDITABLE_STATUSES = [1];       // REGISTERED only
-const CANCELLABLE_STATUSES = [1, 2]; // REGISTERED + IN_PROGRESS
+const CANCELLABLE_STATUSES = [1];    // REGISTERED only — cannot cancel while being served
 const COMPLETED_STATUS = 3;
 
 interface AppointmentActionsProps {

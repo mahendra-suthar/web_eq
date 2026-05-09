@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.models.queue import Queue, AppointmentSlot
 from app.services.queue_service import QueueService
 from app.services.booking_calculation_service import BookingCalculationService
-from app.core.constants import BOOKING_MODE_FIXED, BOOKING_MODE_APPROXIMATE, BOOKING_MODE_HYBRID
+from app.core.constants import BOOKING_MODE_FIXED, BOOKING_MODE_APPROXIMATE, BOOKING_MODE_HYBRID, DEFAULT_SLOT_MINUTES, SLOT_DURATION_FLOOR, SLOT_DURATION_CEILING
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +99,11 @@ class SlotGenerationService:
         if not employee_available or open_time >= close_time:
             return []
 
-        slot_duration = self.queue_service.get_queue_min_slot_duration_minutes(queue.uuid)  # type: ignore[arg-type]
+        avg_times = self.queue_service.get_queue_service_avg_times(queue.uuid)  # type: ignore[arg-type]
+        if avg_times:
+            slot_duration = max(SLOT_DURATION_FLOOR, min(SLOT_DURATION_CEILING, int(min(avg_times))))
+        else:
+            slot_duration = DEFAULT_SLOT_MINUTES
         raw_interval = queue.slot_interval_minutes
         slot_interval = raw_interval if (raw_interval is not None and int(raw_interval) > 0) else slot_duration  # type: ignore[operator]
         capacity = max(1, queue.max_per_slot or 1)  # type: ignore[operator]
@@ -110,7 +114,9 @@ class SlotGenerationService:
 
         while current < close_time:
             slot_end = _time_add(current, slot_duration, ref_date)
-            if slot_end > close_time:
+            # Guard against midnight wraparound: if slot_end wrapped to the next day
+            # it will be numerically less than current, causing an infinite loop.
+            if slot_end <= current or slot_end > close_time:
                 break
             if not _overlaps_break(current, slot_end, breaks):
                 slots.append(
@@ -124,6 +130,9 @@ class SlotGenerationService:
                         is_blocked=False,
                     )
                 )
-            current = _time_add(current, slot_interval, ref_date)  # type: ignore[arg-type]
+            next_current = _time_add(current, slot_interval, ref_date)  # type: ignore[arg-type]
+            if next_current <= current:  # day boundary crossed — stop
+                break
+            current = next_current
 
         return slots
