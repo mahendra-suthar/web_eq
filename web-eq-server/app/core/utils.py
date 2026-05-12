@@ -14,6 +14,7 @@ from app.core.constants import (
     QUEUE_USER_COMPLETED,
     QUEUE_USER_IN_PROGRESS,
     QUEUE_USER_REGISTERED,
+    QUEUE_USER_SCHEDULED,
     TIME_FORMAT,
     TIMEZONE,
 )
@@ -23,6 +24,7 @@ ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 _APP_TZ = pytz.timezone(TIMEZONE)
 APP_TZ = _APP_TZ  # public alias — import this in services that need the timezone object
 _UTC_MIN = datetime.min.replace(tzinfo=timezone.utc)
+_UTC_MAX = datetime.max.replace(tzinfo=timezone.utc)
 
 
 def normalize_email(email: Optional[str]) -> Optional[str]:
@@ -223,15 +225,28 @@ def serialise_dt(val: Any) -> Optional[str]:
 def sort_key_live_queue_row(row: Tuple[Any, Any]) -> tuple:
     """
     Sort key for live queue (QueueUser, User) rows:
-    completed (0) → in_progress (1) → waiting (2), with secondary key by time.
-    Uses a tz-aware sentinel so comparison with DB timestamps never raises TypeError.
+    completed (0) → in_progress (1) → waiting (2) → scheduled/upcoming (3).
+    Waiting: held users (effective_join_time set) come after normal users.
+    Scheduled: sorted by scheduled_start so upcoming cards appear in time order.
+    Uses tz-aware sentinels so timestamp comparisons never raise TypeError.
     """
     qu = row[0]
     if qu.status == QUEUE_USER_COMPLETED:
-        return (0, qu.dequeue_time or qu.created_at or _UTC_MIN)
+        return (0, False, qu.dequeue_time or qu.created_at or _UTC_MIN)
     if qu.status == QUEUE_USER_IN_PROGRESS:
-        return (1, qu.enqueue_time or qu.created_at or _UTC_MIN)
-    return (2, qu.enqueue_time or qu.created_at or _UTC_MIN)
+        return (1, False, qu.enqueue_time or qu.created_at or _UTC_MIN)
+    if qu.status == QUEUE_USER_SCHEDULED:
+        st = getattr(qu, "scheduled_start", None)
+        if st:
+            from datetime import date as _date, datetime as _datetime
+            scheduled_dt = _APP_TZ.localize(_datetime.combine(_date.today(), st))
+        else:
+            scheduled_dt = _UTC_MAX
+        return (3, False, scheduled_dt)
+    # REGISTERED/waiting: held users (effective_join_time set) sort after non-held
+    eff = getattr(qu, "effective_join_time", None)
+    secondary = eff if eff is not None else (qu.enqueue_time or qu.created_at or _UTC_MIN)
+    return (2, eff is not None, secondary)
 
 
 def build_live_queue_users_raw(
@@ -272,6 +287,7 @@ def build_live_queue_users_raw(
             "scheduled_start": st.strftime("%H:%M") if st else None,
             "scheduled_end": se.strftime("%H:%M") if se else None,
             "delay_minutes": getattr(qu, "delay_minutes", None),
+            "is_checked_in": bool(getattr(qu, "is_checked_in", False)),
         })
     return result
 

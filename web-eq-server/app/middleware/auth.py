@@ -39,13 +39,14 @@ def extract_token(request: Request) -> Optional[str]:
     if auth_header.startswith("Bearer "):
         return auth_header.split(" ", 1)[1]
 
-    # Cookie fallback — browser sends these automatically (httpOnly, SameSite=None)
-    token = request.cookies.get("access_token")
+    # Customer cookie checked first — prevents admin app's access_token cookie from
+    # being used on customer endpoints when both apps share the same cookie domain.
+    token = request.cookies.get("customer_access_token")
     if token:
         return token
 
-    # Customer cookie (separate name to prevent session collision on same domain)
-    token = request.cookies.get("customer_access_token")
+    # Business / employee / admin cookie
+    token = request.cookies.get("access_token")
     if token:
         return token
 

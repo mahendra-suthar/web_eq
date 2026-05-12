@@ -7,6 +7,7 @@ import { PhoneNumber, formatPhoneForDisplay } from "../../utils/utils";
 import Button from "../../components/button";
 import { OTPService } from "../../services/otp/otp.service";
 import { ProfileService } from "../../services/profile/profile.service";
+import { confirmFirebaseOTP, sendFirebaseOTP, clearConfirmation, clearRecaptcha } from "../../services/auth/firebase-phone";
 import { useUserStore } from "../../utils/userStore";
 import { OTP_COUNTDOWN_SECONDS, OTP_LENGTH } from "../../utils/constants";
 import "./verify-otp.scss";
@@ -18,6 +19,22 @@ const NEXT_STEP = {
   BUSINESS_REGISTRATION: "business_registration",
 } as const;
 
+function getFirebaseVerifyError(t: (key: string) => string, err: unknown): string {
+  const code = (err as any)?.code as string | undefined;
+  switch (code) {
+    case "auth/invalid-verification-code":
+      return t("otpInvalid");
+    case "auth/code-expired":
+      return t("otpExpired");
+    case "auth/too-many-requests":
+      return t("rateLimitExceeded");
+    case "auth/network-request-failed":
+      return t("networkError");
+    default:
+      return (err as any)?.customMessage || (err as any)?.response?.data?.detail?.message || t("otpVerificationFailed");
+  }
+}
+
 export default function VerifyOTP() {
   const { t } = useLayoutContext();
   const navigate = useNavigate();
@@ -26,7 +43,6 @@ export default function VerifyOTP() {
   const { setProfile, setNextStep, setToken } = useUserStore();
 
   const phoneObj: PhoneNumber | undefined = location.state?.phone;
-
   const phone = phoneObj ? formatPhoneForDisplay(phoneObj) : "";
 
   const [otp, setOtp] = useState("");
@@ -38,11 +54,17 @@ export default function VerifyOTP() {
 
   const otpService = new OTPService();
 
+  // Clear Firebase confirmation and reCAPTCHA state on unmount
+  useEffect(() => {
+    return () => {
+      clearConfirmation();
+      clearRecaptcha();
+    };
+  }, []);
+
   useEffect(() => {
     if (countdown === 0) return;
-    const timer = setInterval(() => {
-      setCountdown((prev) => prev - 1);
-    }, 1000);
+    const timer = setInterval(() => setCountdown((prev) => prev - 1), 1000);
     return () => clearInterval(timer);
   }, [countdown]);
 
@@ -60,11 +82,11 @@ export default function VerifyOTP() {
     setLoading(true);
     setError("");
 
-        if (otp.length !== OTP_LENGTH) {
-          setError(t("incorrectCode"));
-          setLoading(false);
-          return;
-        }
+    if (otp.length !== OTP_LENGTH) {
+      setError(t("incorrectCode"));
+      setLoading(false);
+      return;
+    }
 
     if (!phoneObj) {
       setError(t("otpVerificationFailed"));
@@ -73,12 +95,8 @@ export default function VerifyOTP() {
     }
 
     try {
-      const response = await otpService.businessVerifyOTP(
-        phoneObj.countryCode,
-        phoneObj.localNumber,
-        otp,
-        "web"
-      );
+      const idToken = await confirmFirebaseOTP(otp);
+      const response = await otpService.verifyFirebasePhone(idToken, "web");
 
       if (!response.token || !response.user) {
         setError(t("otpVerificationFailed"));
@@ -141,111 +159,49 @@ export default function VerifyOTP() {
       }
 
       if (nextStepFromBackend === NEXT_STEP.BUSINESS_REGISTRATION) {
-        navigate(ROUTERS_PATH.BUSINESSREGISTRATION, {
-          state: { phone: phoneObj },
-        });
+        navigate(ROUTERS_PATH.BUSINESSREGISTRATION, { state: { phone: phoneObj } });
         return;
       }
 
       navigate(ROUTERS_PATH.DASHBOARD);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setOtp("");
-      let errorMessage = t("otpVerificationFailed");
-
-      if (err?.response?.data?.detail?.error_code) {
-        const errorCode = err.response.data.detail.error_code;
-        switch (errorCode) {
-          case 1:
-            errorMessage = t("otpNotFound");
-            break;
-          case 2:
-            errorMessage = t("otpExpired");
-            break;
-          case 3:
-            errorMessage = t("otpInvalid");
-            break;
-          case 4:
-            errorMessage = t("otpAlreadyUsed");
-            break;
-          default:
-            errorMessage = err?.response?.data?.detail?.message || err?.customMessage || t("otpVerificationFailed");
-        }
-      } else if (err?.code === "ERR_NETWORK" || !err?.response) {
-        errorMessage = t("networkError");
-      } else {
-        errorMessage = err?.customMessage || err?.response?.data?.detail?.message || t("otpVerificationFailed");
-      }
-
-      setError(errorMessage);
+      setError(getFirebaseVerifyError(t, err));
     } finally {
       setLoading(false);
     }
   };
 
   const handleResendOtp = async () => {
-    if (!phoneObj) {
-      return;
-    }
-
+    if (!phoneObj) return;
     setResendLoading(true);
     setError("");
 
     try {
-      await otpService.sendOTP(
-        phoneObj.countryCode,
-        phoneObj.localNumber,
-        "business"
-      );
-
-          setCountdown(OTP_COUNTDOWN_SECONDS);
-          setOtp("");
-          setHasReachedLimit(false);
-    } catch (err: any) {
-      let errorMessage = t("errorSendingCode");
-
-      if (err?.response?.data?.detail?.error_code) {
-        const errorCode = err.response.data.detail.error_code;
-        switch (errorCode) {
-          case 1:
-            errorMessage = t("invalidPhoneFormat");
-            break;
-          case 2:
-            errorMessage = t("rateLimitExceeded");
-            setHasReachedLimit(true);
-            break;
-          case 3:
-            errorMessage = t("phoneAlreadyExist");
-            break;
-          case 4:
-            errorMessage = t("phoneDoesNotExist");
-            break;
-          default:
-            errorMessage = err?.response?.data?.detail?.message || err?.customMessage || t("errorSendingCode");
-        }
-      } else if (err?.code === "ERR_NETWORK" || !err?.response) {
-        errorMessage = t("networkError");
+      await sendFirebaseOTP(`${phoneObj.countryCode}${phoneObj.localNumber}`);
+      setCountdown(OTP_COUNTDOWN_SECONDS);
+      setOtp("");
+      setHasReachedLimit(false);
+    } catch (err: unknown) {
+      const code = (err as any)?.code as string | undefined;
+      if (code === "auth/too-many-requests") {
+        setError(t("rateLimitExceeded"));
+        setHasReachedLimit(true);
       } else {
-        errorMessage = err?.customMessage || err?.response?.data?.detail?.message || t("errorSendingCode");
+        setError((err as any)?.message || t("errorSendingCode"));
       }
-
-      setError(errorMessage);
     } finally {
       setResendLoading(false);
     }
   };
 
   const handleOtpChange = (value: string) => {
-    if (error) {
-      setError("");
-    }
-    const numericValue = value.replace(/\D/g, '').slice(0, OTP_LENGTH);
-    setOtp(numericValue);
+    if (error) setError("");
+    setOtp(value.replace(/\D/g, '').slice(0, OTP_LENGTH));
   };
 
   useEffect(() => {
-    if (!phone) {
-      navigate(ROUTERS_PATH.SENDOTP, { replace: true });
-    }
+    if (!phone) navigate(ROUTERS_PATH.SENDOTP, { replace: true });
   }, [phone, navigate, ROUTERS_PATH.SENDOTP]);
 
   return (
@@ -331,4 +287,3 @@ function OTPSlot(props: SlotProps) {
     </div>
   );
 }
-

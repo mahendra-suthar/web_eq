@@ -17,6 +17,10 @@ from app.core.constants import (
     NOTIF_IN_SERVICE,
     NOTIF_NEW_CUSTOMER,
     NOTIF_SERVICE_COMPLETED,
+    NOTIF_AUTO_HOLD,
+    NOTIF_HEADING_NOW,
+    NOTIF_NO_SHOW,
+    NOTIF_SKIPPED,
 )
 from app.services.notification_service import NotificationService
 from app.services.realtime.notification_manager import notification_manager
@@ -147,3 +151,88 @@ async def notify_service_completed(
         body=f"Your service (Token #{token_number}) is complete. Thank you!",
         data={"token_number": token_number, "queue_name": queue_name},
     )
+
+
+async def notify_no_show(
+    db: Session,
+    user_id: UUID,
+    token_number: str,
+    queue_name: str = "",
+) -> None:
+    """NO_SHOW → customer marked absent and removed from the queue."""
+    await _persist_and_push(
+        db=db,
+        user_id=user_id,
+        type=NOTIF_NO_SHOW,
+        title="Marked as No Show",
+        body=f"Token #{token_number}: you were marked as no show at {queue_name or 'the queue'}. Please rebook if needed.",
+        data={"token_number": token_number, "queue_name": queue_name},
+    )
+
+
+async def notify_skipped(
+    db: Session,
+    user_id: UUID,
+    token_number: str,
+    queue_name: str = "",
+) -> None:
+    """SKIPPED → customer moved to the back of the queue."""
+    await _persist_and_push(
+        db=db,
+        user_id=user_id,
+        type=NOTIF_SKIPPED,
+        title="Moved to Back of Queue",
+        body=f"Token #{token_number}: you were skipped and moved to the back of the queue at {queue_name or 'the queue'}.",
+        data={"token_number": token_number, "queue_name": queue_name},
+    )
+
+
+# ─── Sync-only helpers (called from background scheduler, no WS push) ────────
+
+def notify_auto_hold_sync(
+    db: Session,
+    user_id: UUID,
+    token_number: str,
+    queue_name: str = "",
+) -> None:
+    """AUTO_HOLD — persists DB notification only (called from sync scheduler)."""
+    try:
+        svc = NotificationService(db)
+        svc.create(
+            user_id=user_id,
+            type=NOTIF_AUTO_HOLD,
+            title="Position Update",
+            body=(
+                f"You were moved back one spot in {queue_name or 'the queue'} "
+                f"(Token #{token_number}) because you haven't checked in yet. "
+                "Tap 'I've Arrived' when you're here."
+            ),
+            data={"token_number": token_number, "queue_name": queue_name},
+        )
+    except Exception:
+        logger.exception("notify_auto_hold_sync failed for user_id=%s", user_id)
+
+
+def notify_heading_now_sync(
+    db: Session,
+    user_id: UUID,
+    token_number: str,
+    queue_name: str = "",
+    wait_minutes: int = 0,
+) -> None:
+    """HEADING_NOW — persists DB notification only (called from sync scheduler)."""
+    try:
+        wait_text = f"~{wait_minutes} min" if wait_minutes else "soon"
+        svc = NotificationService(db)
+        svc.create(
+            user_id=user_id,
+            type=NOTIF_HEADING_NOW,
+            title="Time to Head Out!",
+            body=(
+                f"Your turn is coming up in {wait_text} at {queue_name or 'the business'}. "
+                f"Token #{token_number}."
+            ),
+            data={"token_number": token_number, "queue_name": queue_name, "wait_minutes": wait_minutes},
+        )
+    except Exception:
+        logger.exception("notify_heading_now_sync failed for user_id=%s", user_id)

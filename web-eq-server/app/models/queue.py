@@ -62,6 +62,10 @@ class QueueUser(BaseModel):
     is_checked_in = Column(Boolean, default=False, nullable=False)
     check_in_time = Column(TIMESTAMP(timezone=True), nullable=True)
     delay_minutes = Column(Integer, default=0, nullable=False)  # cascaded delay for APPROXIMATE
+    eta_minutes = Column(Integer, nullable=True)  # customer's self-declared travel time (0/15/30/60/90)
+    effective_join_time = Column(TIMESTAMP(timezone=True), nullable=True)  # pushed forward on auto-hold
+    hold_notified_at = Column(TIMESTAMP(timezone=True), nullable=True)  # set after first hold notification
+    heading_notified_at = Column(TIMESTAMP(timezone=True), nullable=True)  # set after "head out" notification
 
     queue = relationship("Queue", back_populates="queue_users", foreign_keys=[queue_id], lazy="select")
     user = relationship("User", back_populates="queue_users", foreign_keys=[user_id], lazy="select")

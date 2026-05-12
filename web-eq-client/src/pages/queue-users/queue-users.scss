@@ -66,3 +66,30 @@
         }
     }
 }
+
+.status-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+}
+
+.arrival-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+
+    &.arrived {
+        background-color: #d1fae5;
+        color: #065f46;
+
+        &::before {
+            content: "✓";
+        }
+    }
+}

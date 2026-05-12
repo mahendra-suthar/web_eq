@@ -122,4 +122,16 @@
         color: #dc2626;
         margin-bottom: 16px;
     }
+
+    .status-badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+
+        &.completed { background: #d1fae5; color: #065f46; }
+        &.unknown   { background: #f3f4f6; color: #6b7280; }
+    }
 }

@@ -25,7 +25,7 @@ export const OTP_COUNTDOWN_SECONDS = 300;
 /**
  * OTP length
  */
-export const OTP_LENGTH = 5;
+export const OTP_LENGTH = 6;
 
 // ============================================================================
 // Phone Number Constants

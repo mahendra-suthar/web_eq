@@ -11,6 +11,7 @@ import {
 } from "../../services/category/category.service";
 import { BusinessService } from "../../services/business/business.service";
 import { AppointmentService, type TodayAppointmentResponse } from "../../services/appointment/appointment.service";
+import { BookingService } from "../../services/booking/booking.service";
 import { ReviewService, type FeaturedReview } from "../../services/review/review.service";
 import StarRating from "../../components/star-rating";
 import { useAuthStore } from "../../store/auth.store";
@@ -147,6 +148,15 @@ export default function LandingPage() {
   }, [isAuthenticated]);
 
   useEffect(() => { fetchTodayAppointments(); }, [fetchTodayAppointments]);
+
+  const markArrived = useCallback(async (queueUserId: string) => {
+    try {
+      await new BookingService().arrive(queueUserId);
+      setTodayAppointments((prev) =>
+        prev.map((a) => a.queue_user_id === queueUserId ? { ...a, is_checked_in: true } : a)
+      );
+    } catch {}
+  }, []);
 
   const fetchFeaturedBusinesses = useCallback(async () => {
     setFeaturedLoading(true);
@@ -394,7 +404,8 @@ export default function LandingPage() {
               <div className={`lp-today-cards${todayAppointments.length === 0 ? " lp-today-cards--empty" : ""}`}>
                 {todayAppointments.map((appt) => {
                   const isInProgress = appt.status === 2;
-                  const isActive = appt.status !== 1;
+                  const isScheduled = appt.status === 8;  // SCHEDULED — pre-active, not yet in queue
+                  const isActive = !isScheduled && appt.status !== 1;
                   const timeSummary = formatAppointmentTimeSummary(
                     appt.appointment_type,
                     appt.scheduled_start ?? null,
@@ -402,36 +413,53 @@ export default function LandingPage() {
                     appt.estimated_appointment_time ?? null
                   );
                   const delayMsg = formatDelayMessage(appt.delay_minutes ?? null);
-                  const hasStats = !isInProgress && (
-                    appt.position != null
-                    || (appt.estimated_wait_minutes != null && appt.estimated_wait_minutes > 0)
-                    || !!timeSummary
-                  );
+                  const hasStats = isScheduled
+                    ? !!timeSummary
+                    : !isInProgress && (
+                        appt.position != null
+                        || (appt.estimated_wait_minutes != null && appt.estimated_wait_minutes > 0)
+                        || !!timeSummary
+                      );
                   return (
                     <article
                       key={appt.queue_user_id}
                       className="lp-today-card reveal"
                       aria-label={`${appt.business_name} — token #${appt.token_number}`}
                     >
-                      <div className={`lp-today-urgency-bar${isActive ? " lp-today-urgency-bar--active" : ""}`} aria-hidden="true" />
+                      <div className={`lp-today-urgency-bar${isActive ? " lp-today-urgency-bar--active" : isScheduled ? " lp-today-urgency-bar--scheduled" : ""}`} aria-hidden="true" />
                       <div className="lp-today-card-body">
                         <div className="lp-today-card-header">
                           <div className="lp-today-card-info">
                             <span className="lp-today-business">{appt.business_name}</span>
                             <p className="lp-today-queue">{appt.queue_name}</p>
                           </div>
-                          <span className={`lp-today-status lp-today-status--${isInProgress ? "serving" : isActive ? "active" : "waiting"}`}>
-                            {isInProgress ? (t("youreBeingServed") || "You're being served") : isActive ? t("landing.statusInProgress") : t("landing.statusWaiting")}
+                          <span className={`lp-today-status lp-today-status--${isInProgress ? "serving" : isScheduled ? "scheduled" : isActive ? "active" : "waiting"}`}>
+                            {isInProgress
+                              ? (t("youreBeingServed") || "You're being served")
+                              : isScheduled
+                              ? (t("statusScheduled") || "Scheduled")
+                              : isActive
+                              ? t("landing.statusInProgress")
+                              : t("landing.statusWaiting")}
                           </span>
                         </div>
+
+                        {isInProgress && (
+                          <div className="lp-today-serving-banner">
+                            <span className="lp-today-serving-dot" aria-hidden="true" />
+                            {t("youreBeingServed")}
+                          </div>
+                        )}
 
                         {hasStats && (
                           <div className="lp-today-stats">
                             {appt.position != null && (
                               <div className="lp-today-stat">
                                 <span className="lp-today-stat-label">{t("landing.todayPosition")}</span>
-                                <span className="lp-today-stat-value">#{appt.position}</span>
-                                {appt.position === 1 && <span className="lp-today-stat-sub">{t("landing.todayNextUp")}</span>}
+                                <span className={`lp-today-stat-value${appt.position === 1 ? " lp-today-stat-value--next" : ""}`}>
+                                  {appt.position === 1 ? "⚡ #1" : `#${appt.position}`}
+                                </span>
+                                {appt.position === 1 && <span className="lp-today-stat-sub lp-today-stat-sub--next">{t("landing.todayNextUp")}</span>}
                               </div>
                             )}
                             {appt.estimated_wait_minutes != null && appt.estimated_wait_minutes > 0 && (
@@ -470,7 +498,27 @@ export default function LandingPage() {
                         </div>
 
                         <div className="lp-today-footer">
-                          <AppointmentActions appointment={appt} onUpdated={fetchTodayAppointments} />
+                          <div className="lp-today-footer-actions">
+                            <AppointmentActions appointment={appt} onUpdated={fetchTodayAppointments} />
+                            {appt.status === 1 && appt.position != null && appt.position <= 3 && (
+                              appt.is_checked_in ? (
+                                <span className="appt-actions__arrived">
+                                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                  {t("arrived")}
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="appt-actions__btn appt-actions__btn--arrive"
+                                  onClick={() => markArrived(appt.queue_user_id)}
+                                >
+                                  {t("iveArrived")}
+                                </button>
+                              )
+                            )}
+                          </div>
                           <button
                             className="lp-today-view-btn"
                             onClick={() => navigate(`/business/${appt.business_id}`)}

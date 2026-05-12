@@ -6,7 +6,7 @@ from datetime import datetime, date, time
 
 from app.schemas.user import UserData
 from app.core.utils import format_time_12h, wait_minutes_from_now
-from app.core.constants import QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_COMPLETED
+from app.core.constants import QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_COMPLETED, QUEUE_USER_SCHEDULED
 
 
 class QueueServiceCreate(BaseModel):
@@ -197,6 +197,8 @@ class QueueUserData(BaseModel):
     priority: bool = False
     enqueue_time: Optional[datetime] = None
     dequeue_time: Optional[datetime] = None
+    is_checked_in: bool = False
+    eta_minutes: Optional[int] = None
 
     @classmethod
     def from_row(cls, queue_user: Any, user: Any) -> "QueueUserData":
@@ -211,6 +213,8 @@ class QueueUserData(BaseModel):
             priority=bool(queue_user.priority),
             enqueue_time=queue_user.enqueue_time,
             dequeue_time=queue_user.dequeue_time,
+            is_checked_in=bool(getattr(queue_user, "is_checked_in", False)),
+            eta_minutes=getattr(queue_user, "eta_minutes", None),
         )
 
     class Config:
@@ -245,6 +249,10 @@ class QueueUserDetailResponse(BaseModel):
     notes: Optional[str] = None
     cancellation_reason: Optional[str] = None
     reschedule_count: int = 0
+    is_checked_in: bool = False
+    check_in_time: Optional[datetime] = None
+    eta_minutes: Optional[int] = None
+    appointment_type: Optional[str] = "QUEUE"
 
     @classmethod
     def from_queue_user(cls, queue_user: Any) -> "QueueUserDetailResponse":
@@ -281,6 +289,10 @@ class QueueUserDetailResponse(BaseModel):
             cancellation_reason=queue_user.cancellation_reason,
             reschedule_count=queue_user.reschedule_count,
             employee_id=employee_id,
+            is_checked_in=bool(getattr(queue_user, "is_checked_in", False)),
+            check_in_time=getattr(queue_user, "check_in_time", None),
+            eta_minutes=getattr(queue_user, "eta_minutes", None),
+            appointment_type=getattr(queue_user, "appointment_type", None) or "QUEUE",
         )
 
 
@@ -344,6 +356,8 @@ class BookingCreateInput(BaseModel):
     recipient_phone: Optional[str] = None
     recipient_country_code: Optional[str] = None
     recipient_name: Optional[str] = None
+    eta_minutes: Optional[int] = None  # customer's self-declared travel time: 0, 15, 30, 60, or 90
+    is_walk_in: bool = False  # True = physically present, auto-marked as checked-in
 
 
 class SlotData(BaseModel):
@@ -550,6 +564,7 @@ class LiveQueueUserItem(BaseModel):
     scheduled_start: Optional[str] = None        # time e.g. "10:30"
     scheduled_end: Optional[str] = None
     delay_minutes: Optional[int] = None          # for APPROXIMATE: cascaded delay
+    is_checked_in: bool = False                   # customer has tapped "I've Arrived"
 
     @classmethod
     def from_user_dict(cls, u: Dict[str, Any], wd: Dict[str, Any] = {}) -> "LiveQueueUserItem":
@@ -593,6 +608,7 @@ class LiveQueueUserItem(BaseModel):
             scheduled_start=u.get("scheduled_start"),
             scheduled_end=u.get("scheduled_end"),
             delay_minutes=u.get("delay_minutes"),
+            is_checked_in=bool(u.get("is_checked_in", False)),
         )
 
 
@@ -605,7 +621,8 @@ class LiveQueueData(BaseModel):
     in_progress_count: int
     completed_count: int
     current_token: Optional[str] = None  # token of in_progress user
-    users: List[LiveQueueUserItem]        # ordered: completed → in_progress → waiting
+    users: List[LiveQueueUserItem]        # ordered: completed → in_progress → waiting → scheduled
+    upcoming_count: int = 0              # SCHEDULED (pre-active) appointments not yet in live queue
     employee_on_leave: bool = False     # True when queue's employee has no schedule / closed exception for this date
 
     @classmethod
@@ -622,6 +639,7 @@ class LiveQueueData(BaseModel):
         waiting_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_REGISTERED)
         in_progress_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_IN_PROGRESS)
         completed_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_COMPLETED)
+        upcoming_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_SCHEDULED)
 
         # Compute live wait estimates so every broadcast reflects current queue state
         waits = calculate_queue_waits(users_raw)
@@ -636,6 +654,7 @@ class LiveQueueData(BaseModel):
             waiting_count=waiting_count,
             in_progress_count=in_progress_count,
             completed_count=completed_count,
+            upcoming_count=upcoming_count,
             current_token=current_token,
             employee_on_leave=employee_on_leave,
             users=[
@@ -667,6 +686,8 @@ class CustomerTodayAppointmentResponse(BaseModel):
     delay_minutes: Optional[int] = None
     expected_at_ts: Optional[int] = None        # epoch ms — drift-free client countdown
     current_token: Optional[str] = None         # token currently being served in this queue
+    is_checked_in: bool = False                  # customer has tapped "I've Arrived"
+    eta_minutes: Optional[int] = None            # customer's self-declared travel time
 
     @classmethod
     def from_queue_user_and_metrics(
@@ -706,6 +727,8 @@ class CustomerTodayAppointmentResponse(BaseModel):
             delay_minutes=getattr(qu, "delay_minutes", None),
             expected_at_ts=expected_at_ts,
             current_token=current_token,
+            is_checked_in=bool(getattr(qu, "is_checked_in", False)),
+            eta_minutes=getattr(qu, "eta_minutes", None),
         )
 
 

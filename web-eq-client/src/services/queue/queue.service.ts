@@ -83,6 +83,10 @@ export interface QueueUserDetailResponse {
   notes?: string | null;
   cancellation_reason?: string | null;
   reschedule_count: number;
+  is_checked_in: boolean;
+  check_in_time?: string | null;
+  eta_minutes?: number | null;
+  appointment_type?: string | null;
 }
 
 export interface QueueUserData {
@@ -103,6 +107,8 @@ export interface QueueUserData {
     reschedule_count: number;
     joined_queue: boolean;
     is_scheduled: boolean;
+    is_checked_in?: boolean;
+    eta_minutes?: number | null;
     user: {
         uuid: string;
         full_name?: string;
@@ -164,7 +170,7 @@ export interface LiveQueueUserItem {
     phone: string;
     token?: string | null;
     service_summary: string;
-    status: number;           // 1=waiting, 2=in_progress, 3=completed
+    status: number;           // 1=waiting, 2=in_progress, 3=completed, 8=scheduled (upcoming)
     enqueue_time?: string | null;
     dequeue_time?: string | null;
     position?: number | null; // 1-indexed, only for waiting users
@@ -175,6 +181,7 @@ export interface LiveQueueUserItem {
     scheduled_start?: string | null;
     scheduled_end?: string | null;
     delay_minutes?: number | null;  // for APPROXIMATE: cascaded delay
+    is_checked_in?: boolean;       // customer has physically arrived
 }
 
 export interface LiveQueueData {
@@ -186,7 +193,8 @@ export interface LiveQueueData {
     in_progress_count: number;
     completed_count: number;
     current_token?: string | null;
-    users: LiveQueueUserItem[];   // ordered: completed → in_progress → waiting
+    users: LiveQueueUserItem[];   // ordered: completed → in_progress → waiting → scheduled
+    upcoming_count?: number;      // count of SCHEDULED (pre-active) appointments
     employee_on_leave?: boolean;  // true when queue's employee has no schedule / closed exception for this date
 }
 
@@ -396,6 +404,24 @@ export class QueueService extends HttpClient {
         }
     }
 
+    async noShowCurrent(queueId: string): Promise<LiveQueueData> {
+        try {
+            return await this.post<LiveQueueData>(`/queue/${queueId}/no-show`);
+        } catch (error: any) {
+            console.error("Failed to mark no show:", error);
+            throw error;
+        }
+    }
+
+    async skipCurrent(queueId: string): Promise<LiveQueueData> {
+        try {
+            return await this.post<LiveQueueData>(`/queue/${queueId}/skip`);
+        } catch (error: any) {
+            console.error("Failed to skip customer:", error);
+            throw error;
+        }
+    }
+
     async startQueue(queueId: string, businessId: string): Promise<QueueData> {
         try {
             return await this.post<QueueData>(
@@ -430,6 +456,8 @@ export class QueueService extends HttpClient {
                 recipient_name: payload.recipient_name ?? null,
                 notes: payload.notes ?? null,
                 appointment_type: payload.appointment_type ?? "QUEUE",
+                is_walk_in: true,   // auto-mark as arrived, exempt from auto-hold
+                eta_minutes: 0,     // physically present
             });
         } catch (error: any) {
             console.error("Failed to create walk-in booking:", error);

@@ -5,9 +5,26 @@ import { RouterConstant } from "../../routers/index";
 import { PhoneNumber, validatePhoneNumber } from "../../utils/utils";
 import PhoneInput from "../../components/phone-input";
 import Button from "../../components/button";
-import { OTPService } from "../../services/otp/otp.service";
+import { sendFirebaseOTP } from "../../services/auth/firebase-phone";
 import { DEFAULT_COUNTRY_CODE } from "../../utils/constants";
 import "./send-otp.scss";
+
+function getFirebaseSendError(t: (key: string) => string, err: unknown): string {
+  const code = (err as any)?.code as string | undefined;
+  switch (code) {
+    case "auth/invalid-phone-number":
+    case "auth/missing-phone-number":
+      return t("invalidPhoneFormat");
+    case "auth/too-many-requests":
+      return t("rateLimitExceeded");
+    case "auth/network-request-failed":
+      return t("networkError");
+    case "auth/quota-exceeded":
+      return t("rateLimitExceeded");
+    default:
+      return (err as any)?.message || t("errorSendingCode");
+  }
+}
 
 export default function SendOTP() {
   const { t } = useLayoutContext();
@@ -25,8 +42,6 @@ export default function SendOTP() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
-  const otpService = new OTPService();
-
   const countryOptions = [{
     code: "IN",
     label: "India",
@@ -37,44 +52,16 @@ export default function SendOTP() {
 
   const handleSendOTP = async (e?: React.FormEvent) => {
     e?.preventDefault();
-
-    if (!isPhoneValid || !phone.localNumber) {
-      return;
-    }
+    if (!isPhoneValid || !phone.localNumber) return;
 
     setLoading(true);
     setError("");
 
     try {
-      await otpService.sendOTP(phone.countryCode, phone.localNumber, "business");
-      navigate(ROUTERS_PATH.VERIFYOTP, { state: { phone: phone, userType: "Business" } });
-    } catch (err: any) {
-      let errorMessage = t("errorSendingCode");
-      if (err?.response?.data?.detail?.error_code) {
-        const errorCode = err.response.data.detail.error_code;
-        switch (errorCode) {
-          case 1: // INVALID_PHONE_FORMAT
-            errorMessage = t("invalidPhoneFormat");
-            break;
-          case 2: // RATE_LIMIT_EXCEEDED
-            errorMessage = t("rateLimitExceeded");
-            break;
-          case 3: // PHONE_ALREADY_EXIST
-            errorMessage = t("phoneAlreadyExist");
-            break;
-          case 4: // PHONE_DOES_NOT_EXIST
-            errorMessage = t("phoneDoesNotExist");
-            break;
-          default:
-            errorMessage = err?.response?.data?.detail?.message || err?.customMessage || t("errorSendingCode");
-        }
-      } else if (err?.code === "ERR_NETWORK" || !err?.response) {
-        errorMessage = t("networkError");
-      } else {
-        errorMessage = err?.customMessage || err?.response?.data?.detail?.message || t("errorSendingCode");
-      }
-
-      setError(errorMessage);
+      await sendFirebaseOTP(`${phone.countryCode}${phone.localNumber}`);
+      navigate(ROUTERS_PATH.VERIFYOTP, { state: { phone, userType: "Business" } });
+    } catch (err: unknown) {
+      setError(getFirebaseSendError(t, err));
     } finally {
       setLoading(false);
     }
@@ -89,7 +76,6 @@ export default function SendOTP() {
 
       <form className="send-otp-form" onSubmit={handleSendOTP}>
         <div className="send-otp-form-fields">
-          {/* Phone Input */}
           <div className="phone-input-wrapper">
             <label className="phone-input-label">{t("phoneNumber")}</label>
             <PhoneInput
@@ -97,10 +83,7 @@ export default function SendOTP() {
               countryCode={phone.countryCode}
               onPhoneChange={setPhone}
               onCountryCodeChange={(newCountryCode) => {
-                setPhone({
-                  countryCode: newCountryCode,
-                  localNumber: phone.localNumber
-                });
+                setPhone({ countryCode: newCountryCode, localNumber: phone.localNumber });
               }}
               countryOptions={countryOptions}
               onValidChange={setIsPhoneValid}
@@ -109,11 +92,7 @@ export default function SendOTP() {
           </div>
         </div>
 
-        {error && (
-          <div className="error-message">
-            {error}
-          </div>
-        )}
+        {error && <div className="error-message">{error}</div>}
 
         <div className="send-otp-form-action">
           <Button

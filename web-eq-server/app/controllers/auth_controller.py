@@ -17,6 +17,7 @@ from app.services.schedule_service import ScheduleService
 from app.controllers.role_controller import RoleController
 from app.middleware.auth import detect_client_type, create_access_token, get_access_token_expires_time
 from app.core.config import RATE_LIMIT_PER_HOUR, OTP_EXPIRY_MINUTES, DEFAULT_OTP, SECRET_KEY, ALGORITHM
+from app.services.firebase_service import verify_firebase_id_token
 from app.core.constants import BUSINESS_REGISTERED
 from app.models.user import User
 from app.models.address import EntityType
@@ -120,7 +121,6 @@ class AuthController:
                 attempts=1,
                 status=1
             )
-            print(f"OTP for {country_code}{phone_number}: {otp}")
             return OTPRequestResponse(message="OTP sent successfully")
         except HTTPException:
             raise
@@ -586,6 +586,98 @@ class AuthController:
             raise
         except Exception:
             logger.exception("Failed to admin_verify_otp (country_code=%s)", data.country_code)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    async def verify_firebase_phone_customer(
+        self, data: "FirebaseVerifyInput", response: Response, request: Request
+    ) -> "LoginResponse":
+        from app.schemas.auth import FirebaseVerifyInput as _FVI  # noqa: F401 — import for type reference only
+        try:
+            claims = await verify_firebase_id_token(data.firebase_token)
+            raw_phone = claims["phone_number"]  # e.g. "+919876543210"
+            if not raw_phone.startswith("+91") or len(raw_phone) != 13:
+                raise HTTPException(
+                    status_code=422,
+                    detail={"message": "Only +91 (India) phone numbers are supported"},
+                )
+            country_code = "+91"
+            local_number = raw_phone[3:]
+
+            user = self.user_service.get_user_by_phone(country_code, local_number)
+            if not user:
+                user = self.user_service.create_user(
+                    UserRegistrationInput(
+                        country_code=country_code,
+                        phone_number=local_number,
+                        user_type="customer",
+                        client_type=None,
+                    )
+                )
+            self.role_controller.assign_role_to_user(user.uuid, "CUSTOMER")  # type: ignore[arg-type]
+            client_type = detect_client_type(request, data.client_type)
+            return await self.auth_service.generate_auth_response(
+                user, response, client_type, user_type="CUSTOMER", profile_type="CUSTOMER"
+            )
+        except HTTPException:
+            raise
+        except ValueError as exc:
+            logger.warning("verify_firebase_phone_customer failed: %s", exc)
+            raise HTTPException(status_code=401, detail={"message": str(exc)})
+        except Exception:
+            logger.exception("Failed to verify_firebase_phone_customer")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    async def verify_firebase_phone_business(
+        self, data: "FirebaseVerifyInput", response: Response, request: Request
+    ) -> "LoginResponse":
+        try:
+            claims = await verify_firebase_id_token(data.firebase_token)
+            raw_phone = claims["phone_number"]
+            if not raw_phone.startswith("+91") or len(raw_phone) != 13:
+                raise HTTPException(
+                    status_code=422,
+                    detail={"message": "Only +91 (India) phone numbers are supported"},
+                )
+            country_code = "+91"
+            local_number = raw_phone[3:]
+
+            client_type = detect_client_type(request, data.client_type)
+            user = self.get_or_create_user_for_business_flow(country_code, local_number, data.client_type)
+            entity_id = UUID(str(user.uuid))  # type: ignore[arg-type]
+            employee = self.employee_service.get_employee_by_phone(country_code, local_number)
+            business = self.business_service.get_business_by_owner(entity_id)
+
+            if business:
+                self.role_controller.assign_role_to_user(user.uuid, "BUSINESS")  # type: ignore[arg-type]
+                if business.status is not None and int(business.status) >= BUSINESS_REGISTERED:  # type: ignore[arg-type]
+                    next_step = "dashboard"
+                else:
+                    next_step = "business_registration"
+                return await self.auth_service.generate_auth_response(
+                    user, response, client_type, user_type="BUSINESS",
+                    next_step=next_step, profile_type="BUSINESS",
+                )
+
+            if employee and (employee.user_id is None or employee.user_id == entity_id):
+                self.role_controller.assign_role_to_user(user.uuid, "EMPLOYEE")  # type: ignore[arg-type]
+                next_step = "dashboard" if employee.is_verified else "invitation_code"  # type: ignore[arg-type]
+                return await self.auth_service.generate_auth_response(
+                    user, response, client_type, user_type="EMPLOYEE",
+                    next_step=next_step, profile_type="EMPLOYEE",
+                )
+
+            next_step = "business_registration" if (user.full_name and str(user.full_name).strip()) else "owner_info"
+            return await self.auth_service.generate_auth_response(
+                user, response, client_type, user_type="BUSINESS",
+                next_step=next_step, profile_type="BUSINESS",
+            )
+        except HTTPException:
+            raise
+        except ValueError as exc:
+            logger.warning("verify_firebase_phone_business failed: %s", exc)
+            raise HTTPException(status_code=401, detail={"message": str(exc)})
+        except Exception:
+            logger.exception("Failed to verify_firebase_phone_business")
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def get_profile(self, user: User) -> UnifiedProfileResponse:

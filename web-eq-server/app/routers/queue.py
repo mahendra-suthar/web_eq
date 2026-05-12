@@ -215,6 +215,24 @@ async def advance_queue(
     return await controller.advance_queue(queue_id)
 
 
+@queue_router.post("/{queue_id}/no-show", response_model=LiveQueueData)
+async def no_show_current(
+    queue_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await QueueController(db).no_show_current(queue_id)
+
+
+@queue_router.post("/{queue_id}/skip", response_model=LiveQueueData)
+async def skip_current(
+    queue_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await QueueController(db).skip_current(queue_id)
+
+
 @queue_router.post("/{queue_id}/start", response_model=QueueData)
 async def start_queue(
     queue_id: UUID,

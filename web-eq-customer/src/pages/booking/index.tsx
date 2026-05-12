@@ -141,6 +141,7 @@ export default function BookingPage() {
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const [slotPickerOpen, setSlotPickerOpen] = useState(false);
+  const [etaMinutes, setEtaMinutes] = useState<number>(0);
 
   const { connected: wsConnectedState } = useQueueWebSocket({
     businessId: businessId || "",
@@ -527,6 +528,7 @@ export default function BookingPage() {
       }
 
       // New booking mode
+      const isToday = selectedDate === new Date().toISOString().split("T")[0];
       const result = await bookingService.createBooking({
         business_id: businessId,
         queue_id: queueId,
@@ -535,6 +537,7 @@ export default function BookingPage() {
         ...((appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && selectedSlot?.uuid
           ? { appointment_type: appointmentMode, slot_id: selectedSlot.uuid }
           : {}),
+        ...(isToday && appointmentMode === "QUEUE" ? { eta_minutes: etaMinutes } : {}),
       });
       if (result.already_in_queue) {
         setBookingConfirmation(result);
@@ -899,6 +902,31 @@ export default function BookingPage() {
                 )}
               </div>
             )}
+          </section>
+        )}
+
+        {/* ETA — only for today's bookings in QUEUE mode */}
+        {selectedDate === new Date().toISOString().split("T")[0] && appointmentMode === "QUEUE" && !isReschedule && (
+          <section className="bk-section bk-section--eta">
+            <div className="bk-section-head">
+              <div>
+                <div className="bk-section-title">{t("bk.howFarAreYou")}</div>
+                <div className="bk-section-sub">{t("bk.howFarAreYouSub")}</div>
+              </div>
+            </div>
+            <div className="bk-eta-options" role="group" aria-label={t("bk.howFarAreYou")}>
+              {([0, 15, 30, 60, 90] as const).map((mins) => (
+                <button
+                  key={mins}
+                  type="button"
+                  className={`bk-eta-btn${etaMinutes === mins ? " bk-eta-btn--selected" : ""}`}
+                  onClick={() => setEtaMinutes(mins)}
+                  aria-pressed={etaMinutes === mins}
+                >
+                  {mins === 0 ? t("bk.imHere") : mins < 60 ? `~${mins} ${t("bk.min")}` : mins === 60 ? `~1 ${t("bk.hour")}` : `~1.5 ${t("bk.hours")}`}
+                </button>
+              ))}
+            </div>
           </section>
         )}
 

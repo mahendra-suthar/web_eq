@@ -627,6 +627,7 @@
   background: linear-gradient(90deg, $gold 0%, #f5d78e 100%);
 
   &--active { background: linear-gradient(90deg, $jade 0%, $mint 100%); }
+  &--scheduled { background: linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%); }
 }
 
 .lp-today-card-body {
@@ -717,6 +718,12 @@
       margin-right: 4px;
       vertical-align: middle;
     }
+  }
+
+  &--scheduled {
+    background: rgba(124, 58, 237, 0.08);
+    color: #7c3aed;
+    border: 1px solid rgba(124, 58, 237, 0.25);
   }
 }
 
@@ -846,6 +853,14 @@
   flex-wrap: wrap;
   padding-top: 14px;
   border-top: 1px solid $border-subtle;
+}
+
+// Groups Reschedule/Cancel + Arrive button together on the left
+.lp-today-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 
   // AppointmentActions already has its own top border + margin — strip it here
   // so the footer's border is the only divider
@@ -870,6 +885,82 @@
   margin-left: auto; // push to the right when actions wrap
 
   &:hover { color: $forest; }
+}
+
+// ── Being served banner ───────────────────────────────────────────────────
+.lp-today-serving-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin: -4px 0 16px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #166534;
+}
+
+.lp-today-serving-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+  animation: lp-pulse-status 1.2s ease-in-out infinite;
+}
+
+// ── Position #1 "You're Next" emphasis ────────────────────────────────────
+.lp-today-stat-value--next {
+  color: $forest !important;
+}
+
+.lp-today-stat-sub--next {
+  color: $jade !important;
+  font-weight: 600 !important;
+}
+
+// ── Arrive action strip ───────────────────────────────────────────────────
+.lp-today-arrive-strip {
+  display: flex;
+  align-items: center;
+  padding: 12px 0 14px;
+  border-top: 1px solid $border-subtle;
+  margin-top: 4px;
+}
+
+.lp-today-arrive-btn {
+  width: 100%;
+  padding: 10px 20px;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+
+  &:hover  { background: #4f46e5; transform: translateY(-1px); }
+  &:active { transform: translateY(0); }
+}
+
+.lp-today-arrived-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  justify-content: center;
+  padding: 9px 16px;
+  background: #d1fae5;
+  color: #065f46;
+  border-radius: 10px;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
 }
 
 // ── Empty card ────────────────────────────────────────────────────────────

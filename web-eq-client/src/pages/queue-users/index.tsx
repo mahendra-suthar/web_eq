@@ -284,7 +284,14 @@ const QueueUsers = () => {
                                         <td>{queueUser.token_number || t("notAvailable")}</td>
                                         <td>{queueUser.queue_date || t("notAvailable")}</td>
                                         <td>{formatDate(queueUser.enqueue_time)}</td>
-                                        <td>{getStatusBadge(queueUser.status)}</td>
+                                        <td>
+                                            <div className="status-cell">
+                                                {getStatusBadge(queueUser.status)}
+                                                {queueUser.status === QueueUserStatus.REGISTERED && queueUser.is_checked_in && (
+                                                    <span className="arrival-badge arrived">{t("checkedIn")}</span>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td>
                                             <span className={`status-badge ${queueUser.priority ? 'priority' : 'normal'}`}>
                                                 {queueUser.priority ? t("yes") : t("no")}
