@@ -22,7 +22,7 @@ databases:
   - name: eq-db-prod
     databaseName: eq_prod_db
     user: eq_prod
-    plan: starter
+    plan: basic-256mb
     region: oregon
 
 services:
