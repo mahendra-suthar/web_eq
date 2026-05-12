@@ -1,0 +1,120 @@
+@use "../../variables.scss" as *;
+
+.user-detail-page {
+    .content-card {
+        max-width: 900px;
+    }
+
+    .card-header.section-header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .detail-sections {
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+    }
+
+    .detail-section {
+        background: #fff;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1e293b;
+            margin: 0 0 20px 0;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .section-content.user-section {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+    }
+
+    .user-avatar-block {
+        flex-shrink: 0;
+
+        .user-avatar-img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #e2e8f0;
+        }
+
+        .user-avatar-placeholder {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: 600;
+            color: #64748b;
+        }
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 16px;
+        flex: 1;
+        min-width: 0;
+
+        .info-field {
+            .info-label {
+                display: block;
+                font-size: 12px;
+                font-weight: 500;
+                color: #64748b;
+                margin-bottom: 4px;
+            }
+
+            .info-value {
+                font-size: 14px;
+                color: #1e293b;
+            }
+        }
+    }
+
+    .queue-summary-section {
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .summary-table {
+            width: 100%;
+        }
+    }
+
+    .empty-state {
+        padding: 2rem;
+        text-align: center;
+        color: #64748b;
+    }
+
+    .loading-state,
+    .error-message {
+        padding: 2rem;
+        text-align: center;
+    }
+
+    .error-message {
+        color: #dc2626;
+        margin-bottom: 16px;
+    }
+}

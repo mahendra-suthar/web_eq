@@ -1,0 +1,161 @@
+@use "../../variables.scss" as *;
+
+.mqc {
+  position: relative;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  transition: box-shadow 0.2s;
+}
+
+.mqc--active {
+  border-color: rgba(22, 163, 74, 0.35);
+  box-shadow: 0 2px 12px rgba(22, 163, 74, 0.12);
+}
+
+/* Coloured left accent bar */
+.mqc__bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #6366f1;
+  border-radius: 14px 0 0 14px;
+}
+
+.mqc--active .mqc__bar {
+  background: #16a34a;
+}
+
+.mqc__body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 16px 20px;
+}
+
+/* ─── Left column ─── */
+.mqc__left {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mqc__icon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.mqc__info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mqc__queue-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.mqc__business {
+  font-weight: 400;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.mqc__status-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mqc__badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+}
+
+.mqc__badge--waiting {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.2);
+  color: #4f46e5;
+}
+
+.mqc__badge--active {
+  background: rgba(22, 163, 74, 0.1);
+  border-color: rgba(22, 163, 74, 0.2);
+  color: #15803d;
+}
+
+.mqc__serving {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.mqc__services {
+  font-size: 12px;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Right column ─── */
+.mqc__right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.mqc__token {
+  font-size: 22px;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+
+.mqc__wait {
+  font-size: 13px;
+  font-weight: 700;
+  color: #6366f1;
+  white-space: nowrap;
+}
+
+.mqc__wait--overrun {
+  color: #f59e0b;
+}
+
+.mqc__time {
+  font-size: 11px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+/* ─── Mobile adjustments ─── */
+@media (max-width: 480px) {
+  .mqc__body {
+    padding: 14px 14px 14px 18px;
+  }
+
+  .mqc__token {
+    font-size: 18px;
+  }
+}

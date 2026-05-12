@@ -1,0 +1,88 @@
+// ─── Brand & primary ─────────────────────────────────────────────────────
+$primary: #00695C;
+$primary-dark: #004D40;
+$primary-light: #B2DFDB;
+
+// ─── Text ───────────────────────────────────────────────────────────────
+$text-primary: #1C252E;
+$text-secondary: #637381;
+$text-disabled: #919EAB;
+
+// ─── Semantic colors ─────────────────────────────────────────────────────
+$color-error: #b91c1c;
+$color-error-bg: #fef2f2;
+$color-error-border: #fecaca;
+$color-success: #166534;
+$color-success-bg: #f0fdf4;
+$color-success-border: #bbf7d0;
+$color-info: #0369a1;
+$color-info-bg: #e0f2fe;
+$color-info-border: #0ea5e9;
+$color-muted: #637381;
+
+// ─── Legacy (keep for gradual migration) ─────────────────────────────────
+$background-neutral: #F4F6F8;
+$error: #FFE9D5;
+$error-dark: #7A0916;
+
+// ─── Spacing scale (px) ──────────────────────────────────────────────────
+$space-xs: 4px;
+$space-sm: 8px;
+$space-md: 12px;
+$space-lg: 16px;
+$space-xl: 24px;
+$space-2xl: 32px;
+$space-3xl: 48px;
+$space-4xl: 64px;
+
+// ─── Typography scale ───────────────────────────────────────────────────
+$text-xs: 0.75rem;    // 12px
+$text-sm: 0.8125rem; // 13px
+$text-base: 0.875rem; // 14px
+$text-md: 0.9375rem; // 15px
+$text-lg: 1rem;      // 16px
+$text-xl: 1.125rem;  // 18px
+$text-2xl: 1.25rem;  // 20px
+$text-3xl: 1.5rem;   // 24px
+$text-4xl: 2rem;     // 32px
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+$font-weight-bold: 700;
+
+// ─── Breakpoints ────────────────────────────────────────────────────────
+$breakpoint-sm: 480px;
+$breakpoint-md: 600px;
+$breakpoint-lg: 768px;
+$breakpoint-xl: 1024px;
+
+// ─── Shadow scale ────────────────────────────────────────────────────────
+$shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.06);
+$shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+$shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+$shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10), 0 4px 8px rgba(0, 0, 0, 0.05);
+$shadow-xl: 0 16px 40px rgba(0, 0, 0, 0.14), 0 8px 16px rgba(0, 0, 0, 0.06);
+$shadow-primary-sm: 0 4px 14px rgba(0, 105, 92, 0.25);
+$shadow-primary-md: 0 8px 24px rgba(0, 105, 92, 0.30);
+
+// ─── Surface / background shades ────────────────────────────────────────
+$surface-subtle: #f8fffe;
+$surface-tint:   #f0faf9;
+
+// ─── Border radius scale ─────────────────────────────────────────────────
+$radius-sm:   6px;
+$radius-md:   10px;
+$radius-lg:   16px;
+$radius-xl:   24px;
+$radius-full: 9999px;
+
+// ─── Premium color palette (used in landing + layout) ────────────────────
+$forest:        #0e4a35;   // deep forest green — primary dark
+$jade:          #1a7a56;   // jade green — primary
+$mint:          #b6e8d3;   // mint — light accent
+$foam:          #e8f7f1;   // foam — very light green bg
+$cream:         #f7f4ef;   // warm cream — section bg
+$warm-white:    #fdfaf5;   // warm white — page bg
+$gold:          #c9a84c;   // gold — accent / highlight
+$ink-dark:      #0d1a14;   // near-black with green tint — heading text
+$muted-green:   #6b7d74;   // muted green-gray — secondary text
+$border-subtle: rgba(14, 74, 53, 0.12); // subtle forest-tinted border

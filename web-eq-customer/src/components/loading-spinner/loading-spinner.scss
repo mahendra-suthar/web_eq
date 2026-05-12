@@ -1,0 +1,41 @@
+@use "../../variables.scss" as *;
+
+.loading-spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.loading-spinner__circle {
+  display: block;
+  border-radius: 50%;
+  border-style: solid;
+  border-color: rgba($primary, 0.2);
+  border-top-color: $primary;
+  animation: loading-spinner-spin 0.7s linear infinite;
+}
+
+.loading-spinner--sm .loading-spinner__circle {
+  width: 24px;
+  height: 24px;
+  border-width: 2px;
+}
+
+.loading-spinner--md .loading-spinner__circle {
+  width: 36px;
+  height: 36px;
+  border-width: 3px;
+}
+
+.loading-spinner--lg .loading-spinner__circle {
+  width: 48px;
+  height: 48px;
+  border-width: 3px;
+}
+
+@keyframes loading-spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

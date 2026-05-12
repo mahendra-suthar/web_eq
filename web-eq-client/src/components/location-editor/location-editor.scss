@@ -1,0 +1,13 @@
+// LocationEditor is rendered inside .profile-section, so it inherits all
+// styles from business-profile.scss (info-grid, section-header, btn, etc.).
+// Only component-specific layout additions go here.
+
+.location-editor {
+  display: flex;
+  flex-direction: column;
+}
+
+// Spacing between the AddressSearch block and the manual fields below
+.location-search-wrapper {
+  margin-bottom: 24px;
+}

@@ -1,0 +1,171 @@
+@use "../../../../variables.scss" as *;
+
+.business-location-page {
+  padding: 48px 56px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+
+  @media screen and (max-width: 768px) {
+    padding: 32px 24px;
+  }
+}
+
+.business-location-header {
+  margin-bottom: 40px;
+  position: relative;
+
+  .back-button {
+    position: absolute;
+    left: 0;
+    top: 0;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: $primary-dark;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      opacity: 0.7;
+    }
+  }
+
+  .header-content {
+    text-align: center;
+  }
+
+  .business-location-title {
+    color: $primary;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 40px;
+    margin: 0 0 8px 0;
+  }
+
+  .business-location-subtitle {
+    color: #637381;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 20px;
+    margin: 0;
+  }
+}
+
+.business-location-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.business-location-form-fields {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+
+  @media screen and (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+.form-field-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-label {
+  color: $primary-dark;
+  font-family: "Noto Sans Hebrew", serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  margin: 0;
+}
+
+.form-field {
+  position: relative;
+
+  input {
+    width: 100%;
+    border-radius: 8px;
+    background: rgba(145, 158, 171, 0.08);
+    height: 53px;
+    padding: 0px 12px;
+    border: 2px solid transparent;
+    color: $primary-dark;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 15px;
+    line-height: 22px;
+    transition: all 0.2s ease;
+
+    &:focus {
+      outline: none;
+      border-color: $primary;
+      background: rgba(145, 158, 171, 0.12);
+    }
+
+    &::placeholder {
+      color: #919EAB;
+    }
+  }
+
+  &.error {
+    input {
+      background-color: rgba(255, 86, 48, 0.08);
+      border-color: #FF5630;
+      color: #FF5630;
+    }
+  }
+
+  .error-text {
+    color: #FF5630;
+    font-size: 12px;
+    font-weight: 500;
+    margin-top: 4px;
+  }
+}
+
+.business-location-form-action {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  padding-top: 40px;
+  margin-top: 16px;
+
+  .button {
+    min-width: 120px;
+    max-width: 200px;
+    padding: 14px 32px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 8px;
+    text-transform: none;
+
+    @media screen and (max-width: 768px) {
+      flex: 1;
+      min-width: auto;
+      max-width: none;
+      padding: 14px 24px;
+    }
+
+    &.button--blue {
+      background-color: $primary;
+      color: white;
+      border: none;
+    }
+
+    &.button--transparent {
+      background: transparent;
+      color: $primary;
+      border: 2px solid $primary;
+    }
+  }
+}

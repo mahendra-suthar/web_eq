@@ -1,0 +1,28 @@
+@use "../../variables.scss" as *;
+
+// ── Phone input row ───────────────────────────────────────────────────────────
+.auth-phone-row { display: flex; gap: 10px; }
+
+.auth-country-select {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 14px; height: 52px; flex-shrink: 0;
+  background: $foam; border: 1.5px solid rgba(14, 74, 53, 0.2);
+  border-radius: 14px; font-size: 14px; font-weight: 500; color: $ink-dark;
+  white-space: nowrap; user-select: none;
+}
+.auth-country-flag { font-size: 18px; }
+
+.auth-phone-input {
+  flex: 1; height: 52px; padding: 0 18px;
+  background: $warm-white; border: 1.5px solid rgba(14, 74, 53, 0.2);
+  border-radius: 14px; font-family: "DM Sans", "Noto Sans Hebrew", sans-serif;
+  font-size: 16px; font-weight: 500; color: $ink-dark; outline: none;
+  transition: all 0.25s; letter-spacing: 0.5px;
+
+  &:focus {
+    border-color: $jade; background: white;
+    box-shadow: 0 0 0 4px rgba(26, 122, 86, 0.08);
+  }
+  &::placeholder { color: #c8d8d0; font-weight: 300; font-size: 14px; letter-spacing: 0; }
+  &--error { border-color: #e05c5c; }
+}

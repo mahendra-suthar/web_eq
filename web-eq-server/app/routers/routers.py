@@ -1,0 +1,37 @@
+from fastapi import APIRouter
+
+from app.routers.auth import auth_router
+from app.routers.category import category_router
+from app.routers.business import business_router
+from app.routers.schedule import schedule_router
+from app.routers.employee import employee_router
+from app.routers.address import address_router
+from app.routers.queue import queue_router
+from app.routers.service import service_router
+from app.routers.user import user_router, users_router, users_router
+from app.routers.review import review_router
+from app.routers.customer import customer_router
+from app.routers.notification import notification_router
+from app.routers.websocket import router as websocket_router
+from app.routers.admin import admin_router
+from app.routers.qr import qr_router
+
+routers = APIRouter()
+
+routers.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+routers.include_router(category_router, prefix="/category", tags=["Category"])
+routers.include_router(business_router, prefix="/business", tags=["Business"])
+routers.include_router(schedule_router, prefix="/schedule", tags=["Schedule"])
+routers.include_router(employee_router, prefix="/employee", tags=["Employee"])
+routers.include_router(address_router, prefix="/address", tags=["Address"])
+routers.include_router(queue_router, prefix="/queue", tags=["Queue"])
+routers.include_router(service_router, prefix="/service", tags=["Service"])
+routers.include_router(user_router, prefix="/user", tags=["User"])
+routers.include_router(users_router, prefix="/users", tags=["Users"])
+routers.include_router(review_router, prefix="/review", tags=["Review"])
+routers.include_router(customer_router, prefix="/customer", tags=["Customer"])
+routers.include_router(notification_router, prefix="/notification", tags=["Notifications"])
+routers.include_router(websocket_router, tags=["WebSocket"])
+routers.include_router(admin_router, prefix="/admin", tags=["Super Admin"])
+routers.include_router(qr_router, prefix="/qr", tags=["QR Code"])
+

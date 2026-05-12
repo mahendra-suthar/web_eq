@@ -1,0 +1,224 @@
+import logging
+from sqlalchemy.orm import Session
+from fastapi import HTTPException
+from typing import List, Optional, Dict, Tuple
+from uuid import UUID
+from collections import defaultdict
+
+from app.services.business_service import BusinessService
+from app.services.address_service import AddressService
+from app.services.queue_service import QueueService
+from app.services.schedule_service import ScheduleService
+from app.models.address import Address, EntityType
+from app.models.queue import QueueService as QueueServiceModel
+from app.models.schedule import ScheduleEntityType
+from app.models.service import Service
+from app.models.business import Business
+from app.schemas.business import (
+    BusinessBasicInfoInput,
+    BusinessBasicInfoUpdate,
+    BusinessData,
+    BusinessListItem,
+    BusinessDetailData,
+    BusinessServiceData,
+    BusinessScheduleInfo,
+    ScheduleDayItem,
+)
+from app.controllers.role_controller import RoleController
+from app.controllers.user_controller import UserController
+from app.core.utils import format_time, current_time_app_tz, day_of_week_app_tz
+from app.models.user import User
+
+logger = logging.getLogger(__name__)
+
+
+class BusinessController:
+    def __init__(self, db: Session):
+        self.db = db
+        self.business_service = BusinessService(db)
+        self.address_service = AddressService(db)
+        self.queue_service = QueueService(db)
+        self.schedule_service = ScheduleService(db)
+        self.role_controller = RoleController(db)
+        self.user_controller = UserController(db)
+
+    async def create_business_basic_info(self, data: BusinessBasicInfoInput) -> BusinessData:
+        try:
+            existing_business = self.business_service.get_business_by_owner(data.owner_id)
+            if existing_business:
+                business = self.business_service.update_business_basic_info(existing_business, data)
+                return BusinessData.from_business(business)
+
+            business = self.business_service.create_business_basic_info(data)
+            self.role_controller.assign_role_to_user(data.owner_id, "BUSINESS")  # type: ignore[arg-type]
+            return BusinessData.from_business(business)
+
+        except HTTPException:
+            raise
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to create_business_basic_info (owner_id=%s)", data.owner_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    async def update_business_basic_info(self, data: BusinessBasicInfoUpdate, user: User) -> BusinessData:
+        try:
+            business = self.business_service.get_business_by_owner(user.uuid)
+            if not business:
+                raise HTTPException(status_code=404, detail="Business not found")
+            updated = self.business_service.update_business_basic_info_partial(business, data)
+            return BusinessData.from_business(updated)
+        except HTTPException:
+            raise
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to update_business_basic_info (user_id=%s)", user.uuid)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    def get_businesses(self, category_id: Optional[UUID] = None, service_ids: Optional[List[UUID]] = None) -> List[BusinessListItem]:
+        try:
+            results = self.business_service.get_businesses_with_services_and_addresses(
+                category_id=category_id, service_ids=service_ids
+            )
+
+            if not results:
+                return []
+
+            businesses_map: Dict[UUID, Business] = {}
+            services_by_business: Dict[UUID, List[Tuple[QueueServiceModel, Service]]] = defaultdict(list)
+            service_seen: Dict[UUID, set] = defaultdict(set)
+            addresses_by_business: Dict[UUID, Optional[Address]] = {}
+
+            for business, queue_service, service, address in results:
+                bid = business.uuid
+
+                if bid not in businesses_map:
+                    businesses_map[bid] = business
+
+                if queue_service and service and queue_service.uuid not in service_seen[bid]:
+                    services_by_business[bid].append((queue_service, service))
+                    service_seen[bid].add(queue_service.uuid)
+
+                if address and bid not in addresses_by_business:
+                    addresses_by_business[bid] = address
+
+            business_ids = list(businesses_map.keys())
+            current_time = current_time_app_tz()
+            day_of_week = day_of_week_app_tz()
+            schedules_map = self.business_service.get_schedules_by_businesses(business_ids, day_of_week)
+            review_stats = self.business_service.get_review_stats_by_businesses(business_ids)
+
+            result = []
+            for bid, business in businesses_map.items():
+                services_data = services_by_business.get(bid, [])
+                address = addresses_by_business.get(bid)
+
+                is_always_open = bool(business.is_always_open)
+                is_open = False
+                opens_at = None
+                closes_at = None
+
+                if is_always_open:
+                    is_open = True
+                else:
+                    schedule = schedules_map.get(bid)
+                    if schedule and schedule.is_open:
+                        opening = schedule.opening_time
+                        closing = schedule.closing_time
+                        if opening and closing:
+                            is_open = opening <= current_time <= closing
+                            opens_at = format_time(opening)
+                            closes_at = format_time(closing)
+                        else:
+                            is_open = True  # is_open flag set but no times = open all day
+
+                avg_rating, review_count = review_stats.get(bid, (0.0, 0))
+
+                result.append(BusinessListItem.from_business(
+                    business=business,
+                    services_data=services_data,
+                    address=address,
+                    is_open=is_open,
+                    is_always_open=is_always_open,
+                    opens_at=opens_at,
+                    closes_at=closes_at,
+                    rating=avg_rating,
+                    review_count=review_count,
+                ))
+
+            return result
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_businesses")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    def get_business_details(self, business_id: UUID) -> BusinessDetailData:
+        try:
+            business = self.business_service.get_business_with_category(business_id)
+            if not business:
+                raise HTTPException(status_code=404, detail="Business not found")
+
+            address = self.address_service.get_primary_address_by_entity(EntityType.BUSINESS, business_id)
+
+            schedule_info: Optional[BusinessScheduleInfo] = None
+            is_always_open = bool(getattr(business, "is_always_open", False))
+            schedules = self.schedule_service.get_schedules_by_entity(business_id, ScheduleEntityType.BUSINESS)
+            if schedules:
+                day_items = [
+                    ScheduleDayItem(
+                        day_of_week=int(s.day_of_week),
+                        opening_time=format_time(s.opening_time) if s.opening_time else None,
+                        closing_time=format_time(s.closing_time) if s.closing_time else None,
+                        is_open=bool(s.is_open),
+                    )
+                    for s in sorted(schedules, key=lambda x: x.day_of_week)
+                ]
+                schedule_info = BusinessScheduleInfo(is_always_open=is_always_open, schedules=day_items)
+            else:
+                schedule_info = BusinessScheduleInfo(is_always_open=is_always_open, schedules=[])
+
+            current_time = current_time_app_tz()
+            day_of_week = day_of_week_app_tz()
+            schedule_for_today = next((s for s in schedules if s.day_of_week == day_of_week), None) if schedules else None
+            if is_always_open:
+                is_open = True
+            elif schedule_for_today and schedule_for_today.is_open:
+                opening = schedule_for_today.opening_time
+                closing = schedule_for_today.closing_time
+                if opening and closing:
+                    is_open = opening <= current_time <= closing
+                else:
+                    is_open = True
+            else:
+                is_open = False
+
+            return BusinessDetailData.from_business(
+                business, address, schedule_info=schedule_info, is_open=is_open
+            )
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_business_details (business_id=%s)", business_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    def get_business_services(self, business_id: UUID) -> List[BusinessServiceData]:
+        try:
+            services_data = self.queue_service.get_business_services(business_id)
+            flat = [
+                BusinessServiceData.from_queue_service_and_service(queue_svc, service)
+                for queue_svc, service in services_data
+            ]
+            by_service: Dict[UUID, List[BusinessServiceData]] = {}
+            for item in flat:
+                key = UUID(item.service_uuid)
+                if key not in by_service:
+                    by_service[key] = []
+                by_service[key].append(item)
+            return [
+                BusinessServiceData.from_grouped_variants(group) for group in by_service.values()
+            ]
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_business_services (business_id=%s)", business_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})

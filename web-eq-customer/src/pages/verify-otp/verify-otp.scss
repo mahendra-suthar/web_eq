@@ -1,0 +1,40 @@
+@use "../../variables.scss" as *;
+
+// ── Individual OTP input boxes ────────────────────────────────────────────────
+.auth-otp-row {
+  display: flex; gap: 10px; justify-content: center;
+  margin-bottom: 6px;
+}
+
+.auth-otp-box {
+  width: 52px; height: 60px; text-align: center;
+  background: $warm-white; border: 1.5px solid rgba(14, 74, 53, 0.2);
+  border-radius: 14px;
+  font-family: "Fraunces", serif; font-size: 26px; font-weight: 700;
+  color: $forest; outline: none; transition: all 0.22s;
+  caret-color: $jade;
+
+  &:focus {
+    border-color: $jade; background: white;
+    box-shadow: 0 0 0 4px rgba(26, 122, 86, 0.08);
+    transform: scale(1.06);
+  }
+  &--filled {
+    border-color: $jade; background: $foam;
+  }
+  &--error {
+    border-color: #e05c5c; background: rgba(224, 92, 92, 0.08);
+    animation: otp-shake 0.35s ease;
+  }
+}
+
+@keyframes otp-shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-6px); }
+  60%       { transform: translateX(6px); }
+}
+
+@media (max-width: #{$breakpoint-md}) {
+  .auth-otp-box { width: 44px; height: 54px; font-size: 22px; }
+  .auth-otp-row { gap: 8px; }
+}

@@ -1,0 +1,264 @@
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { EmployeeService, EmployeeResponse } from '../../services/employee/employee.service';
+import { useBusinessRegistrationStore } from '../../utils/businessRegistrationStore';
+import { useUserStore } from '../../utils/userStore';
+import { getInitials, getAvatarBackground } from '../../utils/utils';
+import Pagination from '../../components/pagination';
+import PageToolbar from '../../components/page-toolbar';
+import { RouterConstant } from '../../routers/index';
+import "./employees.scss";
+
+const Employees = () => {
+    const { t } = useTranslation();
+    const { businessId: routeBusinessId } = useParams<{ businessId?: string }>();
+    const location = useLocation();
+    const navigate = useNavigate();
+    const { businessId: storeBusinessId } = useBusinessRegistrationStore();
+    const profileBusinessId = useUserStore((s) => s.getBusinessId());
+
+    const employeeService = useMemo(() => new EmployeeService(), []);
+    
+    const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string>("");
+    const [searchTerm, setSearchTerm] = useState<string>("");
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [totalPages, setTotalPages] = useState<number>(1);
+    const [limit] = useState<number>(10);
+    const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+
+    // Debounce search input
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1); // Reset to first page when search changes
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    // Fetch employees: prefer route/state/registration store, fallback to user profile (e.g. after registration)
+    const resolvedBusinessId = useMemo(
+        () => routeBusinessId || location.state?.businessId || storeBusinessId || profileBusinessId,
+        [routeBusinessId, location.state?.businessId, storeBusinessId, profileBusinessId]
+    );
+
+    useEffect(() => {
+        if (!resolvedBusinessId) {
+            setError(t("businessIdRequired"));
+            return;
+        }
+
+        const fetchEmployees = async () => {
+            setLoading(true);
+            setError("");
+
+            try {
+                const data = await employeeService.getEmployees(
+                    resolvedBusinessId,
+                    currentPage,
+                    limit,
+                    debouncedSearch
+                );
+                setEmployees(data);
+                // Note: Backend should return total count for proper pagination
+                // For now, we'll estimate based on returned data
+                // You may need to update the backend to return total count
+                if (data.length < limit) {
+                    setTotalPages(currentPage);
+                } else {
+                    setTotalPages(currentPage + 1); // Estimate - adjust when backend returns total
+                }
+            } catch (err: any) {
+                console.error("Failed to fetch employees:", err);
+                let errorMessage = t("failedToLoadEmployees");
+                
+                if (err?.response?.data?.detail?.message) {
+                    errorMessage = err.response.data.detail.message;
+                } else if (err?.message) {
+                    errorMessage = err.message;
+                } else if (err?.code === "ERR_NETWORK" || !err?.response) {
+                    errorMessage = t("networkError");
+                }
+                
+                setError(errorMessage);
+                setEmployees([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchEmployees();
+    }, [resolvedBusinessId, currentPage, limit, debouncedSearch, employeeService, t]);
+
+    // Handle pagination
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+    };
+
+    if (!resolvedBusinessId) {
+        return (
+            <div className="employees-page">
+                <div className="content-card">
+                    <div className="error-message">
+                        {t("businessIdRequired") || "Business ID is required to view employees."}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="employees-page">
+            <div className="content-card">
+                <PageToolbar
+                    filters={
+                        <input
+                            type="text"
+                            className="filter-input"
+                            placeholder={t("searchEmployees")}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            disabled={loading}
+                        />
+                    }
+                    actions={
+                        <>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() =>
+                                    navigate(`${RouterConstant.ROUTERS_PATH.EMPLOYEES}/new`, {
+                                        state: resolvedBusinessId ? { businessId: resolvedBusinessId } : undefined,
+                                    })
+                                }
+                                disabled={loading || !resolvedBusinessId}
+                            >
+                                {t("addEmployee")}
+                            </button>
+                        </>
+                    }
+                />
+
+                {error && (
+                    <div className="error-message" style={{ padding: "1rem", color: "red", marginBottom: "1rem" }}>
+                        {error}
+                    </div>
+                )}
+
+                <div className="data-table-container">
+                    {loading ? (
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>{t("employee")}</th>
+                                    <th>{t("email")}</th>
+                                    <th>{t("phoneNumber")}</th>
+                                    <th>{t("isVerified")}</th>
+                                    <th>{t("actions")}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                    <tr key={i} className="skeleton-row">
+                                        <td>
+                                            <div className="skeleton-user-cell">
+                                                <div className="skeleton-cell skeleton-cell--avatar" />
+                                                <div className="skeleton-cell skeleton-cell--med" />
+                                            </div>
+                                        </td>
+                                        <td><div className="skeleton-cell skeleton-cell--wide" /></td>
+                                        <td><div className="skeleton-cell skeleton-cell--med" /></td>
+                                        <td><div className="skeleton-cell skeleton-cell--short" /></td>
+                                        <td><div className="skeleton-cell skeleton-cell--short" /></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : employees.length === 0 ? (
+                        <div className="empty-state">
+                            <div className="empty-state-icon">👥</div>
+                            <div className="empty-state-title">
+                                {debouncedSearch ? t("noEmployeesFoundSearch") : t("noEmployeesFound")}
+                            </div>
+                            <div className="empty-state-sub">Add your first employee to get started.</div>
+                        </div>
+                    ) : (
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>{t("employee")}</th>
+                                <th>{t("email")}</th>
+                                <th>{t("phoneNumber")}</th>
+                                <th>{t("isVerified")}</th>
+                                <th>{t("actions")}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {employees.map((emp) => (
+                                <tr key={emp.uuid}>
+                                    <td>
+                                        <div className="user-cell">
+                                            <div
+                                                className="user-avatar"
+                                                style={{ background: getAvatarBackground(emp.full_name) }}
+                                            >
+                                                {getInitials(emp.full_name)}
+                                            </div>
+                                            <div className="user-info">
+                                                <div className="user-name">{emp.full_name}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{emp.email || t("notAvailable")}</td>
+                                    <td>
+                                        {emp.country_code && emp.phone_number
+                                            ? `${emp.country_code} ${emp.phone_number}`
+                                            : emp.phone_number
+                                                ? emp.phone_number
+                                                : t("notAvailable")}
+                                    </td>
+                                    <td>
+                                            <span className={`status-badge ${emp.is_verified ? 'active' : 'pending'}`}>
+                                                {emp.is_verified 
+                                                    ? t("verified")
+                                                    : t("unverified")
+                                                }
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div className="action-buttons">
+                                            <button
+                                                type="button"
+                                                className="action-btn"
+                                                title={t("view")}
+                                                aria-label={t("viewEmployee")}
+                                                onClick={() => navigate(`${RouterConstant.ROUTERS_PATH.EMPLOYEES}/${emp.uuid}`)}
+                                            >
+                                                👁️
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    )}
+                </div>
+
+                {!loading && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={handlePageChange}
+                        disabled={loading}
+                    />
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default Employees;

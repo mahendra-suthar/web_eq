@@ -1,0 +1,22 @@
+.pages-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #E0F2F1;
+
+  .main-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    
+    &:has(.send-otp-page),
+    &:has(.verify-otp-page),
+    &:has(.user-profile-page) {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+  }
+}

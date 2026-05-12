@@ -1,0 +1,50 @@
+// Reuse business profile styles
+@use '../business-profile/business-profile.scss' as *;
+
+.employee-profile-page {
+  // Same styles as business-profile-page
+}
+
+.employee-profile-page .tabs-container {
+  margin-top: 20px;
+}
+
+// User and Employee blocks (same visual language as business profile)
+.user-block {
+  background: #f8fafc;
+  border-left: 4px solid #00695C;
+}
+
+.employee-info-block {
+  background: #f8fafc;
+  border-left: 4px solid #94a3b8;
+}
+
+// Queue tab: read-only queue detail
+.queue-services-block {
+  margin-top: 1rem;
+}
+
+.queue-services-table-wrap {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+}
+
+.queue-services-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+
+  th,
+  td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  th {
+    font-weight: 600;
+    color: #475569;
+    background: #f8fafc;
+  }
+}

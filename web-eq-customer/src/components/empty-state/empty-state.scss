@@ -1,0 +1,35 @@
+@use "../../variables.scss" as *;
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: $space-2xl $space-lg;
+  gap: $space-md;
+}
+
+.empty-state__icon {
+  font-size: 2.5rem;
+  line-height: 1;
+  color: $text-disabled;
+}
+
+.empty-state__title {
+  margin: 0;
+  font-size: $text-lg;
+  font-weight: $font-weight-semibold;
+  color: $text-primary;
+}
+
+.empty-state__hint {
+  margin: 0;
+  font-size: $text-base;
+  color: $text-secondary;
+  max-width: 280px;
+  line-height: 1.5;
+}
+
+.empty-state__action {
+  margin-top: $space-sm;
+}

@@ -1,0 +1,10 @@
+.employee-overview-form {
+    .field-error {
+        font-size: 0.875rem;
+        color: var(--color-error, #c00);
+        margin-top: 0.25rem;
+    }
+    .info-input.input-error {
+        border-color: var(--color-error, #c00);
+    }
+}

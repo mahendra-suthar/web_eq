@@ -1,0 +1,148 @@
+@use "./variables.scss" as *;
+
+// ─── Fonts ────────────────────────────────────────────────────────────────
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=Noto+Sans+Hebrew:wght@100..900&display=swap');
+
+// ─── CSS custom properties ────────────────────────────────────────────────
+:root {
+  --forest:       #0e4a35;
+  --jade:         #1a7a56;
+  --mint:         #b6e8d3;
+  --foam:         #e8f7f1;
+  --cream:        #f7f4ef;
+  --warm-white:   #fdfaf5;
+  --gold:         #c9a84c;
+  --ink:          #0d1a14;
+  --muted:        #6b7d74;
+  --border:       rgba(14, 74, 53, 0.12);
+}
+
+// ─── Base resets ──────────────────────────────────────────────────────────
+*, *::before, *::after {
+  box-sizing: border-box;
+  font-family: "Noto Sans Hebrew", serif;
+}
+
+body {
+  margin: 0;
+  padding: 0 !important;
+  max-width: 100% !important;
+  font-family: "Noto Sans Hebrew", serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  direction: ltr;
+  text-align: left;
+  background: var(--warm-white);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+div h1, div h2, div h3, div h4, div h5, div h6, div p {
+  margin: 0;
+  font-style: normal;
+}
+
+a, button {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+input:focus, textarea:focus {
+  outline-color: $primary;
+}
+
+// ─── Form field ───────────────────────────────────────────────────────────
+.form-field input {
+  border-radius: 8px;
+  background: rgba(145, 158, 171, 0.08);
+  height: 53px;
+  padding: 0 $space-md 0 10px;
+  border: none;
+  width: 100%;
+  color: $primary-dark;
+  font-size: $text-md;
+  line-height: 22px;
+
+  @media screen and (max-width: $breakpoint-md) {
+    font-size: $text-base;
+    line-height: 20px;
+    padding: 0 $space-sm;
+    height: 46px;
+  }
+}
+
+.form-field input::placeholder {
+  color: $text-disabled;
+}
+
+// ─── Error message ────────────────────────────────────────────────────────
+.error-message {
+  color: $color-error;
+  font-size: $text-base;
+  font-weight: 400;
+  line-height: 20px;
+  margin-top: $space-lg;
+  padding: $space-md;
+  background-color: $color-error-bg;
+  border-radius: 8px;
+  border: 1px solid $color-error-border;
+}
+
+// ─── Utility classes ──────────────────────────────────────────────────────
+.util-center          { text-align: center; }
+.util-padding-block   { padding: $space-xl; }
+.util-padding-block-sm{ padding: $space-lg; }
+.util-muted           { color: $color-muted; font-size: $text-base; margin: 0; }
+.util-flex-spacer     { flex: 1; }
+
+// ─── Base card ────────────────────────────────────────────────────────────
+.card-base {
+  background: #fff;
+  border: 1px solid #e8ecef;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: border-color 0.2s, box-shadow 0.2s;
+
+  &:hover {
+    border-color: $primary-light;
+    box-shadow: 0 4px 12px rgba(0, 105, 92, 0.08);
+  }
+}
+
+// ─── Loading state ────────────────────────────────────────────────────────
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $space-md;
+  padding: $space-2xl $space-xl;
+  text-align: center;
+}
+
+.loading-state__message {
+  margin: 0;
+  font-size: $text-md;
+  color: $text-secondary;
+}
+
+// ─── Scroll reveal animations ─────────────────────────────────────────────
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+
+  &.visible {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }

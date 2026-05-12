@@ -1,0 +1,500 @@
+@use "../../variables.scss" as *;
+
+.customer-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--warm-white);
+}
+
+// ─── Navigation ───────────────────────────────────────────────────────────
+.cl-nav {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  height: 64px;
+  background: rgba(253, 250, 245, 0.90);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid $border-subtle;
+  transition: box-shadow 0.3s;
+
+  @media (max-width: $breakpoint-sm) { height: 56px; }
+
+  &--scrolled {
+    box-shadow: 0 4px 32px rgba(14, 74, 53, 0.08);
+  }
+}
+
+.cl-nav-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 48px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  @media (max-width: $breakpoint-lg) { padding: 0 24px; }
+  @media (max-width: $breakpoint-sm) { padding: 0 16px; }
+}
+
+// Logo
+.cl-nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  text-decoration: none;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+}
+
+.cl-nav-logo-img {
+  height: 40px;
+  width: auto;
+  display: block;
+  background: transparent;
+}
+
+.cl-nav-logo-text {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: $forest;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+
+// Nav links
+.cl-nav-links {
+  display: flex;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+
+  @media (max-width: $breakpoint-lg) { display: none; }
+}
+
+// Hide desktop auth buttons on mobile — they move into the drawer
+.cl-nav-right-desktop {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+
+  @media (max-width: $breakpoint-lg) { display: none; }
+}
+
+// ─── Hamburger button ──────────────────────────────────────────────────────
+.cl-nav-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 38px;
+  height: 38px;
+  padding: 7px;
+  background: none;
+  border: 1px solid rgba(14, 74, 53, 0.15);
+  border-radius: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+
+  span {
+    display: block;
+    height: 2px;
+    background: $forest;
+    border-radius: 2px;
+    transition: all 0.25s;
+    transform-origin: center;
+  }
+
+  &:hover {
+    background: rgba(14, 74, 53, 0.06);
+    border-color: rgba(14, 74, 53, 0.3);
+  }
+
+  // Animate to X when open
+  &--open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  &--open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+  &--open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+  @media (max-width: $breakpoint-lg) { display: flex; }
+}
+
+// ─── Mobile overlay ────────────────────────────────────────────────────────
+.cl-mobile-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 31, 27, 0.4);
+  z-index: 198;
+  backdrop-filter: blur(2px);
+}
+
+// ─── Mobile drawer ─────────────────────────────────────────────────────────
+.cl-mobile-menu {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(300px, 85vw);
+  background: #fff;
+  z-index: 199;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -8px 0 32px rgba(0,0,0,0.12);
+  overflow-y: auto;
+
+  &--open { transform: translateX(0); }
+}
+
+.cl-mobile-menu-inner {
+  display: flex;
+  flex-direction: column;
+  padding: 80px 24px 32px;
+  gap: 4px;
+}
+
+.cl-mobile-link {
+  display: block;
+  padding: 14px 16px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: $forest;
+  text-decoration: none;
+  border-radius: 10px;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover {
+    background: rgba(14, 74, 53, 0.06);
+    color: $jade;
+  }
+}
+
+.cl-mobile-actions {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(14, 74, 53, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  // Make action buttons full width in mobile menu
+  .cl-btn-ghost,
+  .cl-btn-primary,
+  button,
+  a {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+// ─── Mobile user section (logged-in drawer) ────────────────────────────────
+.cl-mobile-user-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cl-mobile-user-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px 16px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(14, 74, 53, 0.1);
+}
+
+.cl-mobile-user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: $forest;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.cl-mobile-user-name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: $forest;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cl-mobile-notif-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 16px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: $forest;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+
+  &:hover { background: rgba(14, 74, 53, 0.06); }
+}
+
+.cl-mobile-notif-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.cl-mobile-notif-badge {
+  margin-left: auto;
+  background: $forest;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  line-height: 1.4;
+}
+
+.cl-mobile-signout-btn {
+  display: block;
+  width: 100%;
+  padding: 14px 16px;
+  margin-top: 8px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: #c0392b;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+  border-top: 1px solid rgba(14, 74, 53, 0.1);
+
+  &:hover { background: rgba(192, 57, 43, 0.06); }
+}
+
+.cl-nav-link {
+  display: block;
+  padding: 6px 14px;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  color: $muted-green;
+  text-decoration: none;
+  transition: color 0.2s;
+  white-space: nowrap;
+
+  &:hover { color: $forest; }
+}
+
+// Right-side auth buttons
+.cl-nav-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.cl-btn-ghost {
+  padding: 9px 20px;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  color: $forest;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s;
+
+  &:hover { color: $jade; }
+}
+
+.cl-btn-primary {
+  padding: 10px 22px;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  color: #fff;
+  background: $forest;
+  border: none;
+  cursor: pointer;
+  border-radius: $radius-full;
+  box-shadow: 0 2px 12px rgba(14, 74, 53, 0.30);
+  transition: background 0.25s, transform 0.25s, box-shadow 0.25s;
+
+  &:hover {
+    background: $jade;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(14, 74, 53, 0.35);
+  }
+}
+
+// ─── Main content ─────────────────────────────────────────────────────────
+.cl-main {
+  flex: 1;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+}
+
+// ─── Footer ───────────────────────────────────────────────────────────────
+.cl-footer {
+  background: $ink-dark;
+}
+
+.cl-footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 60px 48px 32px;
+
+  @media (max-width: $breakpoint-lg) { padding: 48px 24px 24px; }
+  @media (max-width: $breakpoint-sm) { padding: 40px 20px 20px; }
+}
+
+.cl-footer-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  gap: 48px;
+  padding-bottom: 48px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 32px;
+
+  @media (max-width: $breakpoint-lg) {
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+
+  @media (max-width: $breakpoint-sm) {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}
+
+// Brand column
+.cl-footer-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cl-footer-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  width: fit-content;
+}
+
+.cl-footer-logo-img {
+  height: 44px;
+  width: 44px;
+  object-fit: contain;
+  display: block;
+}
+
+.cl-footer-logo-text {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+
+.cl-footer-brand-desc {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 300 !important;
+  color: rgba(255, 255, 255, 0.45);
+  line-height: 1.65;
+  margin: 0;
+}
+
+// Link columns
+.cl-footer-col {
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  li { margin-bottom: 10px; }
+}
+
+.cl-footer-col-heading {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #fff;
+  margin: 0 0 16px 0;
+}
+
+.cl-footer-link {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 400 !important;
+  color: rgba(255, 255, 255, 0.40);
+  text-decoration: none;
+  transition: color 0.2s;
+
+  &:hover { color: $mint; }
+}
+
+// Bottom bar
+.cl-footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 12.5px !important;
+  color: rgba(255, 255, 255, 0.30);
+  flex-wrap: wrap;
+  gap: 12px;
+
+  @media (max-width: $breakpoint-sm) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+.cl-footer-bottom-links {
+  display: flex;
+  gap: 0;
+
+  .cl-footer-link { margin-left: 20px; }
+}
+

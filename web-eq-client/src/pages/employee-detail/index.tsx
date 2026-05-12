@@ -1,0 +1,794 @@
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { AddressData, DaySchedule } from '../../utils/businessRegistrationStore';
+import { ProfileService, EmployeeDetailsResponse, QueueDetailInfo } from '../../services/profile/profile.service';
+import { EmployeeService } from '../../services/employee/employee.service';
+import { BusinessService } from '../../services/business/business.service';
+import { Tabs } from '../../components/tabs/Tabs';
+import { EmployeeOverviewForm } from '../../components/employee/EmployeeOverviewForm';
+import { RouterConstant } from '../../routers/index';
+import { backendDowToUiDow, emailRegex, formatDurationMinutes, getQueueStatusLabel, uiDowToBackendDow } from '../../utils/utils';
+import { QRService } from '../../services/qr/qr.service';
+import QRCard from '../../components/qr-card';
+import './employee-detail.scss';
+import '../../components/employee/employee-overview-form.scss';
+
+const iconOverview = (
+    <svg className="tab-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
+    </svg>
+);
+const iconLocation = (
+    <svg className="tab-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+        <circle cx="12" cy="10" r="3" />
+    </svg>
+);
+const iconSchedule = (
+    <svg className="tab-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+    </svg>
+);
+const iconQueue = (
+    <svg className="tab-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+        <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+        <path d="M9 14h6M9 18h6" />
+    </svg>
+);
+
+type TabType = 'overview' | 'location' | 'schedule' | 'queue' | 'qr';
+
+const EmployeeDetail = () => {
+    const { t } = useTranslation();
+    const { employeeId } = useParams<{ employeeId: string }>();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [activeTab, setActiveTab] = useState<TabType>('overview');
+    const [fetching, setFetching] = useState(true);
+    const [error, setError] = useState<string>("");
+
+    const profileService = useMemo(() => new ProfileService(), []);
+    const employeeService = useMemo(() => new EmployeeService(), []);
+    const businessService = useMemo(() => new BusinessService(), []);
+    const qrService = useMemo(() => new QRService(), []);
+
+    const [qrObjectUrl, setQrObjectUrl] = useState<string | null>(null);
+    const [qrLoading, setQrLoading] = useState(false);
+    const [qrError, setQrError] = useState<string>("");
+    const qrFetchedRef = useRef(false);
+
+    const [userDisplay, setUserDisplay] = useState({ fullName: "", phoneDisplay: "", email: "" });
+    const [employeeDisplay, setEmployeeDisplay] = useState({
+        fullName: "", email: "", phoneDisplay: "", queueName: "", isVerified: false, profilePicture: null as string | null,
+    });
+    const [employeeCountryCode, setEmployeeCountryCode] = useState("");
+    const [employeePhoneNumber, setEmployeePhoneNumber] = useState("");
+
+    const [editingOverview, setEditingOverview] = useState(false);
+    const [editingLocation, setEditingLocation] = useState(false);
+    const [editingSchedule, setEditingSchedule] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string>("");
+    const [queueDisplay, setQueueDisplay] = useState<{ name: string; uuid?: string; status?: number | null } | null>(null);
+    const [locationData, setLocationData] = useState<AddressData>({
+        unit_number: "", building: "", floor: "", street_1: "", street_2: "",
+        city: "", district: "", state: "", postal_code: "", country: "INDIA",
+    });
+    const [scheduleData, setScheduleData] = useState({ isAlwaysOpen: false, schedule: [] as DaySchedule[] });
+    const [queueDetail, setQueueDetail] = useState<QueueDetailInfo | null>(null);
+    const [businessId, setBusinessId] = useState<string | null>(null);
+    const [assigningQueue, setAssigningQueue] = useState(false);
+    const [queueAssignError, setQueueAssignError] = useState<string>("");
+
+    // UI convention: 0 = Monday, 6 = Sunday. Backend stores schedules as 0=Sunday..6=Saturday.
+    const dayNames = useMemo(() => [
+        { day_of_week: 0, day_name: t("monday") },
+        { day_of_week: 1, day_name: t("tuesday") },
+        { day_of_week: 2, day_name: t("wednesday") },
+        { day_of_week: 3, day_name: t("thursday") },
+        { day_of_week: 4, day_name: t("friday") },
+        { day_of_week: 5, day_name: t("saturday") },
+        { day_of_week: 6, day_name: t("sunday") },
+    ], [t]);
+
+    const fetchProfile = useCallback(async () => {
+        if (!employeeId) return;
+        setFetching(true);
+        setError("");
+        try {
+            const profile: EmployeeDetailsResponse = await profileService.getEmployeeProfile(employeeId);
+            const user = profile.user;
+            const userPhoneDisplay = user?.country_code && user?.phone_number
+                ? `${user.country_code} ${user.phone_number}` : "";
+            setUserDisplay({
+                fullName: user?.full_name?.trim() || "",
+                phoneDisplay: userPhoneDisplay,
+                email: user?.email?.trim() || "",
+            });
+            const emp = profile.employee;
+            if (emp) {
+                const empPhoneDisplay = emp?.country_code && emp?.phone_number
+                    ? `${emp.country_code} ${emp.phone_number}` : (emp?.phone_number || "");
+                setEmployeeDisplay({
+                    fullName: emp?.full_name?.trim() || "",
+                    email: emp?.email?.trim() || "",
+                    phoneDisplay: empPhoneDisplay,
+                    queueName: emp?.queue?.name || "",
+                    isVerified: emp?.is_verified ?? false,
+                    profilePicture: emp?.profile_picture || null,
+                });
+                setEmployeeCountryCode(emp?.country_code || "");
+                setEmployeePhoneNumber(emp?.phone_number || "");
+                if (emp?.queue) {
+                    setQueueDisplay({
+                        name: emp.queue.name,
+                        uuid: emp.queue.uuid,
+                        status: emp.queue.status ?? undefined,
+                    });
+                } else {
+                    setQueueDisplay(null);
+                }
+            } else {
+                setQueueDisplay(null);
+            }
+            setLocationData(profile.address ? {
+                unit_number: profile.address.unit_number || "",
+                building: profile.address.building || "",
+                floor: profile.address.floor || "",
+                street_1: profile.address.street_1,
+                street_2: profile.address.street_2 || "",
+                city: profile.address.city,
+                district: profile.address.district || "",
+                state: profile.address.state,
+                postal_code: profile.address.postal_code,
+                country: profile.address.country || "INDIA",
+            } : {
+                unit_number: "", building: "", floor: "", street_1: "", street_2: "",
+                city: "", district: "", state: "", postal_code: "", country: "INDIA",
+            });
+            const mappedSchedule: DaySchedule[] = dayNames.map(day => {
+                const scheduleItem = profile.schedule?.schedules.find(
+                    (s: { day_of_week: number }) => backendDowToUiDow(s.day_of_week) === day.day_of_week
+                );
+                return {
+                    day_of_week: day.day_of_week,
+                    day_name: day.day_name,
+                    is_open: scheduleItem?.is_open || false,
+                    opening_time: scheduleItem?.opening_time || "",
+                    closing_time: scheduleItem?.closing_time || "",
+                };
+            });
+            setScheduleData({
+                isAlwaysOpen: profile.schedule?.is_always_open || false,
+                schedule: mappedSchedule,
+            });
+            setQueueDetail(profile.queue_detail ?? null);
+            setBusinessId(profile.employee?.business_id ?? null);
+        } catch (err: any) {
+            setError(err?.response?.data?.detail?.message || err?.message || t("failedToLoadEmployees"));
+        } finally {
+            setFetching(false);
+        }
+    }, [employeeId, profileService, dayNames, t]);
+
+    useEffect(() => {
+        fetchProfile();
+    }, [fetchProfile]);
+
+    useEffect(() => {
+        const openTab = (location.state as { openTab?: TabType })?.openTab;
+        if (openTab === 'queue') {
+            setActiveTab('queue');
+        }
+    }, [location.state]);
+
+    const handleRemoveQueue = useCallback(async () => {
+        if (!employeeId) return;
+        setQueueAssignError("");
+        setAssigningQueue(true);
+        try {
+            await employeeService.updateEmployee(employeeId, { queue_id: null });
+            await fetchProfile();
+        } catch (err: any) {
+            setQueueAssignError(err?.response?.data?.detail?.message || err?.message || t("failedToLoadEmployees"));
+        } finally {
+            setAssigningQueue(false);
+        }
+    }, [employeeId, employeeService, fetchProfile, t]);
+
+    const handleSaveEmployee = useCallback(async () => {
+        if (!employeeId) return;
+        const fullName = employeeDisplay.fullName.trim();
+        if (!fullName) {
+            setSaveError(t("fullNameRequired"));
+            return;
+        }
+        const email = employeeDisplay.email?.trim() || undefined;
+        if (email && !emailRegex.test(email)) {
+            setSaveError(t("emailInvalid"));
+            return;
+        }
+        setSaveError("");
+        setSaving(true);
+        try {
+            await employeeService.updateEmployee(employeeId, {
+                full_name: fullName,
+                email: email || undefined,
+                country_code: employeeCountryCode.trim() || undefined,
+                phone_number: employeePhoneNumber.trim() || undefined,
+            });
+            await fetchProfile();
+            setEditingOverview(false);
+        } catch (err: any) {
+            setSaveError(err?.response?.data?.detail?.message || err?.message || t("failedToLoadEmployees"));
+        } finally {
+            setSaving(false);
+        }
+    }, [employeeId, employeeDisplay.fullName, employeeDisplay.email, employeeCountryCode, employeePhoneNumber, employeeService, fetchProfile, t]);
+
+    const handleCancelEdit = useCallback(() => {
+        setEditingOverview(false);
+        setSaveError("");
+        fetchProfile();
+    }, [fetchProfile]);
+
+    const handleSaveLocation = useCallback(async () => {
+        if (!employeeId) return;
+        if (!locationData.street_1?.trim() || !locationData.city?.trim() || !locationData.state?.trim() || !locationData.postal_code?.trim()) {
+            setSaveError(t("enterBusinessAddress"));
+            return;
+        }
+        setSaveError("");
+        setSaving(true);
+        try {
+            await profileService.updateAddress("EMPLOYEE", employeeId, {
+                ...locationData,
+                street_1: locationData.street_1,
+                city: locationData.city,
+                state: locationData.state,
+                postal_code: locationData.postal_code,
+            });
+            await fetchProfile();
+            setEditingLocation(false);
+        } catch (err: any) {
+            setSaveError(err?.response?.data?.detail?.message || err?.message || t("failedToLoadEmployees"));
+        } finally {
+            setSaving(false);
+        }
+    }, [employeeId, locationData, profileService, fetchProfile, t]);
+
+    const handleCancelLocation = useCallback(() => {
+        setEditingLocation(false);
+        setSaveError("");
+        fetchProfile();
+    }, [fetchProfile]);
+
+    const handleSaveSchedule = useCallback(async () => {
+        if (!employeeId) return;
+        if (!scheduleData.isAlwaysOpen && scheduleData.schedule.every(d => !d.is_open)) {
+            setSaveError(t("selectAtLeastOneDay"));
+            return;
+        }
+        setSaveError("");
+        setSaving(true);
+        try {
+            const schedules = scheduleData.schedule.map(d => ({
+                day_of_week: uiDowToBackendDow(d.day_of_week),
+                is_open: d.is_open,
+                opening_time: d.is_open && d.opening_time ? d.opening_time : null,
+                closing_time: d.is_open && d.closing_time ? d.closing_time : null,
+            }));
+            await businessService.upsertSchedules(employeeId, "EMPLOYEE", schedules, scheduleData.isAlwaysOpen);
+            await fetchProfile();
+            setEditingSchedule(false);
+        } catch (err: any) {
+            setSaveError(err?.message || err?.response?.data?.detail?.message || t("failedToLoadEmployees"));
+        } finally {
+            setSaving(false);
+        }
+    }, [employeeId, scheduleData, businessService, fetchProfile, t]);
+
+    const handleCancelSchedule = useCallback(() => {
+        setEditingSchedule(false);
+        setSaveError("");
+        fetchProfile();
+    }, [fetchProfile]);
+
+    useEffect(() => {
+        if (activeTab !== 'qr' || qrFetchedRef.current || !queueDetail) return;
+        qrFetchedRef.current = true;
+        if (!employeeId) return;
+        setQrLoading(true);
+        setQrError("");
+        qrService.getEmployeeQR(employeeId)
+            .then((blob: Blob) => setQrObjectUrl(URL.createObjectURL(blob)))
+            .catch(() => setQrError(t("failedToLoad") || "Failed to load QR code."))
+            .finally(() => setQrLoading(false));
+    }, [activeTab, queueDetail, employeeId, qrService, t]);
+
+    useEffect(() => {
+        return () => {
+            if (qrObjectUrl) URL.revokeObjectURL(qrObjectUrl);
+        };
+    }, [qrObjectUrl]);
+
+    const tabItems = useMemo(() => {
+        return [
+            { id: 'overview' as TabType, label: t("basicInformation"), icon: iconOverview },
+            { id: 'location' as TabType, label: t("location"), icon: iconLocation },
+            { id: 'schedule' as TabType, label: t("schedule"), icon: iconSchedule },
+            { id: 'queue' as TabType, label: t("queue"), icon: iconQueue },
+            { id: 'qr' as TabType, label: "QR Code", icon: iconQueue },
+        ];
+    }, [t]);
+
+    if (!employeeId) {
+        return (
+            <div className="employee-detail-page">
+                <div className="content-card">
+                    <div className="error-message">{t("notAvailable")}</div>
+                </div>
+            </div>
+        );
+    }
+
+    if (fetching) {
+        return (
+            <div className="employee-detail-page">
+                <div className="content-card">
+                    <div className="loading-state" style={{ padding: "2rem", textAlign: "center" }}>
+                        {t("loading")}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="employee-detail-page">
+                <div className="content-card">
+                    <div className="error-message" style={{ padding: "1rem", color: "red" }}>{error}</div>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(RouterConstant.ROUTERS_PATH.EMPLOYEES)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t("back")}
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="employee-detail-page">
+            <div className="content-card">
+                <div className="card-header section-header-actions">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(RouterConstant.ROUTERS_PATH.EMPLOYEES)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t("back")}
+                    </button>
+                </div>
+
+                <Tabs
+                    tabs={tabItems}
+                    activeTabId={activeTab}
+                    onTabChange={(id) => setActiveTab(id as TabType)}
+                >
+                <div className="profile-content">
+                    {saveError && (
+                        <div className="employee-detail-save-error" role="alert">
+                            {saveError}
+                        </div>
+                    )}
+                    {activeTab === 'overview' && (
+                        <div className="profile-section">
+                            <div className="section-header">
+                                <h2 className="section-title">{t("basicInformation")}</h2>
+                            </div>
+                            <div className="section-content">
+                                <div className="info-block owner-block">
+                                    <h3 className="info-block-title">{t("ownerInfo")}</h3>
+                                    <div className="info-grid">
+                                        <div className="info-field">
+                                            <label className="info-label">{t("fullName")}</label>
+                                            <div className="info-value">{userDisplay.fullName || t("notAvailable")}</div>
+                                        </div>
+                                        <div className="info-field">
+                                            <label className="info-label">{t("phoneNumber")}</label>
+                                            <div className="info-value info-value-readonly">{userDisplay.phoneDisplay || t("notAvailable")}</div>
+                                        </div>
+                                        <div className="info-field">
+                                            <label className="info-label">{t("email")}</label>
+                                            <div className="info-value">{userDisplay.email || t("notAvailable")}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="info-block employee-block">
+                                    <div className="info-block-header-actions">
+                                        <h3 className="info-block-title">{t("employee")}</h3>
+                                        {!editingOverview ? (
+                                            <button type="button" className="btn btn-primary" onClick={() => setEditingOverview(true)}>
+                                                {t("editProfile")}
+                                            </button>
+                                        ) : (
+                                            <div className="section-actions">
+                                                <button type="button" className="btn btn-secondary" onClick={handleCancelEdit} disabled={saving}>
+                                                    {t("cancel")}
+                                                </button>
+                                                <button type="button" className="btn btn-primary" onClick={handleSaveEmployee} disabled={saving}>
+                                                    {saving ? t("saving") : t("saveChanges")}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="basic-info-layout">
+                                        <div className="profile-picture-container">
+                                            <div className="profile-picture-wrapper">
+                                                {employeeDisplay.profilePicture ? (
+                                                    <img src={employeeDisplay.profilePicture} alt="" className="profile-picture" />
+                                                ) : (
+                                                    <div className="profile-picture-placeholder">
+                                                        <span className="placeholder-icon">👤</span>
+                                                        <span className="placeholder-text">{t("noProfilePicture")}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <EmployeeOverviewForm
+                                            values={{
+                                                fullName: employeeDisplay.fullName,
+                                                email: employeeDisplay.email,
+                                                countryCode: employeeCountryCode,
+                                                phoneNumber: employeePhoneNumber,
+                                            }}
+                                            onChange={(field, value) => {
+                                                if (field === 'fullName') setEmployeeDisplay(prev => ({ ...prev, fullName: value }));
+                                                else if (field === 'email') setEmployeeDisplay(prev => ({ ...prev, email: value }));
+                                                else if (field === 'countryCode') setEmployeeCountryCode(value);
+                                                else if (field === 'phoneNumber') setEmployeePhoneNumber(value);
+                                            }}
+                                            disabled={saving}
+                                            readOnly={!editingOverview}
+                                            showVerified={true}
+                                            verified={employeeDisplay.isVerified}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'location' && (
+                        <div className="profile-section">
+                            <div className="section-header section-header-actions">
+                                <h2 className="section-title">{t("location")}</h2>
+                                {!editingLocation ? (
+                                    <button type="button" className="btn btn-primary" onClick={() => setEditingLocation(true)}>
+                                        {t("editProfile")}
+                                    </button>
+                                ) : (
+                                    <div className="section-actions">
+                                        <button type="button" className="btn btn-secondary" onClick={handleCancelLocation} disabled={saving}>{t("cancel")}</button>
+                                        <button type="button" className="btn btn-primary" onClick={handleSaveLocation} disabled={saving}>
+                                            {saving ? t("saving") : t("saveChanges")}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="section-content">
+                                <div className="info-grid">
+                                    {[
+                                        { key: 'unit_number', label: t("unitNumber"), placeholder: t("enterUnitNumber") },
+                                        { key: 'building', label: t("building"), placeholder: t("enterBuilding") },
+                                        { key: 'floor', label: t("floor"), placeholder: t("enterFloor") },
+                                    ].map(({ key, label, placeholder }) => (
+                                        <div key={key} className="info-field">
+                                            <label className="info-label">{label}</label>
+                                            {editingLocation ? (
+                                                <input type="text" className="info-input" value={(locationData as any)[key] || ""}
+                                                    onChange={e => setLocationData(prev => ({ ...prev, [key]: e.target.value }))} placeholder={placeholder} />
+                                            ) : (
+                                                <div className="info-value">{(locationData as any)[key] || t("notAvailable")}</div>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {[
+                                        { key: 'street_1', label: t("street1"), placeholder: t("enterStreet1"), fullWidth: true },
+                                        { key: 'street_2', label: t("street2"), placeholder: t("enterStreet2"), fullWidth: true },
+                                    ].map(({ key, label, placeholder, fullWidth }) => (
+                                        <div key={key} className={`info-field ${fullWidth ? 'full-width' : ''}`}>
+                                            <label className="info-label">{label}</label>
+                                            {editingLocation ? (
+                                                <input type="text" className="info-input" value={(locationData as any)[key] || ""}
+                                                    onChange={e => setLocationData(prev => ({ ...prev, [key]: e.target.value }))} placeholder={placeholder} />
+                                            ) : (
+                                                <div className="info-value">{(locationData as any)[key] || t("notAvailable")}</div>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {[
+                                        { key: 'city', label: t("city"), placeholder: t("enterCity") },
+                                        { key: 'district', label: t("district"), placeholder: t("enterDistrict") },
+                                        { key: 'state', label: t("state"), placeholder: t("state") },
+                                        { key: 'postal_code', label: t("postalCode"), placeholder: t("postalCode") },
+                                        { key: 'country', label: t("country"), placeholder: t("country") },
+                                    ].map(({ key, label, placeholder }) => (
+                                        <div key={key} className="info-field">
+                                            <label className="info-label">{label}</label>
+                                            {editingLocation ? (
+                                                <input type="text" className="info-input" value={(locationData as any)[key] || ""}
+                                                    onChange={e => setLocationData(prev => ({ ...prev, [key]: e.target.value }))} placeholder={placeholder} />
+                                            ) : (
+                                                <div className="info-value">{(locationData as any)[key] || t("notAvailable")}</div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'schedule' && (
+                        <div className="profile-section">
+                            <div className="section-header section-header-actions">
+                                <h2 className="section-title">{t("schedule")}</h2>
+                                {!editingSchedule ? (
+                                    <button type="button" className="btn btn-primary" onClick={() => setEditingSchedule(true)}>
+                                        {t("editProfile")}
+                                    </button>
+                                ) : (
+                                    <div className="section-actions">
+                                        <button type="button" className="btn btn-secondary" onClick={handleCancelSchedule} disabled={saving}>{t("cancel")}</button>
+                                        <button type="button" className="btn btn-primary" onClick={handleSaveSchedule} disabled={saving}>
+                                            {saving ? t("saving") : t("saveChanges")}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="section-content">
+                                <div className="schedule-header">
+                                    <div className="always-open-row">
+                                        <label className="info-label" htmlFor="always-open-toggle">{t("alwaysOpen")}</label>
+                                        <label className={`toggle-switch${!editingSchedule ? " toggle-switch--disabled" : ""}`}>
+                                            <input
+                                                id="always-open-toggle"
+                                                type="checkbox"
+                                                checked={scheduleData.isAlwaysOpen}
+                                                disabled={!editingSchedule}
+                                                onChange={e => {
+                                                    if (!editingSchedule) return;
+                                                    const checked = e.target.checked;
+                                                    setScheduleData(prev => ({
+                                                        ...prev,
+                                                        isAlwaysOpen: checked,
+                                                        schedule: checked
+                                                            ? prev.schedule.map(d => ({ ...d, is_open: true, opening_time: "00:00", closing_time: "23:59" }))
+                                                            : prev.schedule.map(d => ({ ...d, is_open: false, opening_time: "", closing_time: "" })),
+                                                    }));
+                                                }}
+                                            />
+                                            <span className="toggle-track" />
+                                        </label>
+                                    </div>
+                                </div>
+                                {!scheduleData.isAlwaysOpen && (
+                                    <div className="schedule-list">
+                                        {[...scheduleData.schedule]
+                                            .sort((a, b) => ((a.day_of_week + 1) % 7) - ((b.day_of_week + 1) % 7))
+                                            .map((day) => {
+                                            const idx = scheduleData.schedule.findIndex(d => d.day_of_week === day.day_of_week);
+                                            return (
+                                            <div key={day.day_of_week} className="schedule-item">
+                                                <div className="schedule-day">
+                                                    {editingSchedule ? (
+                                                        <label className="schedule-toggle-label">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={day.is_open}
+                                                                onChange={() => {
+                                                                    const next = [...scheduleData.schedule];
+                                                                    next[idx] = {
+                                                                        ...day,
+                                                                        is_open: !day.is_open,
+                                                                        opening_time: !day.is_open ? "09:00" : "",
+                                                                        closing_time: !day.is_open ? "18:00" : "",
+                                                                    };
+                                                                    setScheduleData(prev => ({ ...prev, schedule: next }));
+                                                                }}
+                                                            />
+                                                            <span>{day.day_name}</span>
+                                                        </label>
+                                                    ) : (
+                                                        <span>{day.day_name}</span>
+                                                    )}
+                                                </div>
+                                                {day.is_open ? (
+                                                    <div className="schedule-times">
+                                                        {editingSchedule ? (
+                                                            <>
+                                                                <input type="time" className="time-input" value={day.opening_time || ""}
+                                                                    onChange={e => {
+                                                                        const next = [...scheduleData.schedule];
+                                                                        next[idx] = { ...day, opening_time: e.target.value };
+                                                                        setScheduleData(prev => ({ ...prev, schedule: next }));
+                                                                    }} />
+                                                                <span className="time-separator">-</span>
+                                                                <input type="time" className="time-input" value={day.closing_time || ""}
+                                                                    onChange={e => {
+                                                                        const next = [...scheduleData.schedule];
+                                                                        next[idx] = { ...day, closing_time: e.target.value };
+                                                                        setScheduleData(prev => ({ ...prev, schedule: next }));
+                                                                    }} />
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span>{day.opening_time}</span>
+                                                                <span className="time-separator">-</span>
+                                                                <span>{day.closing_time}</span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="schedule-times"><span>{t("closed")}</span></div>
+                                                )}
+                                            </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'queue' && (
+                        <div className="profile-section queue-tab-section">
+                            <div className="section-header section-header-actions">
+                                <h2 className="section-title">{t("queue")}</h2>
+                                {queueDetail && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => {
+                                            const msg =
+                                                t("confirmRemoveQueue") ||
+                                                "Remove this employee from the assigned queue?";
+                                            if (window.confirm(msg)) {
+                                                handleRemoveQueue();
+                                            }
+                                        }}
+                                        disabled={assigningQueue}
+                                    >
+                                        {assigningQueue ? t("saving") : t("removeQueue") || "Remove queue"}
+                                    </button>
+                                )}
+                            </div>
+                            <div className="section-content">
+                                {queueAssignError && (
+                                    <div className="employee-detail-save-error" role="alert">
+                                        {queueAssignError}
+                                    </div>
+                                )}
+                                {queueDetail ? (
+                                    <>
+                                        <div className="info-block queue-details-block">
+                                            <h3 className="info-block-title">{t("queueDetails")}</h3>
+                                            <div className="info-grid">
+                                                <div className="info-field">
+                                                    <label className="info-label">{t("queueName")}</label>
+                                                    <div className="info-value">{queueDetail.name || t("notAvailable")}</div>
+                                                </div>
+                                                <div className="info-field">
+                                                    <label className="info-label">{t("queueId")}</label>
+                                                    <div className="info-value info-value-readonly">{queueDetail.uuid}</div>
+                                                </div>
+                                                {queueDetail.limit != null && (
+                                                    <div className="info-field">
+                                                        <label className="info-label">{t("queueLimit")}</label>
+                                                        <div className="info-value">{queueDetail.limit}</div>
+                                                    </div>
+                                                )}
+                                                {queueDetail.current_length != null && (
+                                                    <div className="info-field">
+                                                        <label className="info-label">{t("currentLength")}</label>
+                                                        <div className="info-value">{queueDetail.current_length}</div>
+                                                    </div>
+                                                )}
+                                                {queueDetail.status != null && (
+                                                    <div className="info-field">
+                                                        <label className="info-label">{t("status")}</label>
+                                                        <div className="info-value">{getQueueStatusLabel(queueDetail.status, t)}</div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {queueDetail.services && queueDetail.services.length > 0 ? (
+                                            <div className="info-block queue-services-block">
+                                                <h3 className="info-block-title">{t("services")}</h3>
+                                                <div className="queue-services-table-wrap">
+                                                    <table className="data-table queue-services-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>{t("serviceName")}</th>
+                                                                <th>{t("serviceDescription")}</th>
+                                                                <th>{t("fee")}</th>
+                                                                <th>{t("averageServiceTime")}</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {queueDetail.services.map((svc) => (
+                                                                <tr key={svc.uuid}>
+                                                                    <td>{svc.name || t("notAvailable")}</td>
+                                                                    <td>{svc.description || t("notAvailable")}</td>
+                                                                    <td>{svc.service_fee != null ? `${svc.service_fee}` : t("notAvailable")}</td>
+                                                                    <td>{svc.avg_service_time != null ? formatDurationMinutes(svc.avg_service_time) : t("notAvailable")}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="info-block">
+                                                <p className="info-value">{t("noServicesAssigned")}</p>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="queue-empty-state">
+                                        <p className="queue-empty-message">{t("noQueueAssignedToEmployee")}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* QR Code Tab */}
+                    {activeTab === 'qr' && (
+                        <div className="profile-section queue-tab-section">
+                            <div className="section-header">
+                                <h2 className="section-title">Employee QR Code</h2>
+                            </div>
+                            <div className="section-content">
+                                {!queueDetail ? (
+                                    <div className="queue-empty-state">
+                                        <p className="queue-empty-message">
+                                            Assign a queue to this employee to generate a QR code.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {qrLoading && (
+                                            <div className="loading-state" style={{ padding: "2rem", textAlign: "center" }}>
+                                                {t("loading")}
+                                            </div>
+                                        )}
+                                        {qrError && (
+                                            <div className="employee-detail-save-error" role="alert">
+                                                {qrError}
+                                            </div>
+                                        )}
+                                        {qrObjectUrl && (
+                                            <QRCard
+                                                qrUrl={qrObjectUrl}
+                                                name={employeeDisplay.fullName}
+                                                meta={queueDetail.name ? `Queue: ${queueDetail.name}` : undefined}
+                                                badge="Employee"
+                                                hint="Place this QR code at the employee's station. Customers scan it to book directly with this employee."
+                                                filename="employee-qr.png"
+                                            />
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+                </Tabs>
+            </div>
+        </div>
+    );
+};
+
+export default EmployeeDetail;
