@@ -16,6 +16,7 @@ from app.services.queue_service import QueueService
 from app.controllers.queue_controller import QueueController
 from app.core.config import CORS_ORIGINS
 from app.core.utils import today_app_date, current_time_app_tz
+from app.core.constants import QUEUE_USER_SCHEDULED, APPOINTMENT_TYPE_FIXED, APPOINTMENT_TYPE_APPROXIMATE
 
 # Import all models to ensure they're registered with SQLAlchemy
 from app.models import (
@@ -29,6 +30,32 @@ from app.models import (
 Base.metadata.create_all(bind=engine)
 
 logger = logging.getLogger(__name__)
+
+
+def run_migration_job() -> None:
+    """One-time startup migration: convert existing Fixed/Approximate REGISTERED appointments to SCHEDULED.
+    Idempotent — safe to run on every startup."""
+    db = SessionLocal()
+    try:
+        from app.models.queue import QueueUser
+        today = today_app_date()
+        updated = (
+            db.query(QueueUser)
+            .filter(
+                QueueUser.status == 1,  # QUEUE_USER_REGISTERED — avoid circular import at module level
+                QueueUser.appointment_type.in_([APPOINTMENT_TYPE_FIXED, APPOINTMENT_TYPE_APPROXIMATE]),
+                QueueUser.queue_date >= today,
+            )
+            .update({QueueUser.status: QUEUE_USER_SCHEDULED}, synchronize_session=False)
+        )
+        db.commit()
+        if updated:
+            logger.info("Migration: converted %d Fixed/Approximate appointments to SCHEDULED", updated)
+    except Exception:
+        db.rollback()
+        logger.exception("Migration job failed")
+    finally:
+        db.close()
 
 
 def run_expiry_job() -> None:
@@ -77,6 +104,7 @@ def run_auto_hold_job() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    run_migration_job()
     run_expiry_job()
     run_activate_scheduled_job()
     scheduler = BackgroundScheduler(timezone="Asia/Kolkata")

@@ -63,9 +63,11 @@ function mapLiveData(data: LiveQueueData, t: (k: string) => string): {
   completed: UIUser[];
   current: CurrentUser | null;
   waiting: UIUser[];
+  upcoming: UIUser[];
 } {
   const completed: UIUser[] = [];
   const waiting: UIUser[] = [];
+  const upcoming: UIUser[] = [];
   let current: CurrentUser | null = null;
   const now = Date.now();
 
@@ -123,12 +125,16 @@ function mapLiveData(data: LiveQueueData, t: (k: string) => string): {
         position: u.position ?? null,
         estimated_token: u.token || "",
       };
-    } else {
+    } else if (u.status === 8) {
+      // SCHEDULED — pre-active, not yet in the live queue
+      upcoming.push(base);
+    } else if (u.status === QueueUserStatus.REGISTERED) {
       waiting.push(base);
     }
+    // FAILED(4), CANCELLED(5), EXPIRED(7) — excluded by backend; skip if present
   }
 
-  return { completed, current, waiting };
+  return { completed, current, waiting, upcoming };
 }
 
 const LiveQueue: React.FC = () => {
@@ -149,6 +155,10 @@ const LiveQueue: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nextLoading, setNextLoading] = useState(false);
+  const [noShowLoading, setNoShowLoading] = useState(false);
+  const [showNoShowConfirm, setShowNoShowConfirm] = useState(false);
+  const [skipLoading, setSkipLoading] = useState(false);
+  const [showSkipConfirm, setShowSkipConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
@@ -240,8 +250,8 @@ const LiveQueue: React.FC = () => {
   });
 
   // Derived UI state — recalculates on new server data OR every 30s tick
-  const { completed, current, waiting } = useMemo(() => {
-    if (!liveData) return { completed: [], current: null, waiting: [] };
+  const { completed, current, waiting, upcoming } = useMemo(() => {
+    if (!liveData) return { completed: [], current: null, waiting: [], upcoming: [] };
     return mapLiveData(liveData, t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveData, tick]);
@@ -249,6 +259,7 @@ const LiveQueue: React.FC = () => {
   const inProgressCount = liveData?.in_progress_count ?? 0;
   const waitingCount = liveData?.waiting_count ?? 0;
   const completedCount = liveData?.completed_count ?? 0;
+  const upcomingCount = liveData?.upcoming_count ?? 0;
   const queueName = liveData?.queue_name ?? "Live Queue";
   const queueStatus = liveData?.queue_status;
   const employeeOnLeave = liveData?.employee_on_leave ?? false;
@@ -266,6 +277,36 @@ const LiveQueue: React.FC = () => {
       setNextLoading(false);
     }
   }, [selectedQueueId, nextLoading]);
+
+  const handleNoShow = useCallback(async () => {
+    if (!selectedQueueId || noShowLoading) return;
+    setActionError(null);
+    setNoShowLoading(true);
+    setShowNoShowConfirm(false);
+    try {
+      const updated = await queueService.noShowCurrent(selectedQueueId);
+      setLiveData(updated);
+    } catch (e: any) {
+      setActionError(e?.response?.data?.detail?.message || e?.response?.data?.detail || t("failedToMarkNoShow"));
+    } finally {
+      setNoShowLoading(false);
+    }
+  }, [selectedQueueId, noShowLoading]);
+
+  const handleSkip = useCallback(async () => {
+    if (!selectedQueueId || skipLoading) return;
+    setActionError(null);
+    setSkipLoading(true);
+    setShowSkipConfirm(false);
+    try {
+      const updated = await queueService.skipCurrent(selectedQueueId);
+      setLiveData(updated);
+    } catch (e: any) {
+      setActionError(e?.response?.data?.detail?.message || e?.response?.data?.detail || t("failedToSkip"));
+    } finally {
+      setSkipLoading(false);
+    }
+  }, [selectedQueueId, skipLoading]);
 
   const handleRefresh = useCallback(() => {
     if (selectedQueueId) fetchLiveQueue(selectedQueueId);
@@ -391,6 +432,14 @@ const LiveQueue: React.FC = () => {
               <span className="lq-counter lq-counter--done">
                 {t("completed") || "Completed"}: {completedCount}
               </span>
+              {upcomingCount > 0 && (
+                <>
+                  <span className="lq-sep" aria-hidden />
+                  <span className="lq-counter lq-counter--upcoming">
+                    {t("upcoming") || "Upcoming"}: {upcomingCount}
+                  </span>
+                </>
+              )}
             </div>
           </div>
           <div className="lq-header__right">
@@ -554,14 +603,68 @@ const LiveQueue: React.FC = () => {
                   </div>
                 </div>
                 <div className="lq-currentCard__actions">
-                  <button
-                    type="button"
-                    className="lq-nextBtn"
-                    onClick={handleNext}
-                    disabled={nextLoading || actionsDisabled}
-                  >
-                    {nextLoading ? "…" : t("next") || "Next"}
-                  </button>
+                  {showNoShowConfirm ? (
+                    <div className="lq-actionConfirm lq-actionConfirm--danger" role="alertdialog">
+                      <p className="lq-actionConfirm__msg">
+                        {t("noShowConfirmMsg", { name: current.full_name })}
+                      </p>
+                      <div className="lq-actionConfirm__btns">
+                        <button type="button" className="lq-actionConfirm__cancel"
+                          onClick={() => setShowNoShowConfirm(false)}>
+                          {t("cancel") || "Cancel"}
+                        </button>
+                        <button type="button" className="lq-actionConfirm__ok lq-actionConfirm__ok--danger"
+                          onClick={handleNoShow} disabled={noShowLoading}>
+                          {noShowLoading ? "…" : t("noShowConfirm")}
+                        </button>
+                      </div>
+                    </div>
+                  ) : showSkipConfirm ? (
+                    <div className="lq-actionConfirm lq-actionConfirm--warning" role="alertdialog">
+                      <p className="lq-actionConfirm__msg">
+                        {t("skipConfirmMsg", { name: current.full_name })}
+                      </p>
+                      <div className="lq-actionConfirm__btns">
+                        <button type="button" className="lq-actionConfirm__cancel"
+                          onClick={() => setShowSkipConfirm(false)}>
+                          {t("cancel") || "Cancel"}
+                        </button>
+                        <button type="button" className="lq-actionConfirm__ok lq-actionConfirm__ok--warning"
+                          onClick={handleSkip} disabled={skipLoading}>
+                          {skipLoading ? "…" : t("skipConfirm")}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="lq-actionBtnRow">
+                      <button
+                        type="button"
+                        className="lq-actionBtn lq-actionBtn--danger"
+                        onClick={() => setShowNoShowConfirm(true)}
+                        disabled={noShowLoading || nextLoading || actionsDisabled}
+                        title={t("noShowHint")}
+                      >
+                        {t("noShow")}
+                      </button>
+                      <button
+                        type="button"
+                        className="lq-actionBtn lq-actionBtn--warning"
+                        onClick={() => setShowSkipConfirm(true)}
+                        disabled={skipLoading || nextLoading || actionsDisabled}
+                        title={t("skipHint")}
+                      >
+                        {t("skip")}
+                      </button>
+                      <button
+                        type="button"
+                        className="lq-nextBtn"
+                        onClick={handleNext}
+                        disabled={nextLoading || actionsDisabled}
+                      >
+                        {nextLoading ? "…" : t("next") || "Next"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
@@ -734,6 +837,53 @@ const LiveQueue: React.FC = () => {
                 </div>
               ))}
             </div>
+          </section>
+        )}
+
+        {/* Upcoming section — SCHEDULED appointments not yet active */}
+        {upcoming.length > 0 && (
+          <section className="lq-upcoming-section" aria-label={t("upcoming") || "Upcoming"}>
+            <div className="lq-upcoming-header">
+              {t("upcoming") || "Upcoming"} · {upcoming.length}
+            </div>
+            {upcoming.map((user) => {
+              const scheduled = formatScheduledLabel(user);
+              return (
+                <article key={user.id} className="lq-upcoming-row">
+                  <div className="lq-row__avatar lq-upcoming-row__avatar" aria-hidden>
+                    {(user.full_name || "?").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="lq-row__meta">
+                    <div className="lq-row__top">
+                      <span className="lq-row__name">{user.full_name}</span>
+                      {user.token && <span className="lq-tokenChip">{user.token}</span>}
+                      <span className="lq-badge lq-badge--apptType" data-type={user.appointment_type || "QUEUE"}>
+                        {appointmentTypeLabel(user.appointment_type, t)}
+                      </span>
+                      <span className="lq-badge lq-badge--scheduled">
+                        {t("statusScheduled") || "Scheduled"}
+                      </span>
+                    </div>
+                    <div className="lq-row__sub">
+                      <span>{user.phone}</span>
+                      {user.service_summary && (
+                        <>
+                          <span className="lq-sep" aria-hidden />
+                          <span>{user.service_summary}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {scheduled && (
+                    <div className="lq-upcoming-row__time">
+                      <span className="lq-row__scheduled">
+                        {t(scheduled.labelKey)} {scheduled.value}
+                      </span>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
           </section>
         )}
       </div>

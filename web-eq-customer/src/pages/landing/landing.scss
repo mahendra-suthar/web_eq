@@ -627,6 +627,7 @@
   background: linear-gradient(90deg, $gold 0%, #f5d78e 100%);
 
   &--active { background: linear-gradient(90deg, $jade 0%, $mint 100%); }
+  &--scheduled { background: linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%); }
 }
 
 .lp-today-card-body {
@@ -717,6 +718,12 @@
       margin-right: 4px;
       vertical-align: middle;
     }
+  }
+
+  &--scheduled {
+    background: rgba(124, 58, 237, 0.08);
+    color: #7c3aed;
+    border: 1px solid rgba(124, 58, 237, 0.25);
   }
 }
 

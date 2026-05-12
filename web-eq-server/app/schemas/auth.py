@@ -82,6 +82,19 @@ class OTPVerifyInput(BaseModel):
         return v
 
 
+class FirebaseVerifyInput(BaseModel):
+    firebase_token: str
+    user_type: Literal['customer', 'business'] = 'customer'
+    client_type: Optional[Literal['mobile', 'web']] = None
+
+    @field_validator("firebase_token")
+    @classmethod
+    def validate_firebase_token(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("firebase_token is required")
+        return v.strip()
+
+
 class VerifyInvitationInput(BaseModel):
     code: str
 

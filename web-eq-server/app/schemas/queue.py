@@ -6,7 +6,7 @@ from datetime import datetime, date, time
 
 from app.schemas.user import UserData
 from app.core.utils import format_time_12h, wait_minutes_from_now
-from app.core.constants import QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_COMPLETED
+from app.core.constants import QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_COMPLETED, QUEUE_USER_SCHEDULED
 
 
 class QueueServiceCreate(BaseModel):
@@ -621,7 +621,8 @@ class LiveQueueData(BaseModel):
     in_progress_count: int
     completed_count: int
     current_token: Optional[str] = None  # token of in_progress user
-    users: List[LiveQueueUserItem]        # ordered: completed → in_progress → waiting
+    users: List[LiveQueueUserItem]        # ordered: completed → in_progress → waiting → scheduled
+    upcoming_count: int = 0              # SCHEDULED (pre-active) appointments not yet in live queue
     employee_on_leave: bool = False     # True when queue's employee has no schedule / closed exception for this date
 
     @classmethod
@@ -638,6 +639,7 @@ class LiveQueueData(BaseModel):
         waiting_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_REGISTERED)
         in_progress_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_IN_PROGRESS)
         completed_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_COMPLETED)
+        upcoming_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_SCHEDULED)
 
         # Compute live wait estimates so every broadcast reflects current queue state
         waits = calculate_queue_waits(users_raw)
@@ -652,6 +654,7 @@ class LiveQueueData(BaseModel):
             waiting_count=waiting_count,
             in_progress_count=in_progress_count,
             completed_count=completed_count,
+            upcoming_count=upcoming_count,
             current_token=current_token,
             employee_on_leave=employee_on_leave,
             users=[

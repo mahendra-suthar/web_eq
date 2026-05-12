@@ -30,7 +30,7 @@ from app.schemas.customer import (
     CustomerUpcomingAppointmentsResponse,
 )
 from app.schemas.auth import UserRegistrationInput
-from app.core.constants import QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS
+from app.core.constants import QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_SCHEDULED
 from app.core.utils import today_app_date, format_date_iso, now_app_tz
 
 
@@ -301,10 +301,10 @@ class CustomerController:
             if not qu:
                 raise HTTPException(status_code=404, detail="Appointment not found")
 
-            if qu.status not in (QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS):
+            if qu.status not in (QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_SCHEDULED):
                 raise HTTPException(
                     status_code=409,
-                    detail="Only waiting or in-progress appointments can be cancelled",
+                    detail="Only waiting, scheduled, or in-progress appointments can be cancelled",
                 )
 
             queue = qu.queue
@@ -361,17 +361,27 @@ class CustomerController:
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def mark_arrived(self, user_id: UUID, queue_user_id: UUID) -> dict:
-        """Mark customer as physically present (checked in). Prevents auto-hold."""
+        """Mark customer as physically present (checked in). Prevents auto-hold.
+        If the appointment is still SCHEDULED (early arrival), activates it immediately."""
         try:
             qu = self.queue_service.get_queue_user_for_update(queue_user_id, user_id)
             if not qu:
                 raise HTTPException(status_code=404, detail="Appointment not found")
-            if qu.status != QUEUE_USER_REGISTERED:
-                raise HTTPException(status_code=409, detail="Only waiting appointments can be checked in")
 
-            qu.is_checked_in = True  # type: ignore[assignment]
-            qu.check_in_time = now_app_tz()  # type: ignore[assignment]
-            self.db.commit()
+            now = now_app_tz()
+            if qu.status == QUEUE_USER_SCHEDULED:
+                # Early arrival — activate into the live queue at actual arrival time
+                qu.status = QUEUE_USER_REGISTERED  # type: ignore[assignment]
+                qu.enqueue_time = now  # type: ignore[assignment]
+                qu.is_checked_in = True  # type: ignore[assignment]
+                qu.check_in_time = now  # type: ignore[assignment]
+                self.db.commit()
+            elif qu.status == QUEUE_USER_REGISTERED:
+                qu.is_checked_in = True  # type: ignore[assignment]
+                qu.check_in_time = now  # type: ignore[assignment]
+                self.db.commit()
+            else:
+                raise HTTPException(status_code=409, detail="Only waiting or scheduled appointments can be checked in")
 
             # Broadcast real-time update so Live Queue and customer screens update instantly
             queue_id = str(qu.queue_id)

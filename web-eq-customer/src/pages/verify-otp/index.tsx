@@ -3,15 +3,31 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import eqLogo from "../../assets/transparent_logo.png";
 import { AuthService } from "../../services/auth/auth.service";
+import { confirmFirebaseOTP, sendFirebaseOTP, clearConfirmation, clearRecaptcha } from "../../services/auth/firebase-phone";
 import { useAuthStore } from "../../store/auth.store";
 import {
   OTP_COUNTDOWN_SECONDS,
   OTP_LENGTH,
-  OTPErrorCode,
   DEFAULT_COUNTRY_CODE,
 } from "../../utils/constants";
 import { getBookingReturnState } from "../../utils/bookingReturnState";
 import "./verify-otp.scss";
+
+function getFirebaseVerifyError(t: ReturnType<typeof useTranslation>["t"], err: unknown): string {
+  const code = (err as any)?.code as string | undefined;
+  switch (code) {
+    case "auth/invalid-verification-code":
+      return t("otpInvalid");
+    case "auth/code-expired":
+      return t("otpExpired");
+    case "auth/too-many-requests":
+      return t("rateLimitExceeded");
+    case "auth/network-request-failed":
+      return t("networkError");
+    default:
+      return (err as any)?.customMessage || (err as any)?.response?.data?.detail?.message || t("otpVerificationFailed");
+  }
+}
 
 export default function VerifyOTPPage() {
   const { t } = useTranslation();
@@ -69,6 +85,14 @@ export default function VerifyOTPPage() {
     if (!phone || !phoneNumber) navigate("/send-otp", { replace: true });
   }, [phone, phoneNumber, navigate]);
 
+  // Clear Firebase confirmation and reCAPTCHA state on unmount
+  useEffect(() => {
+    return () => {
+      clearConfirmation();
+      clearRecaptcha();
+    };
+  }, []);
+
   useEffect(() => {
     if (countdown <= 0) return;
     const id = setInterval(() => setCountdown((p) => p - 1), 1000);
@@ -125,7 +149,8 @@ export default function VerifyOTPPage() {
     setError("");
     try {
       const authService = new AuthService();
-      const response = await authService.verifyOTPCustomer(countryCode, phoneNumber, otp, "web");
+      const idToken = await confirmFirebaseOTP(otp);
+      const response = await authService.verifyFirebasePhone(idToken, "web");
 
       if (response.token && response.user) {
         const toUserData = (u: typeof response.user) => ({
@@ -157,26 +182,10 @@ export default function VerifyOTPPage() {
         setError(t("invalidResponse"));
         triggerShake();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setDigits(Array(OTP_LENGTH).fill(""));
       inputRefs.current[0]?.focus();
-
-      let msg = t("otpVerificationFailed");
-      const code = err?.response?.data?.detail?.error_code;
-      if (code) {
-        switch (code) {
-          case OTPErrorCode.OTP_NOT_FOUND: msg = t("otpNotFound"); break;
-          case OTPErrorCode.OTP_EXPIRED: msg = t("otpExpired"); break;
-          case OTPErrorCode.OTP_INVALID: msg = t("otpInvalid"); break;
-          case OTPErrorCode.OTP_ALREADY_USED: msg = t("otpAlreadyUsed"); break;
-          default: msg = err?.response?.data?.detail?.message || err?.customMessage || t("otpVerificationFailed");
-        }
-      } else if (err?.code === "ERR_NETWORK" || !err?.response) {
-        msg = t("networkError");
-      } else {
-        msg = err?.customMessage || err?.response?.data?.detail?.message || t("otpVerificationFailed");
-      }
-      setError(msg);
+      setError(getFirebaseVerifyError(t, err));
       triggerShake();
     } finally {
       setLoading(false);
@@ -188,13 +197,17 @@ export default function VerifyOTPPage() {
     setResendLoading(true);
     setError("");
     try {
-      const authService = new AuthService();
-      await authService.sendOTP(countryCode, phoneNumber, "customer");
+      await sendFirebaseOTP(`${countryCode}${phoneNumber}`);
       setCountdown(OTP_COUNTDOWN_SECONDS);
       setDigits(Array(OTP_LENGTH).fill(""));
       setTimeout(() => inputRefs.current[0]?.focus(), 50);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail?.message || err?.customMessage || t("failedToSendOtp"));
+    } catch (err: unknown) {
+      const code = (err as any)?.code as string | undefined;
+      if (code === "auth/too-many-requests") {
+        setError(t("rateLimitExceeded"));
+      } else {
+        setError((err as any)?.message || t("failedToSendOtp"));
+      }
     } finally {
       setResendLoading(false);
     }
@@ -204,7 +217,7 @@ export default function VerifyOTPPage() {
     <>
       <div className="auth-band-deco auth-band-deco-1" aria-hidden="true" />
       <div className="auth-band-deco auth-band-deco-2" aria-hidden="true" />
-          <img src={eqLogo} alt="EaseQueue" className="auth-band-logo-img" aria-hidden="true" />
+      <img src={eqLogo} alt="EaseQueue" className="auth-band-logo-img" aria-hidden="true" />
     </>
   );
 
@@ -236,7 +249,6 @@ export default function VerifyOTPPage() {
     );
   }
 
-  // STEP 2: OTP entry
   return (
     <div className="auth-wrap">
       <div className="auth-card">

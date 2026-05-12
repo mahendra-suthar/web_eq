@@ -9,6 +9,8 @@ UNPROTECTED_ROUTE_PATHS = [
     "/api/auth/verify-otp-customer",
     "/api/auth/business-verify-otp",
     "/api/auth/admin-verify-otp",         # Admin OTP login — unprotected so unauthenticated admins can log in
+    "/api/auth/firebase-verify-customer", # Firebase Phone Auth — issues JWT, must be unprotected
+    "/api/auth/firebase-verify-business", # Firebase Phone Auth — issues JWT, must be unprotected
     "/api/auth/logout",                   # Cookie clear — must work even when session is expired
     "/api/auth/token/refresh",            # Silent token refresh — validates cookie, returns new token
     # ── Public catalogue reads ────────────────────────────────────────────────
@@ -69,6 +71,10 @@ QUEUE_USER_FAILED = 4
 QUEUE_USER_CANCELLED = 5
 QUEUE_USER_PRIORITY_REQUESTED = 6
 QUEUE_USER_EXPIRED = 7          # Auto-expired by scheduler: past-day, never served
+QUEUE_USER_SCHEDULED = 8        # Fixed/Approximate: pre-active, not yet in live queue
+
+# Minutes before scheduled_start when a SCHEDULED appointment activates into the live queue
+SCHEDULED_ACTIVATION_LEAD_MINUTES = 15
 
 # Customer API defaults (appointments list pagination)
 CUSTOMER_APPOINTMENTS_DEFAULT_LIMIT = 5
@@ -109,6 +115,8 @@ NOTIF_CALLED_NEXT = "CALLED_NEXT"
 NOTIF_SERVICE_COMPLETED = "SERVICE_COMPLETED"
 NOTIF_AUTO_HOLD = "AUTO_HOLD"          # customer pushed back because not checked in
 NOTIF_HEADING_NOW = "HEADING_NOW"      # "head out now" — wait ≤ eta
+NOTIF_NO_SHOW = "NO_SHOW"             # customer marked absent and removed from queue
+NOTIF_SKIPPED = "SKIPPED"             # customer skipped, moved to back of queue
 
 # Business status label map (int → display string)
 BUSINESS_STATUS_LABELS = {
@@ -129,6 +137,7 @@ QUEUE_USER_STATUS_LABELS = {
     QUEUE_USER_CANCELLED: "Cancelled",
     QUEUE_USER_PRIORITY_REQUESTED: "Priority Requested",
     QUEUE_USER_EXPIRED: "Expired",
+    QUEUE_USER_SCHEDULED: "Scheduled",
 }
 
 # Application roles

@@ -40,6 +40,8 @@ from app.services.notification_triggers import (
     notify_in_service,
     notify_called_next,
     notify_service_completed,
+    notify_no_show,
+    notify_skipped,
     notify_auto_hold_sync,
     notify_heading_now_sync,
 )
@@ -523,18 +525,30 @@ class QueueController:
                 if not queue_services:
                     queue_services = all_queue_services
 
-            if data.queue_date == today_app_date() and not is_walk_in:
-                existing_booking = self.get_existing_booking(
-                    user_id=booking_user_id,
-                    queue_id=queue_id,
-                    queue_date=data.queue_date,
-                    business_id=data.business_id,
-                    queue=queue,
-                    business=business,
-                    calc_service=calc_service,
-                )
-                if existing_booking is not None:
-                    return existing_booking
+            if data.queue_date == today_app_date():
+                if is_walk_in:
+                    # Walk-in: block duplicate — admin must not add someone already in the queue
+                    duplicate = self.queue_service.get_existing_same_day_booking(
+                        booking_user_id, queue_id, data.queue_date
+                    )
+                    if duplicate is not None:
+                        raise HTTPException(
+                            status_code=409,
+                            detail="This customer already has an active appointment in this queue today.",
+                        )
+                else:
+                    # Self-booking: silently return existing booking so the customer sees their slot
+                    existing_booking = self.get_existing_booking(
+                        user_id=booking_user_id,
+                        queue_id=queue_id,
+                        queue_date=data.queue_date,
+                        business_id=data.business_id,
+                        queue=queue,
+                        business=business,
+                        calc_service=calc_service,
+                    )
+                    if existing_booking is not None:
+                        return existing_booking
 
             slot_id = getattr(data, "slot_id", None)
             appointment_type = (data.appointment_type or "QUEUE").upper()
@@ -617,7 +631,9 @@ class QueueController:
                 is_walk_in=bool(getattr(data, "is_walk_in", False)),
             )
 
-            if data.queue_date == today_app_date():
+            # Only add to Redis live queue for walk-ins (REGISTERED immediately).
+            # SCHEDULED (Fixed/Approximate) appointments join when they activate.
+            if data.queue_date == today_app_date() and queue_user.status == QUEUE_USER_REGISTERED:
                 await queue_manager.add_to_queue(
                     db=self.db,
                     queue_id=str(queue_id),
@@ -930,6 +946,126 @@ class QueueController:
         except Exception:
             self.db.rollback()
             logger.exception("Failed to advance_queue (queue_id=%s)", queue_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    async def no_show_current(self, queue_id: UUID) -> LiveQueueData:
+        try:
+            queue = self.queue_service.get_queue_by_id(queue_id)
+            if not queue:
+                raise HTTPException(status_code=404, detail="Queue not found")
+            today = today_app_date()
+            if self.is_employee_on_leave(queue, today):
+                raise HTTPException(status_code=403, detail="Employee is on leave today. Queue cannot be modified.")
+
+            active_users = self.queue_service.get_active_queue_users_with_lock(queue_id, today)
+            in_progress = next((u for u in active_users if u.status == QUEUE_USER_IN_PROGRESS), None)
+            if not in_progress:
+                raise ValueError("No user is currently in progress")
+            waiting = sorted(
+                [u for u in active_users if u.status == QUEUE_USER_REGISTERED],
+                key=lambda u: (u.enqueue_time or u.created_at or datetime.min.replace(tzinfo=timezone.utc)),
+            )
+            now = datetime.now(timezone.utc)
+            self.queue_service.mark_queue_user_failed(in_progress.uuid, now)
+            first_waiting = None
+            if waiting:
+                first_waiting = waiting[0]
+                self.queue_service.mark_queue_user_in_progress(first_waiting.uuid, now)
+            self.queue_service.commit_advance()
+
+            try:
+                await notify_no_show(
+                    db=self.db, user_id=in_progress.user_id,
+                    token_number=str(in_progress.token_number or ""), queue_name=queue.name or "",
+                )
+                if first_waiting:
+                    await notify_in_service(
+                        db=self.db, user_id=first_waiting.user_id,
+                        token_number=str(first_waiting.token_number or ""), queue_name=queue.name or "",
+                    )
+                    if len(waiting) > 1:
+                        await notify_called_next(
+                            db=self.db, user_id=waiting[1].user_id,
+                            token_number=str(waiting[1].token_number or ""), queue_name=queue.name or "",
+                        )
+            except Exception:
+                logger.warning("Notification failed for no_show_current queue_id=%s", queue_id, exc_info=True)
+
+            rows, svc_by_user = self.queue_service.get_live_queue_users_raw(queue_id, today)
+            users_raw = build_live_queue_users_raw(rows, svc_by_user)
+            live_data = self.build_live_queue_data(queue, today, users_raw, self.is_employee_on_leave(queue, today))
+            date_str = today.isoformat()
+            await live_queue_manager.broadcast(str(queue_id), date_str, "live_queue_update", live_data.model_dump(mode="json"))
+            await customer_queue_manager.broadcast_to_queue(self.db, str(queue_id), date_str)
+            return live_data
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail={"message": str(e)})
+        except HTTPException:
+            self.db.rollback()
+            raise
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to no_show_current (queue_id=%s)", queue_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    async def skip_current(self, queue_id: UUID) -> LiveQueueData:
+        try:
+            queue = self.queue_service.get_queue_by_id(queue_id)
+            if not queue:
+                raise HTTPException(status_code=404, detail="Queue not found")
+            today = today_app_date()
+            if self.is_employee_on_leave(queue, today):
+                raise HTTPException(status_code=403, detail="Employee is on leave today. Queue cannot be modified.")
+
+            active_users = self.queue_service.get_active_queue_users_with_lock(queue_id, today)
+            in_progress = next((u for u in active_users if u.status == QUEUE_USER_IN_PROGRESS), None)
+            if not in_progress:
+                raise ValueError("No user is currently in progress")
+            waiting = sorted(
+                [u for u in active_users if u.status == QUEUE_USER_REGISTERED],
+                key=lambda u: (u.enqueue_time or u.created_at or datetime.min.replace(tzinfo=timezone.utc)),
+            )
+            now = datetime.now(timezone.utc)
+            self.queue_service.mark_queue_user_skipped(in_progress.uuid, now)
+            first_waiting = None
+            if waiting:
+                first_waiting = waiting[0]
+                self.queue_service.mark_queue_user_in_progress(first_waiting.uuid, now)
+            self.queue_service.commit_advance()
+
+            try:
+                await notify_skipped(
+                    db=self.db, user_id=in_progress.user_id,
+                    token_number=str(in_progress.token_number or ""), queue_name=queue.name or "",
+                )
+                if first_waiting:
+                    await notify_in_service(
+                        db=self.db, user_id=first_waiting.user_id,
+                        token_number=str(first_waiting.token_number or ""), queue_name=queue.name or "",
+                    )
+                    if len(waiting) > 1:
+                        await notify_called_next(
+                            db=self.db, user_id=waiting[1].user_id,
+                            token_number=str(waiting[1].token_number or ""), queue_name=queue.name or "",
+                        )
+            except Exception:
+                logger.warning("Notification failed for skip_current queue_id=%s", queue_id, exc_info=True)
+
+            rows, svc_by_user = self.queue_service.get_live_queue_users_raw(queue_id, today)
+            users_raw = build_live_queue_users_raw(rows, svc_by_user)
+            live_data = self.build_live_queue_data(queue, today, users_raw, self.is_employee_on_leave(queue, today))
+            date_str = today.isoformat()
+            await live_queue_manager.broadcast(str(queue_id), date_str, "live_queue_update", live_data.model_dump(mode="json"))
+            await customer_queue_manager.broadcast_to_queue(self.db, str(queue_id), date_str)
+            return live_data
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail={"message": str(e)})
+        except HTTPException:
+            self.db.rollback()
+            raise
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to skip_current (queue_id=%s)", queue_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def start_queue(self, queue_id: UUID, business_id: UUID) -> QueueData:

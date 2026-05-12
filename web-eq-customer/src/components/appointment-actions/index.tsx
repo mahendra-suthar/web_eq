@@ -19,8 +19,8 @@ export interface AppointmentActionItem {
   service_summary?: string | null;
 }
 
-const EDITABLE_STATUSES = [1];       // REGISTERED only
-const CANCELLABLE_STATUSES = [1];    // REGISTERED only — cannot cancel while being served
+const EDITABLE_STATUSES = [1, 8];       // REGISTERED + SCHEDULED (pre-active)
+const CANCELLABLE_STATUSES = [1, 8];    // REGISTERED + SCHEDULED — cannot cancel while being served
 const COMPLETED_STATUS = 3;
 
 interface AppointmentActionsProps {

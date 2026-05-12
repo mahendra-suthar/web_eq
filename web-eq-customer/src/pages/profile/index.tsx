@@ -267,7 +267,7 @@ function ProfileInfoSection({ onSaved }: { onSaved: (msg: string) => void }) {
 type ApptStatusClass = "upcoming" | "completed" | "expired" | "cancelled" | "other";
 
 function getRichStatusClass(status: number): ApptStatusClass {
-  if (status === 1 || status === 2) return "upcoming";
+  if (status === 1 || status === 2 || status === 8) return "upcoming";
   if (status === 3) return "completed";
   if (status === 7) return "expired";
   if (status === 4 || status === 5) return "cancelled";
@@ -296,6 +296,7 @@ function AppointmentsSection() {
     4: t("profile.statusFailed"),
     5: t("profile.statusCancelled"),
     7: t("profile.statusExpired"),
+    8: t("profile.statusScheduled"),
   }), [t]);
   const getStatusLabel = useCallback(
     (status: number) => STATUS_LABELS[status] ?? t("profile.statusUnknown"),
@@ -498,8 +499,8 @@ function AppointmentsSection() {
                       </div>
                     </div>
 
-                    {/* Live status bar — active appointments only */}
-                    {!isPast && (
+                    {/* Live status bar — active (waiting/in-progress) only, not pre-scheduled */}
+                    {!isPast && item.status !== 8 && (
                       <div className={`ac-live-bar${
                         item.status === 2 ? " ac-live-bar--serving"
                         : item.position === 1 ? " ac-live-bar--next"
@@ -536,7 +537,7 @@ function AppointmentsSection() {
                             </>
                           )}
                         </div>
-                        {item.status === 1 && item.position != null && item.position <= 3 && (
+                        {(item.status === 8 || (item.status === 1 && item.position != null && item.position <= 3)) && (
                           item.is_checked_in ? (
                             <span className="appt-actions__arrived">
                               <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3" aria-hidden="true">

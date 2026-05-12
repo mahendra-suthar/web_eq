@@ -170,7 +170,7 @@ export interface LiveQueueUserItem {
     phone: string;
     token?: string | null;
     service_summary: string;
-    status: number;           // 1=waiting, 2=in_progress, 3=completed
+    status: number;           // 1=waiting, 2=in_progress, 3=completed, 8=scheduled (upcoming)
     enqueue_time?: string | null;
     dequeue_time?: string | null;
     position?: number | null; // 1-indexed, only for waiting users
@@ -193,7 +193,8 @@ export interface LiveQueueData {
     in_progress_count: number;
     completed_count: number;
     current_token?: string | null;
-    users: LiveQueueUserItem[];   // ordered: completed → in_progress → waiting
+    users: LiveQueueUserItem[];   // ordered: completed → in_progress → waiting → scheduled
+    upcoming_count?: number;      // count of SCHEDULED (pre-active) appointments
     employee_on_leave?: boolean;  // true when queue's employee has no schedule / closed exception for this date
 }
 
@@ -399,6 +400,24 @@ export class QueueService extends HttpClient {
             return await this.post<LiveQueueData>(`/queue/${queueId}/next`);
         } catch (error: any) {
             console.error("Failed to advance queue:", error);
+            throw error;
+        }
+    }
+
+    async noShowCurrent(queueId: string): Promise<LiveQueueData> {
+        try {
+            return await this.post<LiveQueueData>(`/queue/${queueId}/no-show`);
+        } catch (error: any) {
+            console.error("Failed to mark no show:", error);
+            throw error;
+        }
+    }
+
+    async skipCurrent(queueId: string): Promise<LiveQueueData> {
+        try {
+            return await this.post<LiveQueueData>(`/queue/${queueId}/skip`);
+        } catch (error: any) {
+            console.error("Failed to skip customer:", error);
             throw error;
         }
     }

@@ -144,6 +144,31 @@ export class OTPService extends HttpClient {
     }
   }
 
+  /**
+   * Exchange a Firebase Phone Auth ID token for an app session (business/employee flow).
+   * Called after Firebase confirms the OTP on the client side.
+   */
+  async verifyFirebasePhone(
+    firebaseToken: string,
+    clientType: string = "web"
+  ): Promise<LoginResponse> {
+    try {
+      return await this.post<LoginResponse>("/auth/firebase-verify-business", {
+        firebase_token: firebaseToken,
+        user_type: "business",
+        client_type: clientType,
+      }, {
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error: any) {
+      error.customMessage =
+        error?.response?.data?.detail?.message ||
+        error?.response?.data?.detail ||
+        "Verification failed";
+      throw error;
+    }
+  }
+
   async logout(): Promise<void> {
     try {
       await this.post("/auth/logout", {});

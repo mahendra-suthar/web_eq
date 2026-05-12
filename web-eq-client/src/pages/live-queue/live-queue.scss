@@ -69,6 +69,9 @@
   &--done {
     color: #15803d;
   }
+  &--upcoming {
+    color: #7c3aed;
+  }
 }
 
 .lq-sep {
@@ -634,6 +637,59 @@
   color: #b45309;
 }
 
+.lq-badge--scheduled {
+  background: rgba(124, 58, 237, 0.08);
+  border-color: rgba(124, 58, 237, 0.2);
+  color: #7c3aed;
+}
+
+// Upcoming section — pre-active SCHEDULED appointments
+.lq-upcoming-section {
+  margin: 12px 16px 0;
+  border-top: 1px dashed #e5e7eb;
+  padding-top: 10px;
+}
+
+.lq-upcoming-header {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $text-secondary;
+  padding: 0 4px 8px;
+}
+
+.lq-upcoming-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(124, 58, 237, 0.03);
+  border: 1px solid rgba(124, 58, 237, 0.1);
+  margin-bottom: 6px;
+
+  &__avatar {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    border-radius: 50%;
+    background: rgba(124, 58, 237, 0.1);
+    color: #7c3aed;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__time {
+    margin-left: auto;
+    text-align: right;
+    white-space: nowrap;
+  }
+}
+
 .lq-currentCard__delay {
   margin-top: 4px;
   font-size: 12px;
@@ -666,11 +722,116 @@
   white-space: nowrap;
 }
 
+// ─── No Show / Skip action buttons ──────────────────────────────────────────
+.lq-actionBtnRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lq-actionBtn--danger {
+  color: $error-dark;
+  border-color: rgba($error-dark, 0.3) !important;
+  background: transparent !important;
+  font-weight: 600;
+  &:hover:not(:disabled) {
+    background: rgba($error-dark, 0.06) !important;
+    border-color: rgba($error-dark, 0.55) !important;
+  }
+}
+
+.lq-actionBtn--warning {
+  color: #92400e;
+  border-color: rgba(#92400e, 0.3) !important;
+  background: transparent !important;
+  font-weight: 600;
+  &:hover:not(:disabled) {
+    background: rgba(#92400e, 0.06) !important;
+    border-color: rgba(#92400e, 0.55) !important;
+  }
+}
+
+// ─── Inline confirm dialog (replaces button row) ─────────────────────────────
+.lq-actionConfirm {
+  border-radius: 12px;
+  padding: 14px 16px;
+  animation: lq-confirm-in 0.15s ease;
+
+  &--danger {
+    background: rgba($error-dark, 0.05);
+    border: 1px solid rgba($error-dark, 0.18);
+  }
+
+  &--warning {
+    background: rgba(#92400e, 0.05);
+    border: 1px solid rgba(#92400e, 0.18);
+  }
+}
+
+@keyframes lq-confirm-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.lq-actionConfirm__msg {
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0 0 12px;
+  line-height: 1.45;
+
+  .lq-actionConfirm--danger & { color: $error-dark; }
+  .lq-actionConfirm--warning & { color: #92400e; }
+}
+
+.lq-actionConfirm__btns {
+  display: flex;
+  gap: 8px;
+}
+
+.lq-actionConfirm__cancel {
+  flex: 1;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: $text-secondary;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+  &:hover { background: #f8fafc; }
+}
+
+.lq-actionConfirm__ok {
+  flex: 1;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+
+  &--danger {
+    background: $error-dark;
+    &:hover:not(:disabled) { background: #5e0712; }
+  }
+
+  &--warning {
+    background: #92400e;
+    &:hover:not(:disabled) { background: #6e300a; }
+  }
+
+  &:disabled { opacity: 0.55; cursor: not-allowed; }
+}
+
 /* Disabled button state */
 .lq-actionBtn:disabled,
 .lq-nextBtn:disabled,
 .lq-iconAction:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
   pointer-events: none;
 }
@@ -693,7 +854,17 @@
   .lq-currentCard__actions {
     width: 100%;
   }
+  .lq-actionBtnRow {
+    flex-wrap: nowrap;
+  }
+  .lq-actionBtn {
+    flex: 1;
+    text-align: center;
+  }
   .lq-nextBtn {
     width: 100%;
+  }
+  .lq-actionConfirm__btns {
+    flex-direction: column;
   }
 }

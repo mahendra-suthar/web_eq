@@ -52,3 +52,6 @@ AVG_WAIT_TIME_PER_USER = int(os.getenv("AVG_WAIT_TIME_PER_USER", "5"))  # minute
 
 # Customer app base URL — used when encoding URLs into QR codes
 CUSTOMER_APP_URL = os.getenv("CUSTOMER_APP_URL", "http://localhost:5174")
+
+# Firebase Phone Auth — OTP delivery (no DLT required)
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")

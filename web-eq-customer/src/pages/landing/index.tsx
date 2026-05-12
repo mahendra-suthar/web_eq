@@ -404,7 +404,8 @@ export default function LandingPage() {
               <div className={`lp-today-cards${todayAppointments.length === 0 ? " lp-today-cards--empty" : ""}`}>
                 {todayAppointments.map((appt) => {
                   const isInProgress = appt.status === 2;
-                  const isActive = appt.status !== 1;
+                  const isScheduled = appt.status === 8;  // SCHEDULED — pre-active, not yet in queue
+                  const isActive = !isScheduled && appt.status !== 1;
                   const timeSummary = formatAppointmentTimeSummary(
                     appt.appointment_type,
                     appt.scheduled_start ?? null,
@@ -412,26 +413,34 @@ export default function LandingPage() {
                     appt.estimated_appointment_time ?? null
                   );
                   const delayMsg = formatDelayMessage(appt.delay_minutes ?? null);
-                  const hasStats = !isInProgress && (
-                    appt.position != null
-                    || (appt.estimated_wait_minutes != null && appt.estimated_wait_minutes > 0)
-                    || !!timeSummary
-                  );
+                  const hasStats = isScheduled
+                    ? !!timeSummary
+                    : !isInProgress && (
+                        appt.position != null
+                        || (appt.estimated_wait_minutes != null && appt.estimated_wait_minutes > 0)
+                        || !!timeSummary
+                      );
                   return (
                     <article
                       key={appt.queue_user_id}
                       className="lp-today-card reveal"
                       aria-label={`${appt.business_name} — token #${appt.token_number}`}
                     >
-                      <div className={`lp-today-urgency-bar${isActive ? " lp-today-urgency-bar--active" : ""}`} aria-hidden="true" />
+                      <div className={`lp-today-urgency-bar${isActive ? " lp-today-urgency-bar--active" : isScheduled ? " lp-today-urgency-bar--scheduled" : ""}`} aria-hidden="true" />
                       <div className="lp-today-card-body">
                         <div className="lp-today-card-header">
                           <div className="lp-today-card-info">
                             <span className="lp-today-business">{appt.business_name}</span>
                             <p className="lp-today-queue">{appt.queue_name}</p>
                           </div>
-                          <span className={`lp-today-status lp-today-status--${isInProgress ? "serving" : isActive ? "active" : "waiting"}`}>
-                            {isInProgress ? (t("youreBeingServed") || "You're being served") : isActive ? t("landing.statusInProgress") : t("landing.statusWaiting")}
+                          <span className={`lp-today-status lp-today-status--${isInProgress ? "serving" : isScheduled ? "scheduled" : isActive ? "active" : "waiting"}`}>
+                            {isInProgress
+                              ? (t("youreBeingServed") || "You're being served")
+                              : isScheduled
+                              ? (t("statusScheduled") || "Scheduled")
+                              : isActive
+                              ? t("landing.statusInProgress")
+                              : t("landing.statusWaiting")}
                           </span>
                         </div>
 

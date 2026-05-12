@@ -133,6 +133,29 @@ export class AuthService extends HttpClient {
     return res.token as Token;
   }
 
+  /**
+   * Exchange a Firebase Phone Auth ID token for an app session (customer flow).
+   * Called after Firebase confirms the OTP on the client side.
+   */
+  async verifyFirebasePhone(
+    firebaseToken: string,
+    clientType: string = "web"
+  ): Promise<LoginResponse> {
+    try {
+      return await this.post<LoginResponse>("/auth/firebase-verify-customer", {
+        firebase_token: firebaseToken,
+        user_type: "customer",
+        client_type: clientType,
+      });
+    } catch (error: any) {
+      error.customMessage =
+        error?.response?.data?.detail?.message ||
+        error?.response?.data?.detail ||
+        "Verification failed";
+      throw error;
+    }
+  }
+
   async logout(): Promise<void> {
     try {
       await this.post("/auth/logout", {});

@@ -2,17 +2,32 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import eqLogo from "../../assets/transparent_logo.png";
-import { AuthService } from "../../services/auth/auth.service";
+import { sendFirebaseOTP } from "../../services/auth/firebase-phone";
 import {
   PHONE_NUMBER_LENGTH,
   DEFAULT_COUNTRY_CODE,
   VALID_PHONE_START_DIGITS,
-  OTPErrorCode,
-  ProfileType,
 } from "../../utils/constants";
 import { saveBookingReturnState, getBookingReturnState } from "../../utils/bookingReturnState";
 import { EXTERNAL_LINKS } from "../../config/links";
 import "./send-otp.scss";
+
+function getFirebaseSendError(t: ReturnType<typeof useTranslation>["t"], err: unknown): string {
+  const code = (err as any)?.code as string | undefined;
+  switch (code) {
+    case "auth/invalid-phone-number":
+    case "auth/missing-phone-number":
+      return t("enterValidPhone");
+    case "auth/too-many-requests":
+      return t("rateLimitExceeded");
+    case "auth/network-request-failed":
+      return t("networkError");
+    case "auth/quota-exceeded":
+      return t("rateLimitExceeded");
+    default:
+      return (err as any)?.message || t("failedToSendOtp");
+  }
+}
 
 export default function SendOTPPage() {
   const { t } = useTranslation();
@@ -84,8 +99,7 @@ export default function SendOTPPage() {
     setLoading(true);
     setError("");
     try {
-      const authService = new AuthService();
-      await authService.sendOTP(DEFAULT_COUNTRY_CODE, digits, ProfileType.CUSTOMER.toLowerCase());
+      await sendFirebaseOTP(`${DEFAULT_COUNTRY_CODE}${digits}`);
       navigate("/verify-otp", {
         replace: true,
         state: {
@@ -100,23 +114,8 @@ export default function SendOTPPage() {
           rescheduleInitialDate: rescheduleInitialDate ?? undefined,
         },
       });
-    } catch (err: any) {
-      let msg = t("failedToSendOtp");
-      const code = err?.response?.data?.detail?.error_code;
-      if (code) {
-        switch (code) {
-          case OTPErrorCode.INVALID_PHONE_FORMAT: msg = t("invalidPhoneFormat"); break;
-          case OTPErrorCode.RATE_LIMIT_EXCEEDED:  msg = t("rateLimitExceeded");  break;
-          case OTPErrorCode.PHONE_ALREADY_EXIST:  msg = t("phoneAlreadyExist");  break;
-          case OTPErrorCode.PHONE_DOES_NOT_EXIST: msg = t("phoneDoesNotExist");  break;
-          default: msg = err?.response?.data?.detail?.message || err?.customMessage || t("failedToSendOtp");
-        }
-      } else if (err?.code === "ERR_NETWORK" || !err?.response) {
-        msg = t("networkError");
-      } else {
-        msg = err?.customMessage || err?.response?.data?.detail?.message || t("failedToSendOtp");
-      }
-      setError(msg);
+    } catch (err: unknown) {
+      setError(getFirebaseSendError(t, err));
     } finally {
       setLoading(false);
     }
@@ -207,7 +206,6 @@ export default function SendOTPPage() {
 
         </div>
       </div>
-
 
     </div>
   );

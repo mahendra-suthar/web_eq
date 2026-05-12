@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.middleware.permissions import get_current_user, require_roles
-from app.schemas.auth import OTPRequestInput, OTPRequestResponse, OTPVerifyInput, UserRegistrationInput, VerifyInvitationInput
+from app.schemas.auth import OTPRequestInput, OTPRequestResponse, OTPVerifyInput, UserRegistrationInput, VerifyInvitationInput, FirebaseVerifyInput
 from app.schemas.user import LoginResponse, UserData
 from app.schemas.profile import UnifiedProfileResponse, CustomerProfileResponse, BusinessProfileResponse, EmployeeDetailsResponse
 from app.controllers.auth_controller import AuthController
@@ -101,6 +101,16 @@ async def get_employee_profile_route(employee_id: UUID, db: Session = Depends(ge
 async def admin_verify_otp(payload: OTPVerifyInput, response: Response, request: Request, db: Session = Depends(get_db)):
     controller = AuthController(db)
     return await controller.admin_verify_otp(payload, response, request)
+
+
+@auth_router.post("/firebase-verify-customer", response_model=LoginResponse)
+async def firebase_verify_customer(payload: FirebaseVerifyInput, response: Response, request: Request, db: Session = Depends(get_db)):
+    return await AuthController(db).verify_firebase_phone_customer(payload, response, request)
+
+
+@auth_router.post("/firebase-verify-business", response_model=LoginResponse)
+async def firebase_verify_business(payload: FirebaseVerifyInput, response: Response, request: Request, db: Session = Depends(get_db)):
+    return await AuthController(db).verify_firebase_phone_business(payload, response, request)
 
 
 @auth_router.post("/token/refresh", response_model=LoginResponse)

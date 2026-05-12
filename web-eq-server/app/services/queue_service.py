@@ -25,8 +25,11 @@ from app.core.constants import (
     QUEUE_USER_REGISTERED,
     QUEUE_USER_IN_PROGRESS,
     QUEUE_USER_COMPLETED,
+    QUEUE_USER_FAILED,
     QUEUE_USER_CANCELLED,
     QUEUE_USER_EXPIRED,
+    QUEUE_USER_SCHEDULED,
+    SCHEDULED_ACTIVATION_LEAD_MINUTES,
     DEFAULT_SLOT_MINUTES,
     SLOT_DURATION_FLOOR,
     SLOT_DURATION_CEILING,
@@ -301,7 +304,7 @@ class QueueService:
                 .filter(
                     QueueUser.user_id == user_id,
                     QueueUser.queue_date >= today,
-                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_SCHEDULED]),
                 )
                 .order_by(QueueUser.queue_date.asc(), QueueUser.scheduled_start.asc())
                 .all()
@@ -366,24 +369,39 @@ class QueueService:
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def activate_due_scheduled_appointments(self, today: date, now_time: time) -> int:
-        """Transition scheduled appointments whose slot has started to IN_PROGRESS."""
+        """
+        Transition SCHEDULED appointments whose slot is within the activation window
+        into the live queue as REGISTERED. Sets enqueue_time = scheduled_start (IST)
+        so they sort correctly among walk-ins by their slot time.
+        Activates when scheduled_start <= now + SCHEDULED_ACTIVATION_LEAD_MINUTES.
+        """
         try:
-            updated = (
+            import pytz
+            tz = pytz.timezone("Asia/Kolkata")
+            from datetime import datetime as _dt, timedelta as _td
+            threshold_dt = _dt.combine(today, now_time) + _td(minutes=SCHEDULED_ACTIVATION_LEAD_MINUTES)
+            threshold_time = threshold_dt.time()
+
+            due = (
                 self.db.query(QueueUser)
                 .filter(
-                    QueueUser.is_scheduled == True,  # noqa: E712
-                    QueueUser.status == QUEUE_USER_REGISTERED,
+                    QueueUser.status == QUEUE_USER_SCHEDULED,
                     QueueUser.queue_date == today,
                     QueueUser.scheduled_start.isnot(None),
-                    QueueUser.scheduled_start <= now_time,
+                    QueueUser.scheduled_start <= threshold_time,
                 )
-                .update(
-                    {QueueUser.status: QUEUE_USER_IN_PROGRESS},
-                    synchronize_session=False,
-                )
+                .all()
             )
+            if not due:
+                return 0
+
+            for qu in due:
+                qu.status = QUEUE_USER_REGISTERED  # type: ignore[assignment]
+                slot_dt = _dt.combine(today, qu.scheduled_start)
+                qu.enqueue_time = tz.localize(slot_dt)  # type: ignore[assignment]
+
             self.db.commit()
-            return updated
+            return len(due)
         except Exception:
             self.db.rollback()
             logger.exception("Failed to activate_due_scheduled_appointments")
@@ -395,7 +413,7 @@ class QueueService:
                 self.db.query(QueueUser)
                 .filter(
                     QueueUser.queue_date < before_date,
-                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_SCHEDULED]),
                 )
                 .update(
                     {
@@ -494,13 +512,22 @@ class QueueService:
         """Create a QueueUser and its QueueUserService links. Commits the transaction. Returns the created QueueUser."""
         try:
             appt_type = appointment_type or APPOINTMENT_TYPE_QUEUE
-            now = now_app_tz() if is_walk_in else None
+            is_today_queue = (
+                appt_type == APPOINTMENT_TYPE_QUEUE
+                and queue_date == today_app_date()
+            )
+            now = now_app_tz() if (is_walk_in or is_today_queue) else None
+            initial_status = (
+                QUEUE_USER_SCHEDULED
+                if appt_type in (APPOINTMENT_TYPE_FIXED, APPOINTMENT_TYPE_APPROXIMATE)
+                else QUEUE_USER_REGISTERED
+            )
             queue_user = QueueUser(
                 user_id=user_id,
                 queue_id=queue_id,
                 queue_date=queue_date,
                 token_number=token_number,
-                status=QUEUE_USER_REGISTERED,
+                status=initial_status,
                 turn_time=turn_time,
                 notes=notes,
                 is_scheduled=is_scheduled,
@@ -511,8 +538,9 @@ class QueueService:
                 scheduled_start=scheduled_start,
                 scheduled_end=scheduled_end,
                 eta_minutes=eta_minutes,
+                enqueue_time=now,
                 is_checked_in=is_walk_in,
-                check_in_time=now,
+                check_in_time=now if is_walk_in else None,
             )
             self.db.add(queue_user)
             self.db.flush()
@@ -1022,7 +1050,7 @@ class QueueService:
     def get_existing_same_day_booking(
         self, user_id: UUID, queue_id: UUID, queue_date: date
     ) -> Optional[QueueUser]:
-        """Return existing queue user if already in this queue for this date (registered or in-progress)."""
+        """Return existing queue user if already active in this queue for this date (waiting, in-progress, or scheduled)."""
         try:
             return (
                 self.db.query(QueueUser)
@@ -1030,7 +1058,7 @@ class QueueService:
                     QueueUser.user_id == user_id,
                     QueueUser.queue_id == queue_id,
                     QueueUser.queue_date == queue_date,
-                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_SCHEDULED]),
                 )
                 .first()
             )
@@ -1116,6 +1144,12 @@ class QueueService:
                 .filter(
                     QueueUser.queue_id == queue_id,
                     QueueUser.queue_date == queue_date,
+                    QueueUser.status.in_([
+                        QUEUE_USER_REGISTERED,
+                        QUEUE_USER_IN_PROGRESS,
+                        QUEUE_USER_COMPLETED,
+                        QUEUE_USER_SCHEDULED,
+                    ]),
                 )
                 .all()
             )
@@ -1191,6 +1225,32 @@ class QueueService:
             self.db.flush()
         except Exception:
             logger.exception("Failed to mark_queue_user_in_progress (queue_user_id=%s)", queue_user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    def mark_queue_user_failed(self, queue_user_id: UUID, dequeue_time: datetime) -> None:
+        try:
+            self.db.query(QueueUser).filter(QueueUser.uuid == queue_user_id).update(
+                {QueueUser.status: QUEUE_USER_FAILED, QueueUser.dequeue_time: dequeue_time},
+                synchronize_session=False,
+            )
+            self.db.flush()
+        except Exception:
+            logger.exception("Failed to mark_queue_user_failed (queue_user_id=%s)", queue_user_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    def mark_queue_user_skipped(self, queue_user_id: UUID, now: datetime) -> None:
+        try:
+            self.db.query(QueueUser).filter(QueueUser.uuid == queue_user_id).update(
+                {
+                    QueueUser.status: QUEUE_USER_REGISTERED,
+                    QueueUser.effective_join_time: now,
+                    QueueUser.enqueue_time: now,
+                },
+                synchronize_session=False,
+            )
+            self.db.flush()
+        except Exception:
+            logger.exception("Failed to mark_queue_user_skipped (queue_user_id=%s)", queue_user_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def add_delay_to_later_approx_bookings(
