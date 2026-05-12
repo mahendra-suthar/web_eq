@@ -89,7 +89,6 @@ services:
   - type: web
     name: eq-customer-prod
     runtime: static
-    region: oregon
     branch: main
     rootDir: web-eq-customer
     buildCommand: npm ci && npm run build
@@ -117,7 +116,6 @@ services:
   - type: web
     name: eq-admin-prod
     runtime: static
-    region: oregon
     branch: main
     rootDir: web-eq-client
     buildCommand: npm ci && npm run build
