@@ -1,142 +1,74 @@
-# render.yaml — EaseQueue Production Blueprint
-#
-# HOW TO DEPLOY:
-#   1. Merge this file to the `main` branch
-#   2. Render Dashboard → New → Blueprint Instance
-#      → connect repo (mahendra-suthar/web_eq) → branch: main → Deploy
-#
-# CUSTOM DOMAINS (set manually in each service after first deploy):
-#   eq-api-prod      → api.easequeue.com
-#   eq-customer-prod → app.easequeue.com
-#   eq-admin-prod    → admin.easequeue.com
-#
-# NOTE: www.easequeue.com is your existing marketing website — leave it as-is.
-#
-# DNS RECORDS (add at your domain registrar):
-#   Type   Name     Value
-#   CNAME  api      <shown in Render dashboard for eq-api-prod>
-#   CNAME  app      <shown in Render dashboard for eq-customer-prod>
-#   CNAME  admin    <shown in Render dashboard for eq-admin-prod>
-
 databases:
-  - name: eq-db-prod
-    databaseName: eq_prod_db
-    user: eq_prod
-    plan: starter
-    region: oregon
+  - name: web-eq-db
+    databaseName: web_eq_db
+    plan: free
 
 services:
 
-  # ── FastAPI Backend ─────────────────────────────────────────────────────────
+  # =========================
+  # FastAPI Backend
+  # =========================
   - type: web
-    name: eq-api-prod
+    name: web-eq-backend
     runtime: python
-    region: oregon
-    plan: starter
-    branch: main
     rootDir: web-eq-server
-    # autoDeploy off — production deploys should be intentional (trigger manually in dashboard)
-    autoDeploy: false
-    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
-    # gunicorn manages the process; 1 worker keeps APScheduler + WebSocket in-memory state safe
-    startCommand: gunicorn main:app -w 1 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 120 --graceful-timeout 30
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2
     healthCheckPath: /healthz
-    # Only rebuild when server code or requirements change
-    buildFilter:
-      paths:
-        - web-eq-server/**
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11.9"
+        value: 3.11.9
       - key: DATABASE_URL
         fromDatabase:
-          name: eq-db-prod
+          name: web-eq-db
           property: connectionString
       - key: SECRET_KEY
         generateValue: true
-      - key: ALGORITHM
-        value: "HS256"
-      - key: ACCESS_TOKEN_EXPIRE_MINUTES
-        value: "720"
-      - key: WEB_TOKEN_EXPIRE_MINUTES
-        value: "60"
+      - key: REDIS_URL
+        sync: false
       - key: CORS_ORIGINS
-        value: "https://app.easequeue.com,https://admin.easequeue.com"
-      - key: CUSTOMER_APP_URL
-        value: "https://app.easequeue.com"
-      - key: ISSECURE
-        value: "True"
-      - key: SAMESITE
-        value: "none"
-      - key: OTP_EXPIRY_MINUTES
-        value: "5"
-      - key: RATE_LIMIT_PER_HOUR
-        value: "5"
-      - key: DEFAULT_COUNTRY_CODE
-        value: "+91"
-      - key: MAX_QUEUE_SIZE
-        value: "50"
-      - key: AVG_WAIT_TIME_PER_USER
-        value: "5"
-      - key: DB_ECHO_LOGS
-        value: "False"
-      # REDIS_URL: omitted — app falls back to in-memory gracefully at this scale
-      # DEFAULT_OTP: intentionally omitted — never set in production
-      - key: FIREBASE_PROJECT_ID
         sync: false
 
-  # ── Customer App → app.easequeue.com ───────────────────────────────────────
+  # =========================
+  # Admin Frontend
+  # =========================
   - type: web
-    name: eq-customer-prod
+    name: web-eq-admin
     runtime: static
-    region: oregon
-    branch: main
-    rootDir: web-eq-customer
-    buildCommand: npm ci && npm run build
-    staticPublishPath: dist
-    buildFilter:
-      paths:
-        - web-eq-customer/**
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      - key: NODE_VERSION
-        value: "20.11.1"
-      - key: VITE_API_URL
-        value: "https://api.easequeue.com/api"
-      - key: VITE_FIREBASE_API_KEY
-        sync: false
-      - key: VITE_FIREBASE_AUTH_DOMAIN
-        sync: false
-      - key: VITE_FIREBASE_PROJECT_ID
-        sync: false
-
-  # ── Admin / Business Panel → admin.easequeue.com ────────────────────────────
-  - type: web
-    name: eq-admin-prod
-    runtime: static
-    region: oregon
-    branch: main
     rootDir: web-eq-client
-    buildCommand: npm ci && npm run build
+    buildCommand: |
+      npm ci
+      npm run build
     staticPublishPath: build
-    buildFilter:
-      paths:
-        - web-eq-client/**
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
+      - key: VITE_API_URL
+        sync: false
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
+
+  # =========================
+  # Customer Frontend
+  # =========================
+  - type: web
+    name: web-eq-customer
+    runtime: static
+    rootDir: web-eq-customer
+    buildCommand: |
+      npm ci
+      npm run build
+    staticPublishPath: dist
     envVars:
       - key: NODE_VERSION
-        value: "20.11.1"
+        value: 20.11.1
       - key: VITE_API_URL
-        value: "https://api.easequeue.com/api"
-      - key: VITE_FIREBASE_API_KEY
         sync: false
-      - key: VITE_FIREBASE_AUTH_DOMAIN
-        sync: false
-      - key: VITE_FIREBASE_PROJECT_ID
-        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
