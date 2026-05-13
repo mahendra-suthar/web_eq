@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '../../utils/userStore';
-import { ProfileType, QueueStatus, QueueUserStatus } from '../../utils/constants';
+import { ProfileType, QueueStatus, QueueUserStatus, BusinessStatus } from '../../utils/constants';
 import {
   QueueService, QueueData, LiveQueueData, QueueUserData,
 } from '../../services/queue/queue.service';
@@ -81,6 +81,34 @@ function getQueueStatusCls(status: number | null | undefined): string {
   if (status === QueueStatus.STOPPED)    return 'stopped';
   if (status === QueueStatus.REGISTERED) return 'registered';
   return '';
+}
+
+function approvalBannerVariant(status: number): string {
+  if (status === BusinessStatus.SUSPENDED) return 'suspended';
+  if (status === BusinessStatus.TERMINATED) return 'terminated';
+  return 'pending';
+}
+
+function approvalBannerIcon(status: number): string {
+  if (status === BusinessStatus.SUSPENDED) return '⚠️';
+  if (status === BusinessStatus.TERMINATED) return '🚫';
+  return '⏳';
+}
+
+function approvalBannerTitle(status: number): string {
+  if (status === BusinessStatus.SUSPENDED) return 'Account Suspended';
+  if (status === BusinessStatus.TERMINATED) return 'Account Terminated';
+  return 'Pending Approval';
+}
+
+function approvalBannerBody(status: number): string {
+  if (status === BusinessStatus.SUSPENDED)
+    return 'Your business has been suspended. Please contact support.';
+  if (status === BusinessStatus.TERMINATED)
+    return 'This business account has been terminated.';
+  if (status === BusinessStatus.DRAFT)
+    return 'Complete your business registration to go live.';
+  return 'Your business is under review. Customers cannot find you until approved by the admin.';
 }
 
 function isBusinessOpenToday(profile: UnifiedProfileResponse | null): boolean | null {
@@ -244,6 +272,8 @@ const Dashboard = () => {
   );
 
   const isOpen = isBusinessOpenToday(profile);
+  const bizStatus = profile?.business?.status ?? null;
+  const showApprovalBanner = bizStatus !== null && bizStatus !== BusinessStatus.ACTIVE;
 
   // Queue assigned to the owner as a self-employee
   const ownerQueueId = profile?.employee?.queue_id ?? null;
@@ -387,6 +417,17 @@ const Dashboard = () => {
     return (
       <div className="dashboard-page">
         <RefreshBar />
+
+        {/* Approval status banner */}
+        {showApprovalBanner && bizStatus !== null && (
+          <div className={`approval-status-banner approval-status-banner--${approvalBannerVariant(bizStatus)}`}>
+            <span className="approval-status-banner__icon">{approvalBannerIcon(bizStatus)}</span>
+            <div>
+              <strong>{approvalBannerTitle(bizStatus)}</strong>
+              <p>{approvalBannerBody(bizStatus)}</p>
+            </div>
+          </div>
+        )}
 
         {/* Business open / closed banner */}
         {isOpen !== null && (

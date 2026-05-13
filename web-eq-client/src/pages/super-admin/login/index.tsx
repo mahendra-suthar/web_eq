@@ -4,7 +4,7 @@ import { SuperAdminService } from "../../../services/super-admin/super-admin.ser
 import { ProfileService } from "../../../services/profile/profile.service";
 import { useUserStore } from "../../../utils/userStore";
 import { ROUTERS_PATH } from "../../../routers/routers";
-import { DEFAULT_COUNTRY_CODE, PHONE_LENGTH, OTP_LENGTH, VALID_PHONE_START } from "../../../utils/constants";
+import { DEFAULT_COUNTRY_CODE, PHONE_LENGTH, ADMIN_OTP_LENGTH, VALID_PHONE_START } from "../../../utils/constants";
 import "./login.scss";
 
 type Step = "phone" | "otp";
@@ -29,13 +29,13 @@ const SuperAdminLogin = () => {
   };
 
   const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const digits = e.target.value.replace(/\D/g, "").slice(0, OTP_LENGTH);
+    const digits = e.target.value.replace(/\D/g, "").slice(0, ADMIN_OTP_LENGTH);
     setOtp(digits);
     if (error) setError("");
   };
 
   const isPhoneValid = phone.length === PHONE_LENGTH && VALID_PHONE_START.test(phone);
-  const isOtpValid = otp.length === OTP_LENGTH;
+  const isOtpValid = otp.length === ADMIN_OTP_LENGTH;
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +49,13 @@ const SuperAdminLogin = () => {
       await adminService.sendOtp(DEFAULT_COUNTRY_CODE, phone);
       setStep("otp");
     } catch (err: any) {
-      setError(err?.response?.data?.detail?.message || err?.response?.data?.detail || "Failed to send OTP.");
+      const detail = err?.response?.data?.detail;
+      const msg =
+        (Array.isArray(detail) ? detail[0]?.msg : null) ||
+        detail?.message ||
+        (typeof detail === "string" ? detail : null) ||
+        "Failed to send OTP.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -58,7 +64,7 @@ const SuperAdminLogin = () => {
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isOtpValid) {
-      setError("Enter the 5-digit OTP.");
+      setError(`Enter the ${ADMIN_OTP_LENGTH}-digit OTP.`);
       return;
     }
     setLoading(true);
@@ -72,7 +78,12 @@ const SuperAdminLogin = () => {
       navigate(ROUTERS_PATH.SUPER_ADMIN, { replace: true });
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
-      setError(detail?.message || detail || "Invalid OTP or no admin access.");
+      const msg =
+        (Array.isArray(detail) ? detail[0]?.msg : null) ||
+        detail?.message ||
+        (typeof detail === "string" ? detail : null) ||
+        "Invalid OTP or no admin access.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -123,10 +134,10 @@ const SuperAdminLogin = () => {
               type="text"
               inputMode="numeric"
               className="sa-input sa-input--otp"
-              placeholder="5-digit OTP"
+              placeholder={`${ADMIN_OTP_LENGTH}-digit OTP`}
               value={otp}
               onChange={handleOtpChange}
-              maxLength={OTP_LENGTH}
+              maxLength={ADMIN_OTP_LENGTH}
               autoFocus
               autoComplete="one-time-code"
             />

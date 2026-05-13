@@ -3,12 +3,13 @@ from typing import Any, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.category import Category
 from app.models.service import Service
 from app.models.business import Business
+from app.core.constants import BUSINESS_ACTIVE
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +18,56 @@ class CategoryService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all_categories(self) -> List[Category]:
+    def get_all_categories(self) -> List[Any]:
         try:
-            return self.db.query(Category).all()
+            direct_biz_sq = (
+                self.db.query(
+                    Business.category_id.label("cat_id"),
+                    func.count(Business.uuid).label("biz_count"),
+                )
+                .filter(Business.category_id.isnot(None))
+                .filter(Business.status == BUSINESS_ACTIVE)
+                .group_by(Business.category_id)
+                .subquery()
+            )
+
+            child_biz_sq = (
+                self.db.query(
+                    Category.parent_category_id.label("cat_id"),
+                    func.count(Business.uuid).label("biz_count"),
+                )
+                .join(Business, Business.category_id == Category.uuid)
+                .filter(Category.parent_category_id.isnot(None))
+                .filter(Business.status == BUSINESS_ACTIVE)
+                .group_by(Category.parent_category_id)
+                .subquery()
+            )
+
+            has_businesses_col = case(
+                (
+                    or_(
+                        func.coalesce(direct_biz_sq.c.biz_count, 0) > 0,
+                        func.coalesce(child_biz_sq.c.biz_count, 0) > 0,
+                    ),
+                    True,
+                ),
+                else_=False,
+            ).label("has_businesses")
+
+            return (
+                self.db.query(
+                    Category.uuid,
+                    Category.name,
+                    Category.description,
+                    Category.image,
+                    Category.parent_category_id,
+                    has_businesses_col,
+                )
+                .outerjoin(direct_biz_sq, direct_biz_sq.c.cat_id == Category.uuid)
+                .outerjoin(child_biz_sq, child_biz_sq.c.cat_id == Category.uuid)
+                .order_by(Category.name)
+                .all()
+            )
         except Exception:
             logger.exception("Failed to get_all_categories")
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
@@ -52,6 +100,40 @@ class CategoryService:
                 .subquery()
             )
 
+            direct_biz_sq = (
+                self.db.query(
+                    Business.category_id.label("cat_id"),
+                    func.count(Business.uuid).label("biz_count"),
+                )
+                .filter(Business.category_id.isnot(None))
+                .filter(Business.status == BUSINESS_ACTIVE)
+                .group_by(Business.category_id)
+                .subquery()
+            )
+
+            child_biz_sq = (
+                self.db.query(
+                    Category.parent_category_id.label("cat_id"),
+                    func.count(Business.uuid).label("biz_count"),
+                )
+                .join(Business, Business.category_id == Category.uuid)
+                .filter(Category.parent_category_id.isnot(None))
+                .filter(Business.status == BUSINESS_ACTIVE)
+                .group_by(Category.parent_category_id)
+                .subquery()
+            )
+
+            has_businesses_col = case(
+                (
+                    or_(
+                        func.coalesce(direct_biz_sq.c.biz_count, 0) > 0,
+                        func.coalesce(child_biz_sq.c.biz_count, 0) > 0,
+                    ),
+                    True,
+                ),
+                else_=False,
+            ).label("has_businesses")
+
             q = (
                 self.db.query(
                     Category.uuid,
@@ -61,9 +143,12 @@ class CategoryService:
                     Category.parent_category_id,
                     func.coalesce(sub_count_sq.c.sub_count, 0).label("subcategories_count"),
                     func.coalesce(svc_count_sq.c.svc_count, 0).label("services_count"),
+                    has_businesses_col,
                 )
                 .outerjoin(sub_count_sq, sub_count_sq.c.parent_id == Category.uuid)
                 .outerjoin(svc_count_sq, svc_count_sq.c.cat_id == Category.uuid)
+                .outerjoin(direct_biz_sq, direct_biz_sq.c.cat_id == Category.uuid)
+                .outerjoin(child_biz_sq, child_biz_sq.c.cat_id == Category.uuid)
             )
 
             if parent_uuid is not None:

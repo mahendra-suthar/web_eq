@@ -122,7 +122,8 @@ export default function LandingPage() {
       const svc = new CategoryService();
       const data = await svc.getCategoryTree();
       setCategoryRoots(data);
-      if (data.length > 0) setActiveSuperTab(data[0].uuid);
+      const defaultTab = data.find((c) => c.has_businesses) ?? data[0];
+      if (defaultTab) setActiveSuperTab(defaultTab.uuid);
     } catch (err) {
       if (import.meta.env.DEV) console.error("Failed to fetch category tree:", err);
       setParentsError(getApiErrorMessage(err, "Failed to load categories. Please try again later."));
@@ -217,6 +218,7 @@ export default function LandingPage() {
       description: c.description,
       image: c.image,
       service_count: c.services_count,
+      has_businesses: c.has_businesses,
     }));
   }, [categoryRoots, activeSuperTab]);
 
@@ -597,28 +599,39 @@ export default function LandingPage() {
                 role="tabpanel"
               >
                 {displayedSubcats.length > 0 ? (
-                  displayedSubcats.map((sub, i) => (
-                    <button
-                      key={sub.uuid}
-                      className={`lp-subcat-card lp-subcat-card--${activeTabIdx % 4} reveal${i % 4 === 1 ? " reveal-delay-1" : i % 4 === 2 ? " reveal-delay-2" : i % 4 === 3 ? " reveal-delay-3" : ""}`}
-                      onClick={() => navigate(`/categories/${sub.uuid}`, { state: { category: sub } })}
-                      aria-label={sub.name}
-                    >
-                      <div className="lp-subcat-card__icon" aria-hidden="true">{getCategoryEmoji(sub.name)}</div>
-                      <div className="lp-subcat-card__name">{sub.name}</div>
-                      {sub.description && <div className="lp-subcat-card__desc">{sub.description}</div>}
-                      <div className="lp-subcat-card__footer">
-                        <span className="lp-subcat-card__count">
-                          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                            <polyline points="9 11 12 14 22 4" />
-                            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-                          </svg>
-                          {sub.service_count} {t("landing.services")}
-                        </span>
-                        <span className="lp-subcat-card__arrow" aria-hidden="true">→</span>
-                      </div>
-                    </button>
-                  ))
+                  displayedSubcats.map((sub, i) => {
+                    const disabled = !sub.has_businesses;
+                    return (
+                      <button
+                        key={sub.uuid}
+                        aria-label={sub.name}
+                        aria-disabled={disabled}
+                        disabled={disabled}
+                        className={`lp-subcat-card lp-subcat-card--${activeTabIdx % 4}${disabled ? " lp-subcat-card--disabled" : ""} reveal${i % 4 === 1 ? " reveal-delay-1" : i % 4 === 2 ? " reveal-delay-2" : i % 4 === 3 ? " reveal-delay-3" : ""}`}
+                        onClick={() => !disabled && navigate(`/categories/${sub.uuid}`, { state: { category: sub } })}
+                      >
+                        <div className="lp-subcat-card__icon" aria-hidden="true">{getCategoryEmoji(sub.name)}</div>
+                        <div className="lp-subcat-card__name">{sub.name}</div>
+                        {sub.description && <div className="lp-subcat-card__desc">{sub.description}</div>}
+                        <div className="lp-subcat-card__footer">
+                          {disabled ? (
+                            <span className="lp-subcat-card__coming-soon">{t("landing.comingSoon")}</span>
+                          ) : (
+                            <>
+                              <span className="lp-subcat-card__count">
+                                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                  <polyline points="9 11 12 14 22 4" />
+                                  <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+                                </svg>
+                                {sub.service_count} {t("landing.services")}
+                              </span>
+                              <span className="lp-subcat-card__arrow" aria-hidden="true">→</span>
+                            </>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
                 ) : (
                   searchQuery
                     ? <EmptyState title={t("landing.noResultsFor", { query: searchQuery })} hint={t("landing.tryDifferentSearch")} className="lp-empty-full" />

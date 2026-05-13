@@ -262,6 +262,7 @@
     "browseSub": "Pick a category to see businesses and services tailored to what you need.",
     "loadingCategories": "Loading categories…",
     "noCategories": "No categories available.",
+    "comingSoon": "Coming soon",
     "noResultsFor": "No results for \"{{query}}\"",
     "tryDifferentSearch": "Try a different search term.",
     "services": "services",

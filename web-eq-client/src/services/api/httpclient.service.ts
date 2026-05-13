@@ -8,6 +8,8 @@ import axios, {
 import { getApiUrl } from '../../configs/config';
 import { useUserStore } from '../../utils/userStore';
 
+// Shared across all HttpClient instances — concurrent 401s reuse one refresh call.
+let refreshPromise: Promise<string | null> | null = null;
 
 class HttpClient {
   private instance: AxiosInstance;
@@ -43,21 +45,54 @@ class HttpClient {
 
     this.instance.interceptors.response.use(
       this.handleSuccess,
-      (error: any) => {
+      async (error: any) => {
         const status = error?.response?.status;
-        const code = error?.code;
+        const originalRequest = error?.config as any;
+        const isRefreshUrl = String(originalRequest?.url ?? "").includes("/auth/token/refresh-business");
 
-        if (status === 401 || status === 403) {
+        // Silent refresh: attempt once on 401 (not 403 — wrong role, refresh won't help).
+        if (
+          status === 401 &&
+          originalRequest &&
+          !originalRequest._refreshAttempted &&
+          !isRefreshUrl
+        ) {
+          originalRequest._refreshAttempted = true;
+
+          if (!refreshPromise) {
+            refreshPromise = axios
+              .post(`${this.baseURL}/auth/token/refresh-business`, {}, { withCredentials: true })
+              .then((res) => (res.data?.token?.access_token as string) ?? null)
+              .catch(() => null)
+              .finally(() => { refreshPromise = null; });
+          }
+
+          const newToken = await refreshPromise;
+          if (newToken) {
+            useUserStore.getState().setToken(newToken);
+            originalRequest.headers = {
+              ...originalRequest.headers,
+              Authorization: `Bearer ${newToken}`,
+            };
+            return await this.instance(originalRequest);
+          }
+
           window.dispatchEvent(new Event("auth:unauthorized"));
-        } else if (code === "ERR_NETWORK") {
+          return Promise.reject(error);
+        }
+
+        // 403 = wrong role; refresh won't help — log out immediately.
+        // ERR_NETWORK is a connectivity issue, not an auth failure — do not log out.
+        if (status === 403 && !isRefreshUrl) {
           window.dispatchEvent(new Event("auth:unauthorized"));
         }
+
         return Promise.reject(error);
       }
     );
   }
 
-  private handleRequestConfig<T>(config: InternalAxiosRequestConfig<any>): InternalAxiosRequestConfig<any> {
+  private handleRequestConfig(config: InternalAxiosRequestConfig<any>): InternalAxiosRequestConfig<any> {
     config.withCredentials = true; // Ensure cookies are sent with the request
     return config;
   }
