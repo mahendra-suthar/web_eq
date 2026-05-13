@@ -1,5 +1,6 @@
 import { Suspense, lazy } from "react";
 import type { ReactElement } from "react";
+import { useSessionRestore } from "./hooks/useSessionRestore";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { RouterConstant } from "./routers/index";
 import { PrivateRoute } from "./routers/privateRoute";
@@ -50,7 +51,9 @@ const withSuspense = (el: ReactElement) => (
   <Suspense fallback={<PageSpinner />}>{el}</Suspense>
 );
 
-const App = () => (
+const App = () => {
+  useSessionRestore();
+  return (
   <BrowserRouter>
     <AuthFailureHandler />
     <Routes>
@@ -98,6 +101,7 @@ const App = () => (
       <Route path="*" element={<Navigate to={ROUTERS_PATH.ROOT_PATH} replace />} />
     </Routes>
   </BrowserRouter>
-);
+  );
+};
 
 export default App;

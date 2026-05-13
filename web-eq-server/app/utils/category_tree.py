@@ -19,6 +19,7 @@ def _row_to_node(row: Any) -> CategoryTreeNode:
         parent_category_id=str(row.parent_category_id) if row.parent_category_id else None,
         subcategories_count=int(row.subcategories_count or 0),
         services_count=int(row.services_count or 0),
+        has_businesses=bool(row.has_businesses or False),
         children=[],
     )
 

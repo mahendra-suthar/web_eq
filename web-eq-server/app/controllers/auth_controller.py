@@ -231,6 +231,73 @@ class AuthController:
                 detail={"message": "An unexpected error occurred. Please try again."},
             )
 
+    async def refresh_business_token(self, request: Request, response: Response) -> LoginResponse:
+        "Silent token refresh for the business/admin web app."
+        try:
+            raw_token = request.cookies.get("access_token")
+            if not raw_token:
+                raise HTTPException(
+                    status_code=401,
+                    detail={"message": "No session found. Please log in."},
+                )
+
+            try:
+                payload = jose_jwt.decode(
+                    raw_token,
+                    SECRET_KEY,
+                    algorithms=[ALGORITHM],
+                    options={"verify_exp": False},
+                )
+            except JWTError:
+                raise HTTPException(
+                    status_code=401,
+                    detail={"message": "Invalid session. Please log in again."},
+                )
+
+            iat = payload.get("iat")
+            if iat:
+                issued_at = datetime.fromtimestamp(iat, tz=timezone.utc)
+                if datetime.now(timezone.utc) - issued_at > timedelta(hours=24):
+                    raise HTTPException(
+                        status_code=401,
+                        detail={"message": "Session expired. Please log in again."},
+                    )
+
+            user_id = payload.get("sub")
+            user_type = payload.get("user_type")
+
+            if not user_id or user_type not in ("BUSINESS", "EMPLOYEE", "ADMIN"):
+                raise HTTPException(
+                    status_code=401,
+                    detail={"message": "Invalid session. Please log in again."},
+                )
+
+            try:
+                user = self.user_service.get_user_by_id(UUID(user_id))
+            except ValueError:
+                raise HTTPException(
+                    status_code=401,
+                    detail={"message": "Invalid session. Please log in again."},
+                )
+
+            if not user:
+                raise HTTPException(
+                    status_code=401,
+                    detail={"message": "User not found. Please log in again."},
+                )
+
+            return await self.auth_service.generate_auth_response(
+                user, response, "web", user_type=user_type, profile_type=user_type
+            )
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to refresh_business_token")
+            raise HTTPException(
+                status_code=500,
+                detail={"message": "An unexpected error occurred. Please try again."},
+            )
+
     def get_or_create_user_for_business_flow(
         self, country_code: str, phone_number: str, client_type: Optional[str]
     ) -> User:

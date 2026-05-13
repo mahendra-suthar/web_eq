@@ -14,8 +14,18 @@ class CategoryController:
         self.service = CategoryService(db)
 
     def get_all_categories(self) -> List[CategoryData]:
-        categories = self.service.get_all_categories()
-        return [CategoryData.from_category(cat) for cat in categories]
+        rows = self.service.get_all_categories()
+        return [
+            CategoryData(
+                uuid=str(row.uuid),
+                name=str(row.name),
+                description=str(row.description) if row.description is not None else None,
+                image=str(row.image) if row.image is not None else None,
+                parent_category_id=str(row.parent_category_id) if row.parent_category_id is not None else None,
+                has_businesses=bool(row.has_businesses),
+            )
+            for row in rows
+        ]
 
     def get_categories_tree(self, parent_uuid: Optional[UUID] = None) -> List[CategoryTreeNode]:
         rows = self.service.get_categories_tree_rows(parent_uuid)

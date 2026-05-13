@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import Optional, cast, List
-from pydantic import BaseModel, ConfigDict, Field, RootModel
-from app.models.category import Category
+from typing import Optional, List
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CategoryTreeNode(BaseModel):
@@ -15,6 +14,7 @@ class CategoryTreeNode(BaseModel):
     parent_category_id: Optional[str] = None
     subcategories_count: int = 0
     services_count: int = 0
+    has_businesses: bool = False
     children: List[CategoryTreeNode] = Field(default_factory=list)
 
 
@@ -29,17 +29,4 @@ class CategoryData(BaseModel):
     description: Optional[str] = None
     image: Optional[str] = None
     parent_category_id: Optional[str] = None
-
-    @classmethod
-    def from_category(cls, category: Category) -> "CategoryData":
-        description = cast(Optional[str], getattr(category, "description", None))
-        image = cast(Optional[str], getattr(category, "image", None))
-        parent_category_id = cast(Optional[object], getattr(category, "parent_category_id", None))
-
-        return cls(
-            uuid=str(category.uuid),
-            name=str(category.name),
-            description=str(description) if description is not None else None,
-            image=str(image) if image is not None else None,
-            parent_category_id=str(parent_category_id) if parent_category_id is not None else None,
-        )
+    has_businesses: bool = False
