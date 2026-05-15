@@ -1216,7 +1216,7 @@ class QueueController:
                 queue_waits = waits_by_queue.get(str(qu.queue_id), {})
                 wd = queue_waits.get("wait_data", {}).get(str(qu.uuid), {})
                 expected_at_ts = wd.get("expected_at_ts")
-                dynamic_appt_time = wd.get("estimated_appointment_time") or metrics.get("appointment_time")
+                dynamic_appt_time = metrics.get("appointment_time") or wd.get("estimated_appointment_time")
                 live_wait = wd.get("estimated_wait_minutes")
                 if live_wait is not None:
                     metrics = {**metrics, "wait_minutes": live_wait}
