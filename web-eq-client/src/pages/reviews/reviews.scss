@@ -1,0 +1,216 @@
+@import "../../styles/admin-shared";
+
+.reviews-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+// ── Summary card ──────────────────────────────────────────────────────────────
+.rv-summary {
+  padding: 24px 28px;
+}
+
+.rv-summary-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.rv-summary-num {
+  font-size: 48px;
+  font-weight: 700;
+  color: $sh-teal;
+  line-height: 1;
+}
+
+.rv-summary-label {
+  font-size: 14px;
+  color: $sh-slate-500;
+}
+
+// ── Stars ─────────────────────────────────────────────────────────────────────
+.rv-stars {
+  display: flex;
+  gap: 2px;
+}
+
+.rv-star {
+  font-size: 18px;
+  color: $sh-slate-300;
+}
+
+.rv-star--filled {
+  color: #f59e0b;
+}
+
+// ── Review list ───────────────────────────────────────────────────────────────
+.rv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+// ── Review card ───────────────────────────────────────────────────────────────
+.rv-card {
+  border: 1px solid $sh-slate-200;
+  border-radius: $sh-radius-md;
+  padding: 16px;
+  background: $sh-slate-50;
+  transition: background 0.15s;
+
+  &:hover {
+    background: $sh-teal-light;
+    border-color: $sh-teal-mid;
+  }
+}
+
+.rv-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.rv-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.rv-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: $sh-teal;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rv-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rv-user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: $sh-slate-800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rv-business-tag {
+  font-size: 11px;
+  color: $sh-teal;
+  font-weight: 500;
+  background: $sh-teal-light;
+  border-radius: $sh-radius-sm;
+  padding: 1px 6px;
+  display: inline-block;
+}
+
+.rv-date {
+  font-size: 11px;
+  color: $sh-slate-400;
+}
+
+.rv-rating-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.rv-rating-num {
+  font-size: 13px;
+  font-weight: 600;
+  color: $sh-slate-600;
+}
+
+.rv-comment {
+  font-size: 13px;
+  color: $sh-slate-600;
+  line-height: 1.55;
+  margin: 0;
+  white-space: pre-line;
+}
+
+// ── Error ─────────────────────────────────────────────────────────────────────
+.rv-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 16px;
+  padding: 12px 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: $sh-radius-md;
+  font-size: 13px;
+  color: #b91c1c;
+}
+
+.rv-retry-btn {
+  padding: 6px 14px;
+  border-radius: $sh-radius-sm;
+  border: 1px solid #fca5a5;
+  background: transparent;
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    background: #fee2e2;
+  }
+}
+
+// ── Skeleton shimmer ──────────────────────────────────────────────────────────
+.rv-card--skeleton {
+  pointer-events: none;
+  animation: none;
+}
+
+.rv-sk {
+  border-radius: $sh-radius-sm;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 105, 92, 0.06) 25%,
+    rgba(0, 105, 92, 0.13) 50%,
+    rgba(0, 105, 92, 0.06) 75%
+  );
+  background-size: 800px 100%;
+  animation: admin-shimmer 1.4s ease-in-out infinite;
+
+  &--name    { height: 14px; width: 120px; }
+  &--date    { height: 11px; width: 70px; margin-top: 4px; }
+  &--stars   { height: 18px; width: 90px; }
+  &--comment { height: 12px; width: 80%; margin-top: 10px; }
+}
+
+// rv-avatar skeleton — override colour
+.rv-avatar.rv-sk {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 105, 92, 0.1) 25%,
+    rgba(0, 105, 92, 0.2) 50%,
+    rgba(0, 105, 92, 0.1) 75%
+  );
+  background-size: 800px 100%;
+  animation: admin-shimmer 1.4s ease-in-out infinite;
+  color: transparent;
+}

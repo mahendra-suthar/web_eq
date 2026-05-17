@@ -17,12 +17,14 @@ export const Permission = {
   VIEW_LIVE_QUEUE: "VIEW_LIVE_QUEUE",
   VIEW_BUSINESS_PROFILE: "VIEW_BUSINESS_PROFILE",
   VIEW_EMPLOYEE_PROFILE: "VIEW_EMPLOYEE_PROFILE",
+  VIEW_REVIEWS: "VIEW_REVIEWS",
   // Super Admin panel
   VIEW_SUPER_ADMIN: "VIEW_SUPER_ADMIN",
   MANAGE_CATEGORIES: "MANAGE_CATEGORIES",
   MANAGE_SERVICES: "MANAGE_SERVICES",
   MANAGE_BUSINESSES: "MANAGE_BUSINESSES",
   MANAGE_USERS: "MANAGE_USERS",
+  MANAGE_REVIEWS: "MANAGE_REVIEWS",
 } as const;
 
 export type PermissionKey = (typeof Permission)[keyof typeof Permission];
@@ -37,12 +39,14 @@ export const ROLE_PERMISSIONS: Record<PermissionKey, ProfileType[]> = {
   [Permission.VIEW_LIVE_QUEUE]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   [Permission.VIEW_BUSINESS_PROFILE]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   [Permission.VIEW_EMPLOYEE_PROFILE]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
+  [Permission.VIEW_REVIEWS]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   // Super Admin
   [Permission.VIEW_SUPER_ADMIN]: [ProfileType.ADMIN],
   [Permission.MANAGE_CATEGORIES]: [ProfileType.ADMIN],
   [Permission.MANAGE_SERVICES]: [ProfileType.ADMIN],
   [Permission.MANAGE_BUSINESSES]: [ProfileType.ADMIN],
   [Permission.MANAGE_USERS]: [ProfileType.ADMIN],
+  [Permission.MANAGE_REVIEWS]: [ProfileType.ADMIN],
 };
 
 /** Map route path to required permission. Used for route guards. */
@@ -55,11 +59,13 @@ export const ROUTE_PERMISSION: Record<string, PermissionKey> = {
   [ROUTERS_PATH.LIVE_QUEUE]: Permission.VIEW_LIVE_QUEUE,
   [ROUTERS_PATH.BUSINESSPROFILE]: Permission.VIEW_BUSINESS_PROFILE,
   [ROUTERS_PATH.EMPLOYEEPROFILE]: Permission.VIEW_EMPLOYEE_PROFILE,
+  [ROUTERS_PATH.REVIEWS]: Permission.VIEW_REVIEWS,
   [ROUTERS_PATH.SUPER_ADMIN]: Permission.VIEW_SUPER_ADMIN,
   [ROUTERS_PATH.SUPER_ADMIN_CATEGORIES]: Permission.MANAGE_CATEGORIES,
   [ROUTERS_PATH.SUPER_ADMIN_SERVICES]: Permission.MANAGE_SERVICES,
   [ROUTERS_PATH.SUPER_ADMIN_BUSINESSES]: Permission.MANAGE_BUSINESSES,
   [ROUTERS_PATH.SUPER_ADMIN_USERS]: Permission.MANAGE_USERS,
+  [ROUTERS_PATH.SUPER_ADMIN_REVIEWS]: Permission.MANAGE_REVIEWS,
 };
 
 export interface NavItemConfig {
@@ -78,6 +84,7 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { path: ROUTERS_PATH.QUEUES, label: "Queues", icon: "📑", permission: Permission.VIEW_QUEUES, sectionTitle: "Queue Management" },
   { path: ROUTERS_PATH.LIVE_QUEUE, label: "Live Queue", icon: "⚡", permission: Permission.VIEW_LIVE_QUEUE, sectionTitle: "Queue Management" },
   { path: ROUTERS_PATH.QUEUEUSERS, label: "Queue Users", icon: "📋", permission: Permission.VIEW_QUEUE_USERS, sectionTitle: "Queue Management" },
+  { path: ROUTERS_PATH.REVIEWS, label: "My Reviews", icon: "⭐", permission: Permission.VIEW_REVIEWS, sectionTitle: "Insights" },
 ];
 
 /** Super Admin sidebar nav items. */
@@ -87,6 +94,7 @@ export const SUPER_ADMIN_NAV_ITEMS: NavItemConfig[] = [
   { path: ROUTERS_PATH.SUPER_ADMIN_SERVICES, label: "Services", icon: "🔧", permission: Permission.MANAGE_SERVICES, sectionTitle: "Catalogue" },
   { path: ROUTERS_PATH.SUPER_ADMIN_BUSINESSES, label: "Businesses", icon: "🏢", permission: Permission.MANAGE_BUSINESSES, sectionTitle: "Platform" },
   { path: ROUTERS_PATH.SUPER_ADMIN_USERS, label: "Users", icon: "👥", permission: Permission.MANAGE_USERS, sectionTitle: "Platform" },
+  { path: ROUTERS_PATH.SUPER_ADMIN_REVIEWS, label: "Reviews", icon: "⭐", permission: Permission.MANAGE_REVIEWS, sectionTitle: "Platform" },
 ];
 
 /** Check if a role has a given permission. */

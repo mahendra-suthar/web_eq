@@ -56,7 +56,8 @@ export default function LandingPage() {
   const [activeFilter, setActiveFilter] = useState<string>(() => t("landing.filterOpenNow"));
 
   const [todayAppointments, setTodayAppointments] = useState<TodayAppointmentResponse[]>([]);
-  const [todayLoading, setTodayLoading] = useState(false);
+  const [todayLoading, setTodayLoading] = useState(true);
+  const [todayError, setTodayError] = useState(false);
   const [featuredBusinesses, setFeaturedBusinesses] = useState<Business[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [featuredError, setFeaturedError] = useState<string | null>(null);
@@ -135,14 +136,18 @@ export default function LandingPage() {
   useEffect(() => { fetchCategoryTree(); }, [fetchCategoryTree]);
 
   const fetchTodayAppointments = useCallback(async () => {
-    if (!isAuthenticated()) { setTodayAppointments([]); return; }
+    if (!isAuthenticated()) {
+      setTodayAppointments([]);
+      setTodayLoading(false);
+      return;
+    }
     setTodayLoading(true);
+    setTodayError(false);
     try {
       const data = await new AppointmentService().getTodayAppointments();
       setTodayAppointments(data ?? []);
-    } catch (err) {
-      if (import.meta.env.DEV) console.error("Failed to fetch today's appointments:", err);
-      setTodayAppointments([]);
+    } catch {
+      setTodayError(true);
     } finally {
       setTodayLoading(false);
     }
@@ -398,9 +403,31 @@ export default function LandingPage() {
             </div>
 
             {todayLoading ? (
-              <div className="loading-state lp-today-loading">
-                <LoadingSpinner aria-label="Loading appointments" size="md" />
-                <p className="loading-state__message">{t("landing.loadingAppointments")}</p>
+              <div className="lp-today-cards" aria-busy="true" aria-label="Loading appointments">
+                {[0, 1].map((i) => (
+                  <article key={i} className="lp-today-card lp-today-card--skeleton" aria-hidden="true">
+                    <div className="lp-today-urgency-bar lp-sk-bar" />
+                    <div className="lp-today-card-body">
+                      <div className="lp-sk lp-sk--title" />
+                      <div className="lp-sk lp-sk--sub" />
+                      <div className="lp-today-stats" style={{ marginTop: 14 }}>
+                        {[0, 1, 2].map((j) => <div key={j} className="lp-today-stat lp-sk-stat" />)}
+                      </div>
+                      <div className="lp-sk lp-sk--line" />
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : todayError ? (
+              <div className="lp-today-cards lp-today-cards--empty">
+                <div className="lp-today-empty lp-today-empty--error reveal">
+                  <div className="lp-today-empty-emoji" aria-hidden="true">⚠️</div>
+                  <div className="lp-today-empty-title">{t("landing.todayErrorTitle")}</div>
+                  <div className="lp-today-empty-sub">{t("landing.todayErrorSub")}</div>
+                  <button className="lp-today-empty-btn" onClick={fetchTodayAppointments}>
+                    {t("landing.todayRetry")}
+                  </button>
+                </div>
               </div>
             ) : (
               <div className={`lp-today-cards${todayAppointments.length === 0 ? " lp-today-cards--empty" : ""}`}>
@@ -687,7 +714,7 @@ export default function LandingPage() {
                   hint={activeFilter === filterOpenNow ? t("landing.noOpenBizHint") : t("landing.noBizHint")}
                   action={
                     activeFilter === filterOpenNow ? (
-                      <button className="lp-empty-action-btn" onClick={() => setActiveFilter("")}>
+                      <button className="lp-empty-action-btn" onClick={() => navigate("/search")}>
                         {t("landing.showAllBusinesses")}
                       </button>
                     ) : undefined

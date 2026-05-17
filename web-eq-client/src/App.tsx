@@ -30,6 +30,7 @@ import QueueAdd from "./pages/queue-add";
 import QueueDetail from "./pages/queue-detail";
 import UserDetail from "./pages/user-detail";
 import LiveQueue from "./pages/live-queue";
+import ReviewsPage from "./pages/reviews";
 
 // Super Admin — lazy-loaded for code splitting
 const SuperAdminLogin = lazy(() => import("./pages/super-admin/login"));
@@ -38,6 +39,7 @@ const SuperAdminCategories = lazy(() => import("./pages/super-admin/categories")
 const SuperAdminServices = lazy(() => import("./pages/super-admin/services"));
 const SuperAdminBusinesses = lazy(() => import("./pages/super-admin/businesses"));
 const SuperAdminUsers = lazy(() => import("./pages/super-admin/users"));
+const SuperAdminReviews = lazy(() => import("./pages/super-admin/reviews"));
 
 const { ROUTERS_PATH } = RouterConstant;
 
@@ -77,6 +79,7 @@ const App = () => {
         <Route path={ROUTERS_PATH.SUPER_ADMIN_SERVICES} element={withSuspense(<SuperAdminServices />)} />
         <Route path={ROUTERS_PATH.SUPER_ADMIN_BUSINESSES} element={withSuspense(<SuperAdminBusinesses />)} />
         <Route path={ROUTERS_PATH.SUPER_ADMIN_USERS} element={withSuspense(<SuperAdminUsers />)} />
+        <Route path={ROUTERS_PATH.SUPER_ADMIN_REVIEWS} element={withSuspense(<SuperAdminReviews />)} />
       </Route>
 
       {/* Business / Employee admin panel */}
@@ -95,6 +98,7 @@ const App = () => {
         <Route path={ROUTERS_PATH.LIVE_QUEUE} element={<RoleGuard permission={Permission.VIEW_LIVE_QUEUE}><LiveQueue /></RoleGuard>} />
         <Route path={ROUTERS_PATH.QUEUEUSERS} element={<QueueUsers />} />
         <Route path={`${ROUTERS_PATH.QUEUEUSERS}/:queueUserId`} element={<RoleGuard permission={Permission.VIEW_QUEUE_USERS}><QueueUserDetail /></RoleGuard>} />
+        <Route path={ROUTERS_PATH.REVIEWS} element={<RoleGuard permission={Permission.VIEW_REVIEWS}><ReviewsPage /></RoleGuard>} />
       </Route>
 
       {/* Catch-all — redirect unknown paths to root */}

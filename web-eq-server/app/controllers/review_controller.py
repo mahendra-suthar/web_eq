@@ -5,7 +5,9 @@ from typing import List, Optional
 from uuid import UUID
 
 from app.services.review_service import ReviewService
-from app.schemas.review import ReviewCreateInput, ReviewData, BusinessReviewSummary, FeaturedReviewData
+from app.services.business_service import BusinessService
+from app.services.employee_service import EmployeeService
+from app.schemas.review import ReviewCreateInput, ReviewData, BusinessReviewSummary, FeaturedReviewData, MyReviewsResponse
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +58,45 @@ class ReviewController:
             raise
         except Exception:
             logger.exception("Failed to get_featured_reviews")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    def get_my_reviews(self, current_user, user_type: str, limit: int, offset: int) -> MyReviewsResponse:
+        try:
+            review_svc = self.review_service
+            profile_type = user_type.upper()
+
+            if profile_type == "ADMIN":
+                reviews = review_svc.get_all_reviews(limit, offset)
+                avg, count = review_svc.get_all_reviews_summary()
+
+            elif profile_type == "BUSINESS":
+                business_svc = BusinessService(self.db)
+                business = business_svc.get_business_by_owner(current_user.uuid)
+                if not business:
+                    return MyReviewsResponse(reviews=[], avg_rating=0.0, review_count=0)
+                reviews = review_svc.get_reviews_by_business(business.uuid, limit, offset)
+                avg, count = review_svc.get_review_summary_by_business(business.uuid)
+
+            elif profile_type == "EMPLOYEE":
+                employee_svc = EmployeeService(self.db)
+                employee = employee_svc.get_employee_by_user_id(current_user.uuid)
+                if not employee:
+                    return MyReviewsResponse(reviews=[], avg_rating=0.0, review_count=0)
+                reviews = review_svc.get_reviews_by_employee(employee.uuid, limit, offset)
+                avg, count = review_svc.get_review_summary_by_employee(employee.uuid)
+
+            else:
+                return MyReviewsResponse(reviews=[], avg_rating=0.0, review_count=0)
+
+            return MyReviewsResponse(
+                reviews=[ReviewData.from_review(r) for r in reviews],
+                avg_rating=avg,
+                review_count=count,
+            )
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to get_my_reviews (user=%s)", current_user.uuid)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_my_review(

@@ -1105,7 +1105,7 @@ class QueueService:
                 .filter(
                     QueueUser.user_id == user_id,
                     QueueUser.queue_date == today,
-                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_SCHEDULED]),
                 )
                 .order_by(QueueUser.created_at.desc())
                 .all()
