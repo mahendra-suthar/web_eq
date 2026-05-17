@@ -112,6 +112,68 @@ class ReviewService:
             logger.exception("Failed to get_user_review_for_appointment (user_id=%s queue_user_id=%s)", user_id, queue_user_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
+    def get_reviews_by_employee(self, employee_id: UUID, limit: int = 10, offset: int = 0) -> List[Review]:
+        try:
+            return (
+                self.db.query(Review)
+                .options(joinedload(Review.user))
+                .filter(Review.employee_id == employee_id)
+                .order_by(Review.created_at.desc())
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
+        except Exception:
+            logger.exception("Failed to get_reviews_by_employee (employee_id=%s)", employee_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    def get_review_summary_by_employee(self, employee_id: UUID) -> Tuple[float, int]:
+        try:
+            result = (
+                self.db.query(
+                    func.coalesce(func.avg(Review.rating), 0.0),
+                    func.count(Review.uuid)
+                )
+                .filter(Review.employee_id == employee_id)
+                .first()
+            )
+            avg_rating = round(float(result[0]), 1) if result else 0.0
+            count = int(result[1]) if result else 0
+            return avg_rating, count
+        except Exception:
+            logger.exception("Failed to get_review_summary_by_employee (employee_id=%s)", employee_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    def get_all_reviews(self, limit: int = 10, offset: int = 0) -> List[Review]:
+        try:
+            return (
+                self.db.query(Review)
+                .options(joinedload(Review.user), joinedload(Review.business))
+                .order_by(Review.created_at.desc())
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
+        except Exception:
+            logger.exception("Failed to get_all_reviews")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    def get_all_reviews_summary(self) -> Tuple[float, int]:
+        try:
+            result = (
+                self.db.query(
+                    func.coalesce(func.avg(Review.rating), 0.0),
+                    func.count(Review.uuid)
+                )
+                .first()
+            )
+            avg_rating = round(float(result[0]), 1) if result else 0.0
+            count = int(result[1]) if result else 0
+            return avg_rating, count
+        except Exception:
+            logger.exception("Failed to get_all_reviews_summary")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
     def get_featured_reviews(self, limit: int = 6) -> List[Review]:
         try:
             return (
