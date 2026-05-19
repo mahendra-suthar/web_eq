@@ -25,6 +25,7 @@ UNPROTECTED_ROUTE_PATHS = [
     "/api/review/get_business_review_summary/", # per-business rating summary
     "/api/review/featured",                     # landing page featured reviews
     "/api/queue/available_slots/",        # public slot viewing
+    "/api/contact_form",                  # marketing site contact form — no auth required
     # ── Docs ─────────────────────────────────────────────────────────────────
     "/api/docs",
     "/api/openapi.json",
@@ -113,7 +114,6 @@ NOTIF_NEW_CUSTOMER = "NEW_CUSTOMER"
 NOTIF_IN_SERVICE = "IN_SERVICE"
 NOTIF_CALLED_NEXT = "CALLED_NEXT"
 NOTIF_SERVICE_COMPLETED = "SERVICE_COMPLETED"
-NOTIF_AUTO_HOLD = "AUTO_HOLD"          # customer pushed back because not checked in
 NOTIF_HEADING_NOW = "HEADING_NOW"      # "head out now" — wait ≤ eta
 NOTIF_NO_SHOW = "NO_SHOW"             # customer marked absent and removed from queue
 NOTIF_SKIPPED = "SKIPPED"             # customer skipped, moved to back of queue

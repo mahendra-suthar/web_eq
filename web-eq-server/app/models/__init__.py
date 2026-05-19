@@ -11,6 +11,7 @@ from app.models.queue import Queue, QueueUser, QueueService, QueueUserService, A
 from app.models.role import Role, UserRoles
 from app.models.review import Review
 from app.models.notification import Notification
+from app.models.contact import ContactForm
 
 __all__ = [
     "BaseModel",
@@ -33,5 +34,6 @@ __all__ = [
     "UserRoles",
     "Review",
     "Notification",
+    "ContactForm",
 ]
 
