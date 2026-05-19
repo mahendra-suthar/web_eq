@@ -977,7 +977,11 @@ export default function BookingPage() {
               {t("bk.thService")}
             </div>
             <div className="bk-sc-value">
-              {selectedServices.length > 0 ? selectedServices.map(s => s.name).join(" + ") : <span className="bk-sc-empty">{t("bk.none")}</span>}
+              {selectedQueueOption && displayQueueServices.length > 0
+                ? displayQueueServices.map(s => s.service_name).join(" + ")
+                : selectedServices.length > 0
+                  ? selectedServices.map(s => s.name).join(" + ")
+                  : <span className="bk-sc-empty">{t("bk.none")}</span>}
             </div>
           </div>
           <div className="bk-sc-row">
