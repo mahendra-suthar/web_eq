@@ -361,37 +361,33 @@ class CustomerController:
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     async def mark_arrived(self, user_id: UUID, queue_user_id: UUID) -> dict:
-        """Mark customer as physically present (checked in). Prevents auto-hold.
-        If the appointment is still SCHEDULED (early arrival), activates it immediately."""
+        """Record physical presence only. Queue position and activation are managed
+        by the activate_scheduled job — this never changes status or enqueue_time."""
         try:
             qu = self.queue_service.get_queue_user_for_update(queue_user_id, user_id)
             if not qu:
                 raise HTTPException(status_code=404, detail="Appointment not found")
 
-            now = now_app_tz()
-            if qu.status == QUEUE_USER_SCHEDULED:
-                # Early arrival — activate into the live queue at actual arrival time
-                qu.status = QUEUE_USER_REGISTERED  # type: ignore[assignment]
-                qu.enqueue_time = now  # type: ignore[assignment]
-                qu.is_checked_in = True  # type: ignore[assignment]
-                qu.check_in_time = now  # type: ignore[assignment]
-                self.db.commit()
-            elif qu.status == QUEUE_USER_REGISTERED:
-                qu.is_checked_in = True  # type: ignore[assignment]
-                qu.check_in_time = now  # type: ignore[assignment]
-                self.db.commit()
-            else:
+            if qu.status not in (QUEUE_USER_SCHEDULED, QUEUE_USER_REGISTERED):
                 raise HTTPException(status_code=409, detail="Only waiting or scheduled appointments can be checked in")
 
-            # Broadcast real-time update so Live Queue and customer screens update instantly
+            if qu.is_checked_in:
+                return {"success": True, "is_checked_in": True}
+
+            now = now_app_tz()
+            qu.is_checked_in = True  # type: ignore[assignment]
+            qu.check_in_time = now   # type: ignore[assignment]
+            self.db.commit()
+
+            # Broadcast only to the employee live queue so the "Here" badge updates.
+            # Customer positions are unchanged — no customer broadcast needed.
             queue_id = str(qu.queue_id)
             date_str = qu.queue_date.strftime("%Y-%m-%d")
             try:
                 await live_queue_manager.broadcast(
-                    queue_id, date_str,
+                    queue_id, date_str, "live_queue_update",
                     live_queue_manager.get_live_queue_state(self.db, queue_id, date_str)
                 )
-                await customer_queue_manager.broadcast_to_queue(self.db, queue_id, date_str)
             except Exception:
                 logger.warning("mark_arrived: broadcast failed (non-critical)", exc_info=True)
 

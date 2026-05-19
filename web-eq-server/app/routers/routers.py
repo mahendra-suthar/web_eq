@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.routers.auth import auth_router
+from app.routers.contact import contact_router
 from app.routers.category import category_router
 from app.routers.business import business_router
 from app.routers.schedule import schedule_router
@@ -34,4 +35,5 @@ routers.include_router(notification_router, prefix="/notification", tags=["Notif
 routers.include_router(websocket_router, tags=["WebSocket"])
 routers.include_router(admin_router, prefix="/admin", tags=["Super Admin"])
 routers.include_router(qr_router, prefix="/qr", tags=["QR Code"])
+routers.include_router(contact_router, tags=["Contact"])
 

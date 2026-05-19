@@ -12,6 +12,7 @@ import {
 import { BusinessService } from "../../services/business/business.service";
 import { AppointmentService, type TodayAppointmentResponse } from "../../services/appointment/appointment.service";
 import { BookingService } from "../../services/booking/booking.service";
+import { useCustomerQueueWS, type CustomerQueueUpdate } from "../../hooks/useCustomerQueueWS";
 import { ReviewService, type FeaturedReview } from "../../services/review/review.service";
 import StarRating from "../../components/star-rating";
 import { useAuthStore } from "../../store/auth.store";
@@ -31,6 +32,24 @@ import {
 import "./landing.scss";
 
 const FEATURED_LIMIT = 6;
+
+const LIVE_STATUSES = new Set([1, 2, 8]); // REGISTERED, IN_PROGRESS, SCHEDULED
+
+function AppointmentQueueSync({
+  appointment,
+  onUpdate,
+}: {
+  appointment: TodayAppointmentResponse;
+  onUpdate: (update: CustomerQueueUpdate) => void;
+}) {
+  useCustomerQueueWS(
+    appointment.queue_id,
+    appointment.queue_date ?? null,
+    appointment.queue_user_id,
+    { onUpdate },
+  );
+  return null;
+}
 
 const HIW_META = [
   { num: "01", icon: "🔍" },
@@ -162,6 +181,24 @@ export default function LandingPage() {
         prev.map((a) => a.queue_user_id === queueUserId ? { ...a, is_checked_in: true } : a)
       );
     } catch {}
+  }, []);
+
+  const handleQueueUpdate = useCallback((update: CustomerQueueUpdate) => {
+    setTodayAppointments((prev) =>
+      prev.map((a) =>
+        a.queue_user_id === update.queue_user_id
+          ? {
+              ...a,
+              position: update.position,
+              status: update.status ?? a.status,
+              estimated_wait_minutes: update.estimated_wait_minutes,
+              estimated_appointment_time: update.estimated_appointment_time,
+              expected_at_ts: update.expected_at_ts,
+              current_token: update.current_token ?? a.current_token,
+            }
+          : a
+      )
+    );
   }, []);
 
   const fetchFeaturedBusinesses = useCallback(async () => {
@@ -430,7 +467,18 @@ export default function LandingPage() {
                 </div>
               </div>
             ) : (
-              <div className={`lp-today-cards${todayAppointments.length === 0 ? " lp-today-cards--empty" : ""}`}>
+              <>
+                {isAuthenticated() && todayAppointments
+                  .filter((a) => LIVE_STATUSES.has(a.status))
+                  .map((a) => (
+                    <AppointmentQueueSync
+                      key={a.queue_user_id}
+                      appointment={a}
+                      onUpdate={handleQueueUpdate}
+                    />
+                  ))}
+
+                <div className={`lp-today-cards${todayAppointments.length === 0 ? " lp-today-cards--empty" : ""}`}>
                 {todayAppointments.map((appt) => {
                   const isInProgress = appt.status === 2;
                   const isScheduled = appt.status === 8;  // SCHEDULED — pre-active, not yet in queue
@@ -529,7 +577,7 @@ export default function LandingPage() {
                         <div className="lp-today-footer">
                           <div className="lp-today-footer-actions">
                             <AppointmentActions appointment={appt} onUpdated={fetchTodayAppointments} />
-                            {appt.status === 1 && appt.position != null && appt.position <= 3 && (
+                            {(appt.status === 8 || (appt.status === 1 && appt.position != null && appt.position <= 3)) && (
                               appt.is_checked_in ? (
                                 <span className="appt-actions__arrived">
                                   <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3" aria-hidden="true">
@@ -572,6 +620,7 @@ export default function LandingPage() {
                   </button>
                 </div>
               </div>
+              </>
             )}
           </div>
         </section>

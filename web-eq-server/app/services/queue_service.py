@@ -990,34 +990,16 @@ class QueueService:
         enqueue_time: Optional[datetime],
         created_at: Optional[datetime],
         exclude_queue_user_id: UUID,
-        effective_join_time: Optional[datetime] = None,
     ) -> Dict[str, Any]:
-        # Ordering: effective_join_time ASC NULLS FIRST, enqueue_time ASC NULLS LAST, created_at ASC
-        # NULL effective_join_time = normal user (comes first); non-NULL = auto-held (pushed back)
-        if effective_join_time is not None:
-            # Current user has been auto-held: all normal users AND held users with earlier effective_join_time are ahead
-            order_ahead = or_(
-                QueueUser.effective_join_time.is_(None),
-                and_(
-                    QueueUser.effective_join_time.isnot(None),
-                    QueueUser.effective_join_time < effective_join_time,
-                ),
-            )
-        elif enqueue_time is not None:
-            # Current user is normal, has enqueue_time: only other normal users with earlier enqueue_time
+        if enqueue_time is not None:
             order_ahead = and_(
-                QueueUser.effective_join_time.is_(None),
                 QueueUser.enqueue_time.isnot(None),
                 QueueUser.enqueue_time < enqueue_time,
             )
         else:
-            # Current user is normal, no enqueue_time: normal users with any enqueue_time or earlier created_at
-            order_ahead = and_(
-                QueueUser.effective_join_time.is_(None),
-                or_(
-                    QueueUser.enqueue_time.isnot(None),
-                    and_(QueueUser.enqueue_time.is_(None), QueueUser.created_at < created_at),
-                ),
+            order_ahead = or_(
+                QueueUser.enqueue_time.isnot(None),
+                and_(QueueUser.enqueue_time.is_(None), QueueUser.created_at < created_at),
             )
         try:
             ahead_count = (
@@ -1185,7 +1167,6 @@ class QueueService:
                 )
                 .with_for_update()
                 .order_by(
-                    QueueUser.effective_join_time.asc().nullsfirst(),  # held users (non-NULL) come after normal
                     QueueUser.enqueue_time.asc().nullslast(),
                     QueueUser.created_at.asc(),
                 )
@@ -1243,7 +1224,6 @@ class QueueService:
             self.db.query(QueueUser).filter(QueueUser.uuid == queue_user_id).update(
                 {
                     QueueUser.status: QUEUE_USER_REGISTERED,
-                    QueueUser.effective_join_time: now,
                     QueueUser.enqueue_time: now,
                 },
                 synchronize_session=False,
@@ -1444,33 +1424,6 @@ class QueueService:
         except Exception:
             logger.exception("Failed to get_queue_users (business_id=%s page=%s)", business_id, page)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
-
-    def get_queue_ids_with_registered_users_today(self, today: date) -> List[UUID]:
-        """Return distinct queue_ids that have at least one registered user today."""
-        try:
-            rows = (
-                self.db.query(QueueUser.queue_id)
-                .filter(
-                    QueueUser.queue_date == today,
-                    QueueUser.status == QUEUE_USER_REGISTERED,
-                )
-                .distinct()
-                .all()
-            )
-            return [row[0] for row in rows]
-        except Exception:
-            logger.exception("get_queue_ids_with_registered_users_today failed (today=%s)", today)
-            return []
-
-    def apply_auto_hold(self, queue_user: QueueUser, now: datetime) -> bool:
-        """Push user back by setting effective_join_time. Sets hold_notified_at on first hold.
-        Returns True if a notification should be sent (first hold only)."""
-        queue_user.effective_join_time = now  # type: ignore[assignment]
-        send_notification = queue_user.hold_notified_at is None
-        if send_notification:
-            queue_user.hold_notified_at = now  # type: ignore[assignment]
-        self.db.flush()
-        return send_notification
 
     def get_eta_notification_candidates(self, today: date) -> List[QueueUser]:
         """Return registered users today who declared an ETA and have not yet been notified."""

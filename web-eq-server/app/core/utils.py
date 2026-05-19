@@ -226,7 +226,6 @@ def sort_key_live_queue_row(row: Tuple[Any, Any]) -> tuple:
     """
     Sort key for live queue (QueueUser, User) rows:
     completed (0) → in_progress (1) → waiting (2) → scheduled/upcoming (3).
-    Waiting: held users (effective_join_time set) come after normal users.
     Scheduled: sorted by scheduled_start so upcoming cards appear in time order.
     Uses tz-aware sentinels so timestamp comparisons never raise TypeError.
     """
@@ -243,10 +242,8 @@ def sort_key_live_queue_row(row: Tuple[Any, Any]) -> tuple:
         else:
             scheduled_dt = _UTC_MAX
         return (3, False, scheduled_dt)
-    # REGISTERED/waiting: held users (effective_join_time set) sort after non-held
-    eff = getattr(qu, "effective_join_time", None)
-    secondary = eff if eff is not None else (qu.enqueue_time or qu.created_at or _UTC_MIN)
-    return (2, eff is not None, secondary)
+    # REGISTERED/waiting: sorted by enqueue_time (employees manually skip absent customers)
+    return (2, False, qu.enqueue_time or qu.created_at or _UTC_MIN)
 
 
 def build_live_queue_users_raw(
