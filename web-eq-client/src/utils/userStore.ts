@@ -3,6 +3,8 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { UnifiedProfileResponse } from "../services/profile/profile.service";
 import { ProfileType } from "./constants";
 
+const TOKEN_SS_KEY = "eq_admin_token";
+
 interface UserState {
   profile: UnifiedProfileResponse | null;
   nextStep: string | null;
@@ -32,14 +34,18 @@ export const useUserStore = create(
     (set, get) => ({
       profile: null,
       nextStep: null,
-      token: null,
+      token: sessionStorage.getItem(TOKEN_SS_KEY) ?? null,
       impersonating: false,
       impersonatedBusinessName: null,
       preImpersonationProfile: null,
 
       setProfile: (profile) => set({ profile }),
       setNextStep: (step) => set({ nextStep: step }),
-      setToken: (token) => set({ token }),
+      setToken: (token) => {
+        if (token) sessionStorage.setItem(TOKEN_SS_KEY, token);
+        else sessionStorage.removeItem(TOKEN_SS_KEY);
+        set({ token });
+      },
 
       isAuthenticated: () => {
         const profile = get().profile;
@@ -87,14 +93,17 @@ export const useUserStore = create(
         return null;
       },
 
-      resetUser: () => set({
-        profile: null,
-        nextStep: null,
-        token: null,
-        impersonating: false,
-        impersonatedBusinessName: null,
-        preImpersonationProfile: null,
-      }),
+      resetUser: () => {
+        sessionStorage.removeItem(TOKEN_SS_KEY);
+        set({
+          profile: null,
+          nextStep: null,
+          token: null,
+          impersonating: false,
+          impersonatedBusinessName: null,
+          preImpersonationProfile: null,
+        });
+      },
 
       // Impersonation
 
@@ -106,7 +115,8 @@ export const useUserStore = create(
           impersonatedBusinessName: businessName,
         })),
 
-      exitImpersonation: () =>
+      exitImpersonation: () => {
+        sessionStorage.removeItem(TOKEN_SS_KEY);
         set((state) => ({
           profile: state.preImpersonationProfile,
           nextStep: "dashboard",
@@ -114,7 +124,8 @@ export const useUserStore = create(
           impersonating: false,
           impersonatedBusinessName: null,
           preImpersonationProfile: null,
-        })),
+        }));
+      },
 
       isImpersonating: () => get().impersonating,
     }),

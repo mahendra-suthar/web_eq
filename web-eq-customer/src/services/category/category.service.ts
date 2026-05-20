@@ -10,6 +10,7 @@ export interface CategoryTreeNode {
   parent_category_id: string | null;
   subcategories_count: number;
   services_count: number;
+  has_businesses: boolean;
   children: CategoryTreeNode[];
 }
 
@@ -19,6 +20,7 @@ export interface SubcategoryData {
   description: string | null;
   image: string | null;
   service_count: number;
+  has_businesses: boolean;
 }
 
 export interface CategoryDetailData {
@@ -27,6 +29,7 @@ export interface CategoryDetailData {
   description: string | null;
   image: string | null;
   parent_category_id: string | null;
+  has_businesses: boolean;
 }
 
 export interface ServiceData {
@@ -39,6 +42,7 @@ export interface CategoryWithServicesData {
   name: string;
   description: string | null;
   image: string | null;
+  has_businesses: boolean;
   services: ServiceData[];
 }
 
@@ -74,6 +78,7 @@ function normalizeTreeNode(raw: CategoryTreeNode): CategoryTreeNode {
     parent_category_id: raw.parent_category_id ?? null,
     subcategories_count: raw.subcategories_count ?? 0,
     services_count: raw.services_count ?? 0,
+    has_businesses: raw.has_businesses ?? false,
     children,
   };
 }
@@ -127,12 +132,13 @@ export class CategoryService extends HttpClient {
     )
       .then((response) => {
         const raw = unwrapList<CategoryDetailData>(response);
-        const data = raw.map((row) => ({
+        const data: CategoryDetailData[] = raw.map((row) => ({
           uuid: row.uuid,
           name: row.name,
           description: row.description ?? null,
           image: row.image ?? null,
           parent_category_id: row.parent_category_id ?? null,
+          has_businesses: row.has_businesses ?? false,
         }));
         cachedAllCategories = data;
         return data;
@@ -162,6 +168,7 @@ export class CategoryService extends HttpClient {
       name: cat.name,
       description: cat.description,
       image: cat.image,
+      has_businesses: cat.has_businesses,
       services: rawServices.map((s) => ({
         id: String(s.service_uuid ?? s.uuid),
         name: s.name,

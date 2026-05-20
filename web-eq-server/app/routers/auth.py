@@ -120,6 +120,13 @@ async def refresh_token(request: Request, response: Response, db: Session = Depe
     return await controller.refresh_customer_token(request, response)
 
 
+@auth_router.post("/token/refresh-business", response_model=LoginResponse)
+async def refresh_business_token(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Silently refresh the business/admin access token using the httpOnly cookie."""
+    controller = AuthController(db)
+    return await controller.refresh_business_token(request, response)
+
+
 @auth_router.post("/logout", status_code=204)
 async def logout(request: Request, response: Response):
     """Clear the auth cookie for whichever app type is calling (customer or business/employee)."""

@@ -237,10 +237,28 @@ export function getApiErrorMessage(
   fallback: string = "Something went wrong. Please try again."
 ): string {
   if (err == null) return fallback;
-  const anyErr = err as { response?: { data?: { detail?: string | string[] } }; message?: string };
-  const detail = anyErr?.response?.data?.detail;
+
+  type ApiError = {
+    response?: { data?: { detail?: string | string[] | { message?: string } } };
+    message?: string;
+  };
+
+  const detail = (err as ApiError)?.response?.data?.detail;
+
   if (typeof detail === "string" && detail.trim()) return detail.trim();
-  if (Array.isArray(detail) && detail.length > 0 && typeof detail[0] === "string") return detail[0];
-  if (typeof anyErr?.message === "string" && anyErr.message.trim()) return anyErr.message.trim();
+
+  if (Array.isArray(detail)) {
+    const first = detail.find((d) => typeof d === "string" && d.trim());
+    if (first) return (first as string).trim();
+  }
+
+  if (detail !== null && typeof detail === "object" && "message" in detail) {
+    const msg = (detail as { message?: string }).message;
+    if (typeof msg === "string" && msg.trim()) return msg.trim();
+  }
+
+  const httpMsg = (err as ApiError)?.message;
+  if (typeof httpMsg === "string" && httpMsg.trim()) return fallback;
+
   return fallback;
 }

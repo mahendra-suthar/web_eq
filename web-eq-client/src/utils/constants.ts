@@ -112,7 +112,8 @@ export const VALID_PHONE_START = /^[6-9]/;
  */
 export const OTP_COUNTDOWN_SECONDS = 300;
 
-export const OTP_LENGTH = 6;
+export const OTP_LENGTH = 6; // Firebase OTP (business login)
+export const ADMIN_OTP_LENGTH = 5; // Backend OTP (super admin login)
 
 // ============================================================================
 // Pagination Constants

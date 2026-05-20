@@ -1031,6 +1031,47 @@
   &:hover { background: rgba(255, 255, 255, 0.22); border-color: rgba(255, 255, 255, 0.5); }
 }
 
+// ── Skeleton shimmer ─────────────────────────────────────────────────────────
+@keyframes lp-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+.lp-today-card--skeleton { pointer-events: none; }
+
+.lp-sk {
+  border-radius: $radius-sm;
+  background: linear-gradient(
+    90deg,
+    rgba(14, 74, 53, 0.07) 25%,
+    rgba(14, 74, 53, 0.15) 50%,
+    rgba(14, 74, 53, 0.07) 75%
+  );
+  background-size: 800px 100%;
+  animation: lp-shimmer 1.4s ease-in-out infinite;
+
+  &--title { height: 18px; width: 55%; margin-bottom: 8px; }
+  &--sub   { height: 13px; width: 75%; margin-bottom: 16px; }
+  &--line  { height: 12px; width: 40%; margin-top: 14px; }
+}
+
+.lp-sk-stat {
+  height: 48px;
+  background: linear-gradient(
+    90deg,
+    rgba(14, 74, 53, 0.05) 25%,
+    rgba(14, 74, 53, 0.11) 50%,
+    rgba(14, 74, 53, 0.05) 75%
+  );
+  background-size: 800px 100%;
+  animation: lp-shimmer 1.4s ease-in-out infinite;
+}
+
+.lp-sk-bar { background: rgba(14, 74, 53, 0.15) !important; }
+
+// ── Error state variant ───────────────────────────────────────────────────────
+.lp-today-empty--error { border-color: rgba(255, 100, 100, 0.30); }
+
 // ─── Super-category tabs ───────────────────────────────────────────────────
 .lp-super-tabs {
   display: flex;
@@ -1087,6 +1128,14 @@ $_tab-colors: (
       .lp-super-tab__count { background: rgba(255, 255, 255, 0.2); color: #fff; }
     }
   }
+}
+
+.lp-super-tab--disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  filter: grayscale(50%);
+  pointer-events: none;
+  &:hover { transform: none; box-shadow: none; }
 }
 
 // ─── Subcategory grid ──────────────────────────────────────────────────────
@@ -1241,6 +1290,21 @@ $_tab-colors: (
     &__name  { font-size: 14px; }
     &__desc  { display: none; } // hide on mobile for compact layout
     &__arrow { display: none; }
+  }
+}
+
+.lp-subcat-card--disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  filter: grayscale(50%);
+  pointer-events: none;
+  &:hover { transform: none; box-shadow: none; &::before { opacity: 0; } }
+
+  .lp-subcat-card__coming-soon {
+    font-size: 11px;
+    font-weight: 600;
+    color: $muted-green;
+    letter-spacing: 0.3px;
   }
 }
 

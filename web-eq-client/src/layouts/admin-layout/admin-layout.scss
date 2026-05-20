@@ -177,6 +177,31 @@ $shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
         font-weight: 600;
     }
 
+    .sidebar-support {
+        padding: 8px 0;
+        border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .sidebar-support-link {
+        padding: 10px 18px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: rgba(255,255,255,0.6);
+        font-size: 14px;
+        text-decoration: none;
+        margin: 1px 8px;
+        border-radius: $radius-md;
+        transition: all 0.18s;
+
+        &:hover {
+            background: rgba(255,255,255,0.06);
+            color: rgba(255,255,255,0.9);
+        }
+
+        .nav-item-icon { color: rgba(255,255,255,0.6); }
+    }
+
     .admin-info {
         padding: 14px 18px;
         border-top: 1px solid rgba(255,255,255,0.08);

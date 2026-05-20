@@ -102,7 +102,8 @@ class BusinessService:
 
     def get_businesses_with_filters(self, category_id: Optional[UUID] = None, service_ids: Optional[List[UUID]] = None) -> List[Business]:
         query = self.db.query(Business).options(joinedload(Business.category)).distinct()
-        
+        query = query.filter(Business.status == BUSINESS_ACTIVE)
+
         if category_id:
             query = query.filter(Business.category_id == category_id)
         
@@ -132,7 +133,8 @@ class BusinessService:
             )
             .options(joinedload(Business.category))
         )
-        
+        query = query.filter(Business.status == BUSINESS_ACTIVE)
+
         if category_id:
             query = query.filter(Business.category_id == category_id)
         

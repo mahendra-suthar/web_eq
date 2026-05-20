@@ -31,6 +31,7 @@ class ReviewData(BaseModel):
     comment: Optional[str] = None
     is_verified: bool = True
     user_name: Optional[str] = None
+    business_name: Optional[str] = None
     created_at: Optional[str] = None
 
     @classmethod
@@ -38,6 +39,9 @@ class ReviewData(BaseModel):
         user_name = None
         if review.user:
             user_name = review.user.full_name if hasattr(review.user, 'full_name') else None
+        business_name = None
+        if hasattr(review, 'business') and review.business:
+            business_name = review.business.name
 
         return cls(
             uuid=str(review.uuid),
@@ -50,6 +54,7 @@ class ReviewData(BaseModel):
             comment=review.comment,
             is_verified=review.is_verified,
             user_name=user_name,
+            business_name=business_name,
             created_at=str(review.created_at) if review.created_at else None,
         )
 
@@ -80,4 +85,10 @@ class FeaturedReviewData(BaseModel):
 
 class BusinessReviewSummary(BaseModel):
     average_rating: float
+    review_count: int
+
+
+class MyReviewsResponse(BaseModel):
+    reviews: list[ReviewData]
+    avg_rating: float
     review_count: int

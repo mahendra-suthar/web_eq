@@ -55,3 +55,11 @@ CUSTOMER_APP_URL = os.getenv("CUSTOMER_APP_URL", "http://localhost:5174")
 
 # Firebase Phone Auth — OTP delivery (no DLT required)
 FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
+
+# ─── SMTP / Email ─────────────────────────────────────────────────────────────
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM = os.getenv("SMTP_FROM", "")
+CONTACT_RECIPIENT_EMAIL = os.getenv("CONTACT_RECIPIENT_EMAIL", "contact@easequeue.com")

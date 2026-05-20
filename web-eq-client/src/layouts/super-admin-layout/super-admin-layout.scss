@@ -98,6 +98,32 @@ $topbar-h:     56px;
   &--active     { background: $accent; color: #fff; }
 }
 
+.sa-support {
+  padding: 8px 0;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+
+.sa-support-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: $text-muted;
+  text-decoration: none;
+  margin-bottom: 2px;
+  transition: background 0.15s, color 0.15s;
+
+  .sa-nav-icon { font-size: 16px; width: 20px; text-align: center; display: flex; align-items: center; justify-content: center; }
+
+  &:hover {
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+  }
+}
+
 .sa-user {
   display: flex;
   align-items: center;

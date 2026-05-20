@@ -143,7 +143,7 @@ export default function BookingPage() {
   const [slotPickerOpen, setSlotPickerOpen] = useState(false);
   const [etaMinutes, setEtaMinutes] = useState<number>(0);
 
-  const { connected: wsConnectedState } = useQueueWebSocket({
+  useQueueWebSocket({
     businessId: businessId || "",
     date: selectedDate || "",
     enabled: !!businessId && !!selectedDate,
@@ -623,12 +623,6 @@ export default function BookingPage() {
           </h1>
           <div className="bk-biz-row">
             {initialBusinessName && <span className="bk-biz-name">{initialBusinessName}</span>}
-            {selectedDate && (
-              <div className={`bk-live-badge${wsConnectedState ? "" : " bk-live-badge--off"}`}>
-                <span className="bk-live-dot" aria-hidden />
-                {wsConnectedState ? t("bk.liveQueueUpdates") : t("connecting")}
-              </div>
-            )}
           </div>
           {isReschedule && (
             <p className="bk-reschedule-hint">{t("bk.rescheduleHint")}</p>
@@ -777,7 +771,6 @@ export default function BookingPage() {
                 <div className="bk-section-title"><span className="bk-section-num">3</span> {t("selectTimeSlot")}</div>
                 <div className="bk-section-sub">{t("bk.queueSub")}</div>
               </div>
-              {wsConnectedState && !previewLoading && <div className="bk-updated-tag">{t("bk.updatedNow")}</div>}
             </div>
 
             {previewLoading ? (
@@ -849,7 +842,7 @@ export default function BookingPage() {
               </div>
             )}
 
-            {wsConnectedState && !previewLoading && queueOptions.length > 0 && (
+            {!previewLoading && queueOptions.length > 0 && (
               <div className="bk-refresh-row">
                 <button type="button" className="bk-refresh-btn" onClick={fetchBookingPreview}>
                   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
@@ -946,12 +939,6 @@ export default function BookingPage() {
           <div className="bk-biz-strip-avatar">{(initialBusinessName || "B").charAt(0).toUpperCase()}</div>
           <div>
             <div className="bk-biz-strip-name">{initialBusinessName || "Business"}</div>
-            {wsConnectedState && (
-              <div className="bk-biz-strip-meta">
-                <span className="bk-live-dot bk-live-dot--sm" />
-                {t("bk.liveActive")}
-              </div>
-            )}
           </div>
         </div>
 
@@ -990,7 +977,11 @@ export default function BookingPage() {
               {t("bk.thService")}
             </div>
             <div className="bk-sc-value">
-              {selectedServices.length > 0 ? selectedServices.map(s => s.name).join(" + ") : <span className="bk-sc-empty">{t("bk.none")}</span>}
+              {selectedQueueOption && displayQueueServices.length > 0
+                ? displayQueueServices.map(s => s.service_name).join(" + ")
+                : selectedServices.length > 0
+                  ? selectedServices.map(s => s.name).join(" + ")
+                  : <span className="bk-sc-empty">{t("bk.none")}</span>}
             </div>
           </div>
           <div className="bk-sc-row">

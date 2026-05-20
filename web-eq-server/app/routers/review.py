@@ -5,8 +5,8 @@ from uuid import UUID
 
 from app.db.database import get_db
 from app.controllers.review_controller import ReviewController
-from app.schemas.review import ReviewCreateInput, ReviewData, BusinessReviewSummary, FeaturedReviewData
-from app.middleware.permissions import get_current_user
+from app.schemas.review import ReviewCreateInput, ReviewData, BusinessReviewSummary, FeaturedReviewData, MyReviewsResponse
+from app.middleware.permissions import get_current_user, require_roles, get_user_type
 from app.schemas.user import UserData
 
 review_router = APIRouter()
@@ -47,6 +47,18 @@ async def get_featured_reviews(
     db: Session = Depends(get_db),
 ) -> List[FeaturedReviewData]:
     return ReviewController(db).get_featured_reviews(limit)
+
+
+@review_router.get("/my_reviews", response_model=MyReviewsResponse)
+async def get_my_reviews(
+    limit: int = Query(10, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    _: None = Depends(require_roles(["BUSINESS", "EMPLOYEE", "ADMIN"])),
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MyReviewsResponse:
+    user_type = get_user_type()
+    return ReviewController(db).get_my_reviews(current_user, user_type, limit, offset)
 
 
 @review_router.get("/my_review", response_model=Optional[ReviewData])

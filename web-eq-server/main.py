@@ -23,7 +23,7 @@ from app.models import (
     User, UserLogin, Business, Category,
     Address, Schedule, ScheduleBreak, ScheduleException, Employee, Service,
     Queue, QueueUser, QueueService as QueueServiceModel, QueueUserService, AppointmentSlot,
-    Role, UserRoles, Review
+    Role, UserRoles, Review, ContactForm,
 )  # noqa: F401
 
 # Create the database schema
@@ -85,19 +85,16 @@ def run_activate_scheduled_job() -> None:
         db.close()
 
 
-def run_auto_hold_job() -> None:
-    """Every minute: push unchecked position-#1 users back by one position and notify them (once)."""
+def run_eta_notification_job() -> None:
+    """Every minute: send 'Time to Head Out!' push when wait <= customer's eta_minutes."""
     db = SessionLocal()
     try:
         controller = QueueController(db)
-        held = controller.process_auto_holds()
         eta_notified = controller.check_and_notify_eta()
-        if held:
-            logger.info("Auto-hold job: held %d user(s)", held)
         if eta_notified:
-            logger.info("Auto-hold job: sent %d heading-now notification(s)", eta_notified)
+            logger.info("ETA notification job: sent %d heading-now notification(s)", eta_notified)
     except Exception:
-        logger.exception("Auto-hold job failed")
+        logger.exception("ETA notification job failed")
     finally:
         db.close()
 
@@ -110,9 +107,9 @@ async def lifespan(app: FastAPI):
     scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
     scheduler.add_job(run_expiry_job, "cron", hour=0, minute=5, id="expire_appointments")
     scheduler.add_job(run_activate_scheduled_job, "interval", minutes=1, id="activate_scheduled")
-    scheduler.add_job(run_auto_hold_job, "interval", minutes=1, id="auto_hold")
+    scheduler.add_job(run_eta_notification_job, "interval", minutes=1, id="eta_notification")
     scheduler.start()
-    logger.info("APScheduler started: expiry at 00:05 IST, activate-scheduled every 1 min, auto-hold every 1 min")
+    logger.info("APScheduler started: expiry at 00:05 IST, activate-scheduled every 1 min, ETA notification every 1 min")
     yield
     scheduler.shutdown(wait=False)
     logger.info("APScheduler shut down")
@@ -133,6 +130,8 @@ origins = [
     "http://127.0.0.1:3001",
     "http://127.0.0.1:5173",
     "http://localhost:5173",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
 ]
 
 if CORS_ORIGINS:

@@ -24,8 +24,8 @@ export default function Navbar({ right, mobileRight }: NavbarProps) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Close menu on route change
-  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+  // Close menu on any navigation (pathname or search params)
+  useEffect(() => { setMenuOpen(false); }, [location.pathname, location.search]);
 
 
   // Prevent body scroll when menu open
@@ -53,6 +53,24 @@ export default function Navbar({ right, mobileRight }: NavbarProps) {
     { key: "nav.howItWorks",  label: t("nav.howItWorks"),  href: "/#how-it-works",          external: false },
     { key: "nav.forBusiness", label: t("nav.forBusiness"), href: EXTERNAL_LINKS.adminPanel, external: true },
   ];
+
+  const NAV_ICONS: Record<string, React.ReactNode> = {
+    "nav.explore": (
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+    ),
+    "nav.howItWorks": (
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    ),
+    "nav.forBusiness": (
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>
+      </svg>
+    ),
+  };
 
   return (
     <>
@@ -113,7 +131,26 @@ export default function Navbar({ right, mobileRight }: NavbarProps) {
         ref={menuRef}
         aria-hidden={!menuOpen}
       >
+        {/* Drawer header */}
+        <div className="cl-mobile-header">
+          <button
+            className="cl-nav-logo"
+            onClick={() => { navigate("/"); setMenuOpen(false); }}
+            aria-label={t("nav.logoAriaLabel")}
+          >
+            <img src={eqLogo} alt="" className="cl-nav-logo-img" aria-hidden="true" />
+            <span className="cl-nav-logo-text">EaseQueue</span>
+          </button>
+          <button className="cl-mobile-close" onClick={() => setMenuOpen(false)} aria-label="Close menu">
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Scrollable body */}
         <div className="cl-mobile-menu-inner">
+          <div className="cl-mobile-section-label">Discover</div>
           {NAV_LINKS.map((link) => (
             link.external ? (
               <a
@@ -124,6 +161,7 @@ export default function Navbar({ right, mobileRight }: NavbarProps) {
                 rel="noopener noreferrer"
                 onClick={() => setMenuOpen(false)}
               >
+                <span className="cl-mobile-link-icon">{NAV_ICONS[link.key]}</span>
                 {link.label}
               </a>
             ) : (
@@ -133,13 +171,17 @@ export default function Navbar({ right, mobileRight }: NavbarProps) {
                 className="cl-mobile-link"
                 onClick={(e) => handleNavLink(e, link.href)}
               >
+                <span className="cl-mobile-link-icon">{NAV_ICONS[link.key]}</span>
                 {link.label}
               </a>
             )
           ))}
-          {(mobileRight ?? right) && (
+          {/* User section renders directly — no centering wrapper */}
+          {mobileRight}
+          {/* Unauthenticated buttons (Sign In / Get Started) get the centered actions wrapper */}
+          {!mobileRight && right && (
             <div className="cl-mobile-actions" onClick={() => setMenuOpen(false)}>
-              {mobileRight ?? right}
+              {right}
             </div>
           )}
         </div>

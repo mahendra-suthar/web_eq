@@ -42,7 +42,6 @@ from app.services.notification_triggers import (
     notify_service_completed,
     notify_no_show,
     notify_skipped,
-    notify_auto_hold_sync,
     notify_heading_now_sync,
 )
 from app.services.realtime.queue_manager import queue_manager
@@ -1216,7 +1215,7 @@ class QueueController:
                 queue_waits = waits_by_queue.get(str(qu.queue_id), {})
                 wd = queue_waits.get("wait_data", {}).get(str(qu.uuid), {})
                 expected_at_ts = wd.get("expected_at_ts")
-                dynamic_appt_time = wd.get("estimated_appointment_time") or metrics.get("appointment_time")
+                dynamic_appt_time = metrics.get("appointment_time") or wd.get("estimated_appointment_time")
                 live_wait = wd.get("estimated_wait_minutes")
                 if live_wait is not None:
                     metrics = {**metrics, "wait_minutes": live_wait}
@@ -1239,58 +1238,6 @@ class QueueController:
 
     # ── Scheduled jobs ─────────────────────────────────────────────────────────
 
-    def process_auto_holds(self) -> int:
-        """
-        Called every minute by the scheduler.
-        For each active queue today: if the first-in-line user is not checked in,
-        push them one position back by advancing their effective_join_time.
-        Notifies the user once (on first hold only).
-        Returns total number of holds applied.
-        """
-        today = today_app_date()
-        now = now_app_tz()
-        total_held = 0
-
-        queue_ids = self.queue_service.get_queue_ids_with_registered_users_today(today)
-
-        for queue_id in queue_ids:
-            try:
-                active = self.queue_service.get_active_queue_users_with_lock(queue_id, today)
-                waiting = [u for u in active if u.status == QUEUE_USER_REGISTERED]
-                if not waiting:
-                    continue
-
-                first = waiting[0]
-                if first.is_checked_in:
-                    continue
-
-                send_notification = self.queue_service.apply_auto_hold(first, now)
-                total_held += 1
-
-                if send_notification:
-                    queue_name = first.queue.name if first.queue else ""
-                    notify_auto_hold_sync(
-                        db=self.db,
-                        user_id=first.user_id,
-                        token_number=first.token_number or "",
-                        queue_name=queue_name,
-                    )
-            except Exception:
-                logger.exception("process_auto_holds: error processing queue_id=%s", queue_id)
-                try:
-                    self.db.rollback()
-                except Exception:
-                    pass
-                continue
-
-        try:
-            self.db.commit()
-        except Exception:
-            self.db.rollback()
-            logger.exception("process_auto_holds: commit failed")
-
-        return total_held
-
     def check_and_notify_eta(self) -> int:
         """
         Called every minute by the scheduler.
@@ -1312,7 +1259,6 @@ class QueueController:
                     enqueue_time=qu.enqueue_time,
                     created_at=qu.created_at,
                     exclude_queue_user_id=qu.uuid,
-                    effective_join_time=qu.effective_join_time,
                 )
                 position = metrics["ahead_count"] + 1
                 wait_minutes = metrics["total_wait_minutes"]

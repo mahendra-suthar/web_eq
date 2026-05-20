@@ -17,7 +17,6 @@ from app.core.constants import (
     NOTIF_IN_SERVICE,
     NOTIF_NEW_CUSTOMER,
     NOTIF_SERVICE_COMPLETED,
-    NOTIF_AUTO_HOLD,
     NOTIF_HEADING_NOW,
     NOTIF_NO_SHOW,
     NOTIF_SKIPPED,
@@ -188,30 +187,6 @@ async def notify_skipped(
 
 
 # ─── Sync-only helpers (called from background scheduler, no WS push) ────────
-
-def notify_auto_hold_sync(
-    db: Session,
-    user_id: UUID,
-    token_number: str,
-    queue_name: str = "",
-) -> None:
-    """AUTO_HOLD — persists DB notification only (called from sync scheduler)."""
-    try:
-        svc = NotificationService(db)
-        svc.create(
-            user_id=user_id,
-            type=NOTIF_AUTO_HOLD,
-            title="Position Update",
-            body=(
-                f"You were moved back one spot in {queue_name or 'the queue'} "
-                f"(Token #{token_number}) because you haven't checked in yet. "
-                "Tap 'I've Arrived' when you're here."
-            ),
-            data={"token_number": token_number, "queue_name": queue_name},
-        )
-    except Exception:
-        logger.exception("notify_auto_hold_sync failed for user_id=%s", user_id)
-
 
 def notify_heading_now_sync(
     db: Session,

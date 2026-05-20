@@ -12,6 +12,7 @@ import {
 import { BusinessService } from "../../services/business/business.service";
 import { AppointmentService, type TodayAppointmentResponse } from "../../services/appointment/appointment.service";
 import { BookingService } from "../../services/booking/booking.service";
+import { useCustomerQueueWS, type CustomerQueueUpdate } from "../../hooks/useCustomerQueueWS";
 import { ReviewService, type FeaturedReview } from "../../services/review/review.service";
 import StarRating from "../../components/star-rating";
 import { useAuthStore } from "../../store/auth.store";
@@ -31,6 +32,24 @@ import {
 import "./landing.scss";
 
 const FEATURED_LIMIT = 6;
+
+const LIVE_STATUSES = new Set([1, 2, 8]); // REGISTERED, IN_PROGRESS, SCHEDULED
+
+function AppointmentQueueSync({
+  appointment,
+  onUpdate,
+}: {
+  appointment: TodayAppointmentResponse;
+  onUpdate: (update: CustomerQueueUpdate) => void;
+}) {
+  useCustomerQueueWS(
+    appointment.queue_id,
+    appointment.queue_date ?? null,
+    appointment.queue_user_id,
+    { onUpdate },
+  );
+  return null;
+}
 
 const HIW_META = [
   { num: "01", icon: "🔍" },
@@ -56,7 +75,8 @@ export default function LandingPage() {
   const [activeFilter, setActiveFilter] = useState<string>(() => t("landing.filterOpenNow"));
 
   const [todayAppointments, setTodayAppointments] = useState<TodayAppointmentResponse[]>([]);
-  const [todayLoading, setTodayLoading] = useState(false);
+  const [todayLoading, setTodayLoading] = useState(true);
+  const [todayError, setTodayError] = useState(false);
   const [featuredBusinesses, setFeaturedBusinesses] = useState<Business[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [featuredError, setFeaturedError] = useState<string | null>(null);
@@ -122,7 +142,8 @@ export default function LandingPage() {
       const svc = new CategoryService();
       const data = await svc.getCategoryTree();
       setCategoryRoots(data);
-      if (data.length > 0) setActiveSuperTab(data[0].uuid);
+      const defaultTab = data.find((c) => c.has_businesses) ?? data[0];
+      if (defaultTab) setActiveSuperTab(defaultTab.uuid);
     } catch (err) {
       if (import.meta.env.DEV) console.error("Failed to fetch category tree:", err);
       setParentsError(getApiErrorMessage(err, "Failed to load categories. Please try again later."));
@@ -134,14 +155,18 @@ export default function LandingPage() {
   useEffect(() => { fetchCategoryTree(); }, [fetchCategoryTree]);
 
   const fetchTodayAppointments = useCallback(async () => {
-    if (!isAuthenticated()) { setTodayAppointments([]); return; }
+    if (!isAuthenticated()) {
+      setTodayAppointments([]);
+      setTodayLoading(false);
+      return;
+    }
     setTodayLoading(true);
+    setTodayError(false);
     try {
       const data = await new AppointmentService().getTodayAppointments();
       setTodayAppointments(data ?? []);
-    } catch (err) {
-      if (import.meta.env.DEV) console.error("Failed to fetch today's appointments:", err);
-      setTodayAppointments([]);
+    } catch {
+      setTodayError(true);
     } finally {
       setTodayLoading(false);
     }
@@ -156,6 +181,24 @@ export default function LandingPage() {
         prev.map((a) => a.queue_user_id === queueUserId ? { ...a, is_checked_in: true } : a)
       );
     } catch {}
+  }, []);
+
+  const handleQueueUpdate = useCallback((update: CustomerQueueUpdate) => {
+    setTodayAppointments((prev) =>
+      prev.map((a) =>
+        a.queue_user_id === update.queue_user_id
+          ? {
+              ...a,
+              position: update.position,
+              status: update.status ?? a.status,
+              estimated_wait_minutes: update.estimated_wait_minutes,
+              estimated_appointment_time: update.estimated_appointment_time,
+              expected_at_ts: update.expected_at_ts,
+              current_token: update.current_token ?? a.current_token,
+            }
+          : a
+      )
+    );
   }, []);
 
   const fetchFeaturedBusinesses = useCallback(async () => {
@@ -217,6 +260,7 @@ export default function LandingPage() {
       description: c.description,
       image: c.image,
       service_count: c.services_count,
+      has_businesses: c.has_businesses,
     }));
   }, [categoryRoots, activeSuperTab]);
 
@@ -396,12 +440,45 @@ export default function LandingPage() {
             </div>
 
             {todayLoading ? (
-              <div className="loading-state lp-today-loading">
-                <LoadingSpinner aria-label="Loading appointments" size="md" />
-                <p className="loading-state__message">{t("landing.loadingAppointments")}</p>
+              <div className="lp-today-cards" aria-busy="true" aria-label="Loading appointments">
+                {[0, 1].map((i) => (
+                  <article key={i} className="lp-today-card lp-today-card--skeleton" aria-hidden="true">
+                    <div className="lp-today-urgency-bar lp-sk-bar" />
+                    <div className="lp-today-card-body">
+                      <div className="lp-sk lp-sk--title" />
+                      <div className="lp-sk lp-sk--sub" />
+                      <div className="lp-today-stats" style={{ marginTop: 14 }}>
+                        {[0, 1, 2].map((j) => <div key={j} className="lp-today-stat lp-sk-stat" />)}
+                      </div>
+                      <div className="lp-sk lp-sk--line" />
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : todayError ? (
+              <div className="lp-today-cards lp-today-cards--empty">
+                <div className="lp-today-empty lp-today-empty--error reveal">
+                  <div className="lp-today-empty-emoji" aria-hidden="true">⚠️</div>
+                  <div className="lp-today-empty-title">{t("landing.todayErrorTitle")}</div>
+                  <div className="lp-today-empty-sub">{t("landing.todayErrorSub")}</div>
+                  <button className="lp-today-empty-btn" onClick={fetchTodayAppointments}>
+                    {t("landing.todayRetry")}
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className={`lp-today-cards${todayAppointments.length === 0 ? " lp-today-cards--empty" : ""}`}>
+              <>
+                {isAuthenticated() && todayAppointments
+                  .filter((a) => LIVE_STATUSES.has(a.status))
+                  .map((a) => (
+                    <AppointmentQueueSync
+                      key={a.queue_user_id}
+                      appointment={a}
+                      onUpdate={handleQueueUpdate}
+                    />
+                  ))}
+
+                <div className={`lp-today-cards${todayAppointments.length === 0 ? " lp-today-cards--empty" : ""}`}>
                 {todayAppointments.map((appt) => {
                   const isInProgress = appt.status === 2;
                   const isScheduled = appt.status === 8;  // SCHEDULED — pre-active, not yet in queue
@@ -500,7 +577,7 @@ export default function LandingPage() {
                         <div className="lp-today-footer">
                           <div className="lp-today-footer-actions">
                             <AppointmentActions appointment={appt} onUpdated={fetchTodayAppointments} />
-                            {appt.status === 1 && appt.position != null && appt.position <= 3 && (
+                            {(appt.status === 8 || (appt.status === 1 && appt.position != null && appt.position <= 3)) && (
                               appt.is_checked_in ? (
                                 <span className="appt-actions__arrived">
                                   <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3" aria-hidden="true">
@@ -543,6 +620,7 @@ export default function LandingPage() {
                   </button>
                 </div>
               </div>
+              </>
             )}
           </div>
         </section>
@@ -597,28 +675,39 @@ export default function LandingPage() {
                 role="tabpanel"
               >
                 {displayedSubcats.length > 0 ? (
-                  displayedSubcats.map((sub, i) => (
-                    <button
-                      key={sub.uuid}
-                      className={`lp-subcat-card lp-subcat-card--${activeTabIdx % 4} reveal${i % 4 === 1 ? " reveal-delay-1" : i % 4 === 2 ? " reveal-delay-2" : i % 4 === 3 ? " reveal-delay-3" : ""}`}
-                      onClick={() => navigate(`/categories/${sub.uuid}`, { state: { category: sub } })}
-                      aria-label={sub.name}
-                    >
-                      <div className="lp-subcat-card__icon" aria-hidden="true">{getCategoryEmoji(sub.name)}</div>
-                      <div className="lp-subcat-card__name">{sub.name}</div>
-                      {sub.description && <div className="lp-subcat-card__desc">{sub.description}</div>}
-                      <div className="lp-subcat-card__footer">
-                        <span className="lp-subcat-card__count">
-                          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                            <polyline points="9 11 12 14 22 4" />
-                            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-                          </svg>
-                          {sub.service_count} {t("landing.services")}
-                        </span>
-                        <span className="lp-subcat-card__arrow" aria-hidden="true">→</span>
-                      </div>
-                    </button>
-                  ))
+                  displayedSubcats.map((sub, i) => {
+                    const disabled = !sub.has_businesses;
+                    return (
+                      <button
+                        key={sub.uuid}
+                        aria-label={sub.name}
+                        aria-disabled={disabled}
+                        disabled={disabled}
+                        className={`lp-subcat-card lp-subcat-card--${activeTabIdx % 4}${disabled ? " lp-subcat-card--disabled" : ""} reveal${i % 4 === 1 ? " reveal-delay-1" : i % 4 === 2 ? " reveal-delay-2" : i % 4 === 3 ? " reveal-delay-3" : ""}`}
+                        onClick={() => !disabled && navigate(`/categories/${sub.uuid}`, { state: { category: sub } })}
+                      >
+                        <div className="lp-subcat-card__icon" aria-hidden="true">{getCategoryEmoji(sub.name)}</div>
+                        <div className="lp-subcat-card__name">{sub.name}</div>
+                        {sub.description && <div className="lp-subcat-card__desc">{sub.description}</div>}
+                        <div className="lp-subcat-card__footer">
+                          {disabled ? (
+                            <span className="lp-subcat-card__coming-soon">{t("landing.comingSoon")}</span>
+                          ) : (
+                            <>
+                              <span className="lp-subcat-card__count">
+                                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                  <polyline points="9 11 12 14 22 4" />
+                                  <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+                                </svg>
+                                {sub.service_count} {t("landing.services")}
+                              </span>
+                              <span className="lp-subcat-card__arrow" aria-hidden="true">→</span>
+                            </>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
                 ) : (
                   searchQuery
                     ? <EmptyState title={t("landing.noResultsFor", { query: searchQuery })} hint={t("landing.tryDifferentSearch")} className="lp-empty-full" />
@@ -674,7 +763,7 @@ export default function LandingPage() {
                   hint={activeFilter === filterOpenNow ? t("landing.noOpenBizHint") : t("landing.noBizHint")}
                   action={
                     activeFilter === filterOpenNow ? (
-                      <button className="lp-empty-action-btn" onClick={() => setActiveFilter("")}>
+                      <button className="lp-empty-action-btn" onClick={() => navigate("/search")}>
                         {t("landing.showAllBusinesses")}
                       </button>
                     ) : undefined
