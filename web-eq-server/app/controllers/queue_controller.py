@@ -12,7 +12,7 @@ from app.core.constants import (
     BUSINESS_REGISTERED,
     QUEUE_RUNNING, QUEUE_STOPPED,
     QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_COMPLETED,
-    QUEUE_USER_FAILED, QUEUE_USER_CANCELLED,
+    QUEUE_USER_FAILED, QUEUE_USER_CANCELLED, QUEUE_USER_SCHEDULED,
     QUEUE_USER_PRIORITY_REQUESTED, QUEUE_USER_EXPIRED,
     QUEUE_USER_STATUS_LABELS,
     TIME_FORMAT, DEFAULT_AVG_TIME,
@@ -334,6 +334,9 @@ class QueueController:
                 else:
                     remaining = turn
                 result[qid]["total_wait_minutes"] += remaining
+            elif status == QUEUE_USER_SCHEDULED:
+                result[qid]["registered_count"] += 1
+                result[qid]["total_wait_minutes"] += turn
         return result
 
     def _build_services_by_queue(self, raw_details: List[dict]) -> Dict[UUID, List[dict]]:
@@ -524,30 +527,29 @@ class QueueController:
                 if not queue_services:
                     queue_services = all_queue_services
 
-            if data.queue_date == today_app_date():
-                if is_walk_in:
-                    # Walk-in: block duplicate — admin must not add someone already in the queue
-                    duplicate = self.queue_service.get_existing_same_day_booking(
-                        booking_user_id, queue_id, data.queue_date
+            if is_walk_in and data.queue_date == today_app_date():
+                # Walk-in: block duplicate — admin must not add someone already in the queue today
+                duplicate = self.queue_service.get_existing_same_day_booking(
+                    booking_user_id, queue_id, data.queue_date
+                )
+                if duplicate is not None:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="This customer already has an active appointment in this queue today.",
                     )
-                    if duplicate is not None:
-                        raise HTTPException(
-                            status_code=409,
-                            detail="This customer already has an active appointment in this queue today.",
-                        )
-                else:
-                    # Self-booking: silently return existing booking so the customer sees their slot
-                    existing_booking = self.get_existing_booking(
-                        user_id=booking_user_id,
-                        queue_id=queue_id,
-                        queue_date=data.queue_date,
-                        business_id=data.business_id,
-                        queue=queue,
-                        business=business,
-                        calc_service=calc_service,
-                    )
-                    if existing_booking is not None:
-                        return existing_booking
+            elif not is_walk_in:
+                # Self-booking: return existing slot for today OR future dates — prevents duplicate slots
+                existing_booking = self.get_existing_booking(
+                    user_id=booking_user_id,
+                    queue_id=queue_id,
+                    queue_date=data.queue_date,
+                    business_id=data.business_id,
+                    queue=queue,
+                    business=business,
+                    calc_service=calc_service,
+                )
+                if existing_booking is not None:
+                    return existing_booking
 
             slot_id = getattr(data, "slot_id", None)
             appointment_type = (data.appointment_type or "QUEUE").upper()
@@ -1178,6 +1180,8 @@ class QueueController:
             if not queue_users:
                 return CustomerTodayAppointmentsResponse(items=[])
 
+            calc_service = BookingCalculationService(self.db)
+            app_tz = pytz.timezone(TIMEZONE)
             waits_by_queue: dict = {}
             for qu in queue_users:
                 qid = str(qu.queue_id)
@@ -1187,12 +1191,14 @@ class QueueController:
                             qu.queue_id, today
                         )
                         users_raw = build_live_queue_users_raw(rows, svc_by_user)
-                        result = calculate_queue_waits(users_raw)
+                        open_dt = None
+                        if qu.queue:
+                            open_time, _, _, _ = calc_service.get_employee_window(qu.queue, today)
+                            open_dt = app_tz.localize(datetime.combine(today, open_time))
+                        result = calculate_queue_waits(users_raw, open_dt=open_dt)
                         waits_by_queue[qid] = result
                     except Exception:
                         waits_by_queue[qid] = {"current_token": None, "wait_data": {}}
-
-            calc_service = BookingCalculationService(self.db)
             items = []
             for qu in queue_users:
                 queue = qu.queue

@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 def calculate_queue_waits(
     users: List[dict],
     now: Optional[datetime] = None,
+    open_dt: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """
     Given a list of queue-user dicts (from build_live_queue_users_raw), compute
@@ -56,6 +57,8 @@ def calculate_queue_waits(
     """
     if now is None:
         now = now_app_tz()
+
+    base = max(now, open_dt) if open_dt is not None else now
 
     # Self-adapting fallback turn_time
     completed_times = [
@@ -120,7 +123,7 @@ def calculate_queue_waits(
 
     # WAITING users — cumulative
     for wu in waiting_sorted:
-        expected_dt = now + timedelta(minutes=cumulative)
+        expected_dt = base + timedelta(minutes=cumulative)
         wait_data[str(wu["uuid"])] = {
             "expected_at_ts": _to_epoch_ms(expected_dt),
             "estimated_wait_minutes": max(0, int(round(cumulative))),
@@ -242,13 +245,15 @@ class LiveQueueManager:
         completed_count = sum(1 for u in users if u["status"] == QUEUE_USER_COMPLETED)
 
         employee_on_leave = False
+        open_dt: Optional[datetime] = None
         if queue:
             calc = BookingCalculationService(db)
-            _, _, _, employee_available = calc.get_employee_window(queue, queue_date)
+            open_time, _, _, employee_available = calc.get_employee_window(queue, queue_date)
             employee_on_leave = not employee_available
+            open_dt = _APP_TZ.localize(datetime.combine(queue_date, open_time))
 
         # Dynamic wait estimation via shared helper
-        waits = calculate_queue_waits(users)
+        waits = calculate_queue_waits(users, open_dt=open_dt)
         current_token = waits["current_token"]
         wait_data = waits["wait_data"]
 

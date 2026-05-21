@@ -358,7 +358,7 @@ class QueueService:
                     QueueUser.user_id == user_id,
                     QueueUser.queue_date == queue_date,
                     QueueUser.scheduled_start == slot_start,
-                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_SCHEDULED]),
                 )
             )
             if exclude_queue_user_id:
@@ -891,7 +891,7 @@ class QueueService:
                 .filter(
                     QueueUser.queue_id.in_(queue_ids),
                     QueueUser.queue_date == booking_date,
-                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_SCHEDULED]),
                 )
                 .all()
             )
