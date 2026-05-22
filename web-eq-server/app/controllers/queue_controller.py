@@ -1134,7 +1134,15 @@ class QueueController:
     def build_live_queue_data(
         self, queue: Any, queue_date: date, users_raw: list, employee_on_leave: bool = False
     ) -> LiveQueueData:
-        return LiveQueueData.from_build(queue, queue_date, users_raw, employee_on_leave)
+        from app.core.utils import APP_TZ
+        open_dt = None
+        try:
+            calc = BookingCalculationService(self.db)
+            open_time, _, _, _ = calc.get_employee_window(queue, queue_date)
+            open_dt = APP_TZ.localize(datetime.combine(queue_date, open_time))
+        except Exception:
+            pass
+        return LiveQueueData.from_build(queue, queue_date, users_raw, employee_on_leave, open_dt=open_dt)
 
     def get_existing_booking(
         self,
@@ -1221,6 +1229,9 @@ class QueueController:
                 queue_waits = waits_by_queue.get(str(qu.queue_id), {})
                 wd = queue_waits.get("wait_data", {}).get(str(qu.uuid), {})
                 expected_at_ts = wd.get("expected_at_ts")
+                expected_end_ts = wd.get("expected_end_ts")
+                estimated_end_time = wd.get("estimated_end_time")
+                service_duration_minutes = wd.get("service_duration_minutes")
                 dynamic_appt_time = metrics.get("appointment_time") or wd.get("estimated_appointment_time")
                 live_wait = wd.get("estimated_wait_minutes")
                 if live_wait is not None:
@@ -1233,6 +1244,9 @@ class QueueController:
                         queue_service_uuids=qs_uuids,
                         expected_at_ts=expected_at_ts,
                         current_token=queue_waits.get("current_token"),
+                        expected_end_ts=expected_end_ts,
+                        estimated_end_time=estimated_end_time,
+                        service_duration_minutes=service_duration_minutes,
                     )
                 )
             return CustomerTodayAppointmentsResponse(items=items)

@@ -519,7 +519,11 @@ function AppointmentsSection() {
                               <span className="ac-live-bar__next-icon">⚡</span>
                               <span className="ac-live-bar__next-text">{t("youreNext")}</span>
                               {item.estimated_appointment_time && (
-                                <span className="ac-live-bar__wait">{t("expectedAt")} {item.estimated_appointment_time}</span>
+                                <span className="ac-live-bar__wait">
+                                  {item.estimated_end_time
+                                    ? `${item.estimated_appointment_time} → ${item.estimated_end_time}`
+                                    : `${t("expectedAt")} ${item.estimated_appointment_time}`}
+                                </span>
                               )}
                             </>
                           ) : (
@@ -531,7 +535,11 @@ function AppointmentsSection() {
                                 </>
                               )}
                               {item.estimated_appointment_time ? (
-                                <span className="ac-live-bar__wait">{t("expectedAt")} {item.estimated_appointment_time}</span>
+                                <span className="ac-live-bar__wait">
+                                  {item.estimated_end_time
+                                    ? `${item.estimated_appointment_time} → ${item.estimated_end_time}`
+                                    : `${t("expectedAt")} ${item.estimated_appointment_time}`}
+                                </span>
                               ) : item.estimated_wait_minutes != null && item.estimated_wait_minutes > 0 ? (
                                 <span className="ac-live-bar__wait">~{item.estimated_wait_minutes} {t("minWait")}</span>
                               ) : null}

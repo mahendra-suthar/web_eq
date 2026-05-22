@@ -98,6 +98,9 @@ export function useLiveQueueWS(
                     case "queue_stopped":
                         onStoppedRef.current?.(msg.data);
                         break;
+                    case "initial_state":
+                        onUpdateRef.current?.(msg.data as LiveQueueData);
+                        break;
                     case "ping":
                         ws.send(JSON.stringify({ type: "pong" }));
                         break;

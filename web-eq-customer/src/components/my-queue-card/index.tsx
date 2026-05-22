@@ -109,7 +109,9 @@ const MyQueueCard: React.FC<MyQueueCardProps> = ({ appointment }) => {
           )}
           {liveData.estimated_appointment_time && !isInProgress && (
             <div className="mqc__time">
-              {t("expectedAt") || "Expected at"} {liveData.estimated_appointment_time}
+              {liveData.estimated_end_time
+                ? `${liveData.estimated_appointment_time} → ${liveData.estimated_end_time}`
+                : `${t("expectedAt") || "Expected at"} ${liveData.estimated_appointment_time}`}
             </div>
           )}
         </div>

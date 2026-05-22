@@ -436,6 +436,7 @@
   "checkInTime": "Checked-in At",
   "etaTravel": "Travel ETA",
   "imAlreadyHere": "Already here",
-  "min": "min"
+  "min": "min",
+  "endsAt": "Ends"
 }
 
