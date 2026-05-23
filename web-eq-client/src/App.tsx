@@ -1,5 +1,7 @@
 import { Suspense, lazy } from "react";
 import type { ReactElement } from "react";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { useSessionRestore } from "./hooks/useSessionRestore";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { RouterConstant } from "./routers/index";
@@ -57,6 +59,7 @@ const App = () => {
   useSessionRestore();
   return (
   <BrowserRouter>
+    <ToastContainer position="top-right" autoClose={3000} />
     <AuthFailureHandler />
     <Routes>
       {/* Public / Auth routes */}

@@ -9,6 +9,8 @@ import { Tabs } from '../../components/tabs/Tabs';
 import { EmployeeOverviewForm } from '../../components/employee/EmployeeOverviewForm';
 import { RouterConstant } from '../../routers/index';
 import { backendDowToUiDow, emailRegex, formatDurationMinutes, getQueueStatusLabel, uiDowToBackendDow } from '../../utils/utils';
+import { toast } from 'react-toastify';
+import { ShareMenu } from '../../components/share-menu/ShareMenu';
 import { QRService } from '../../services/qr/qr.service';
 import QRCard from '../../components/qr-card';
 import './employee-detail.scss';
@@ -42,6 +44,57 @@ const iconQueue = (
 
 type TabType = 'overview' | 'location' | 'schedule' | 'queue' | 'qr';
 
+function formatExpiry(expiresAt: string | null): { label: string; expired: boolean } {
+    if (!expiresAt) return { label: "No expiry", expired: false };
+    const diff = new Date(expiresAt).getTime() - Date.now();
+    if (diff <= 0) return { label: "Expired", expired: true };
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    if (hours < 1) return { label: "Expires in < 1h", expired: false };
+    if (hours < 24) return { label: `Expires in ${hours}h`, expired: false };
+    const days = Math.floor(hours / 24);
+    return { label: `Expires in ${days}d`, expired: false };
+}
+
+interface InvitationCodeCardProps {
+    code: string;
+    expiresAt: string | null;
+    shareSlot?: React.ReactNode;
+    copied: boolean;
+    regenerating: boolean;
+    onCopy: () => void;
+    onRegenerate: () => void;
+}
+
+function InvitationCodeCard({ code, expiresAt, shareSlot, copied, regenerating, onCopy, onRegenerate }: InvitationCodeCardProps) {
+    const { label, expired } = formatExpiry(expiresAt);
+    return (
+        <div className="invitation-code-card">
+            <div className="invitation-code-card__row">
+                <span className="invitation-code-card__code">{code}</span>
+                <div className="invitation-code-card__actions">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={onCopy} disabled={expired}>
+                        {copied ? "Copied!" : "Copy"}
+                    </button>
+                    {shareSlot}
+                </div>
+            </div>
+            <div className="invitation-code-card__meta">
+                <span className={`invitation-code-card__expiry${expired ? " invitation-code-card__expiry--expired" : ""}`}>
+                    {label}
+                </span>
+                <button
+                    type="button"
+                    className="invitation-code-card__regenerate"
+                    onClick={onRegenerate}
+                    disabled={regenerating}
+                >
+                    {regenerating ? "Regenerating…" : "Regenerate"}
+                </button>
+            </div>
+        </div>
+    );
+}
+
 const EmployeeDetail = () => {
     const { t } = useTranslation();
     const { employeeId } = useParams<{ employeeId: string }>();
@@ -73,7 +126,6 @@ const EmployeeDetail = () => {
     const [editingSchedule, setEditingSchedule] = useState(false);
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState<string>("");
-    const [queueDisplay, setQueueDisplay] = useState<{ name: string; uuid?: string; status?: number | null } | null>(null);
     const [locationData, setLocationData] = useState<AddressData>({
         unit_number: "", building: "", floor: "", street_1: "", street_2: "",
         city: "", district: "", state: "", postal_code: "", country: "INDIA",
@@ -83,6 +135,11 @@ const EmployeeDetail = () => {
     const [businessId, setBusinessId] = useState<string | null>(null);
     const [assigningQueue, setAssigningQueue] = useState(false);
     const [queueAssignError, setQueueAssignError] = useState<string>("");
+    const [invitationCode, setInvitationCode] = useState<string | null>(null);
+    const [invitationCodeExpiresAt, setInvitationCodeExpiresAt] = useState<string | null>(null);
+    const [invitationLoading, setInvitationLoading] = useState(false);
+    const [invitationError, setInvitationError] = useState<string>("");
+    const [codeCopied, setCodeCopied] = useState(false);
 
     // UI convention: 0 = Monday, 6 = Sunday. Backend stores schedules as 0=Sunday..6=Saturday.
     const dayNames = useMemo(() => [
@@ -123,17 +180,6 @@ const EmployeeDetail = () => {
                 });
                 setEmployeeCountryCode(emp?.country_code || "");
                 setEmployeePhoneNumber(emp?.phone_number || "");
-                if (emp?.queue) {
-                    setQueueDisplay({
-                        name: emp.queue.name,
-                        uuid: emp.queue.uuid,
-                        status: emp.queue.status ?? undefined,
-                    });
-                } else {
-                    setQueueDisplay(null);
-                }
-            } else {
-                setQueueDisplay(null);
             }
             setLocationData(profile.address ? {
                 unit_number: profile.address.unit_number || "",
@@ -178,6 +224,73 @@ const EmployeeDetail = () => {
     useEffect(() => {
         fetchProfile();
     }, [fetchProfile]);
+
+    // Load invitation code from get_employees list (includes invitation_code fields).
+    // Only needed when employee is not yet verified (unverified employees have pending codes).
+    useEffect(() => {
+        if (!businessId || !employeeId) return;
+        if (employeeDisplay.isVerified) {
+            setInvitationCode(null);
+            setInvitationCodeExpiresAt(null);
+            return;
+        }
+        let cancelled = false;
+        setInvitationLoading(true);
+        setInvitationError("");
+        employeeService.getEmployees(businessId, 1, 200, "")
+            .then((list) => {
+                if (cancelled) return;
+                const emp = list.find((e) => e.uuid === employeeId);
+                setInvitationCode(emp?.invitation_code ?? null);
+                setInvitationCodeExpiresAt(emp?.invitation_code_expires_at ?? null);
+            })
+            .catch(() => {
+                if (!cancelled) setInvitationError("Failed to load invitation code");
+            })
+            .finally(() => { if (!cancelled) setInvitationLoading(false); });
+        return () => { cancelled = true; };
+    }, [businessId, employeeId, employeeDisplay.isVerified, employeeService]);
+
+    const handleRegenerateCode = useCallback(async () => {
+        if (!employeeId || !businessId) return;
+        setInvitationLoading(true);
+        setInvitationError("");
+        try {
+            const updated = await employeeService.regenerateInvitationCode(employeeId, businessId);
+            setInvitationCode(updated.invitation_code ?? null);
+            setInvitationCodeExpiresAt(updated.invitation_code_expires_at ?? null);
+        } catch (err: any) {
+            setInvitationError(err?.message || "Failed to regenerate code");
+        } finally {
+            setInvitationLoading(false);
+        }
+    }, [employeeId, businessId, employeeService]);
+
+    const handleCopyCode = useCallback(async () => {
+        if (!invitationCode) return;
+        let ok = false;
+        if (navigator.clipboard?.writeText) {
+            try { await navigator.clipboard.writeText(invitationCode); ok = true; } catch { /* fall through */ }
+        }
+        if (!ok) {
+            try {
+                const el = document.createElement("textarea");
+                el.value = invitationCode;
+                el.style.cssText = "position:fixed;top:-9999px;left:-9999px";
+                document.body.appendChild(el);
+                el.select();
+                ok = document.execCommand("copy");
+                document.body.removeChild(el);
+            } catch { /* nothing */ }
+        }
+        if (ok) {
+            setCodeCopied(true);
+            setTimeout(() => setCodeCopied(false), 2000);
+        } else {
+            toast.error("Could not copy. Please copy the code manually.");
+        }
+    }, [invitationCode]);
+
 
     useEffect(() => {
         const openTab = (location.state as { openTab?: TabType })?.openTab;
@@ -456,6 +569,48 @@ const EmployeeDetail = () => {
                                         />
                                     </div>
                                 </div>
+
+                                {/* Invitation Code block — only for unverified employees */}
+                                {!employeeDisplay.isVerified && (
+                                    <div className="info-block invitation-code-block">
+                                        <h3 className="info-block-title">Invitation Code</h3>
+                                        <p className="info-block-hint">
+                                            Share this code with the employee so they can join via the EaseQueue app.
+                                        </p>
+                                        {invitationLoading ? (
+                                            <div className="invitation-loading">{t("loading")}</div>
+                                        ) : invitationError ? (
+                                            <div className="invitation-error">{invitationError}</div>
+                                        ) : invitationCode ? (
+                                            <InvitationCodeCard
+                                                code={invitationCode}
+                                                expiresAt={invitationCodeExpiresAt}
+                                                shareSlot={
+                                                    <ShareMenu
+                                                        employeeName={employeeDisplay.fullName}
+                                                        code={invitationCode}
+                                                    />
+                                                }
+                                                copied={codeCopied}
+                                                regenerating={invitationLoading}
+                                                onCopy={handleCopyCode}
+                                                onRegenerate={handleRegenerateCode}
+                                            />
+                                        ) : (
+                                            <div className="invitation-no-code">
+                                                <p>No active invitation code.</p>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-primary btn-sm"
+                                                    onClick={handleRegenerateCode}
+                                                    disabled={invitationLoading}
+                                                >
+                                                    Generate Code
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

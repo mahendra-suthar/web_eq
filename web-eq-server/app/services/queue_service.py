@@ -801,7 +801,7 @@ class QueueService:
                     QueueUser.queue_id == queue_id,
                     QueueUser.queue_date == queue_date,
                     QueueUser.appointment_type.in_([APPOINTMENT_TYPE_FIXED, APPOINTMENT_TYPE_APPROXIMATE]),
-                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
+                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_SCHEDULED]),
                     QueueUser.scheduled_start.isnot(None),
                 )
                 .all()
@@ -883,10 +883,13 @@ class QueueService:
         try:
             rows = (
                 self.db.query(
+                    QueueUser.uuid,
                     QueueUser.queue_id,
                     QueueUser.status,
                     QueueUser.turn_time,
                     QueueUser.enqueue_time,
+                    QueueUser.appointment_type,
+                    QueueUser.scheduled_start,
                 )
                 .filter(
                     QueueUser.queue_id.in_(queue_ids),
@@ -897,10 +900,16 @@ class QueueService:
             )
             return [
                 {
+                    "uuid": row.uuid,
                     "queue_id": row.queue_id,
                     "status": row.status,
                     "turn_time": row.turn_time,
                     "enqueue_time": row.enqueue_time,
+                    "appointment_type": row.appointment_type,
+                    "scheduled_start": (
+                        row.scheduled_start.strftime("%H:%M")
+                        if row.scheduled_start else None
+                    ),
                 }
                 for row in rows
             ]

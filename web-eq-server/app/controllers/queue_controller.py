@@ -20,6 +20,7 @@ from app.core.constants import (
     APPOINTMENT_TYPE_QUEUE, APPOINTMENT_TYPE_FIXED, APPOINTMENT_TYPE_APPROXIMATE,
 )
 from app.core.utils import (
+    APP_TZ,
     build_live_queue_users_raw,
     today_app_date,
     current_time_app_tz,
@@ -301,42 +302,101 @@ class QueueController:
     # Customer Booking APIs
     # ─────────────────────────────────────────────────────────────────────────
 
-    def _build_today_metrics(
+    def _build_queue_preview_metrics(
         self,
-        queue_ids: List[UUID],
-        raw_rows: List[dict],
+        queues: List[Any],
+        booking_date: date,
         current_time: datetime,
+        raw_rows: List[dict],
+        services_by_queue: Optional[Dict] = None,
     ) -> Dict[UUID, Dict[str, Any]]:
-        """Build per-queue metrics from DB rows (delay-aware for in-progress)."""
-        result: Dict[UUID, Dict[str, Any]] = {
-            qid: {"registered_count": 0, "in_progress_count": 0, "total_wait_minutes": 0}
-            for qid in queue_ids
-        }
-        for row in raw_rows:
-            qid = row["queue_id"]
-            status = row["status"]
-            turn = row.get("turn_time") or 0
-            if status == QUEUE_USER_REGISTERED:
-                result[qid]["registered_count"] += 1
-                result[qid]["total_wait_minutes"] += turn
-            elif status == QUEUE_USER_IN_PROGRESS:
-                result[qid]["in_progress_count"] += 1
-                enqueue_time = row.get("enqueue_time")
-                if current_time and enqueue_time:
-                    try:
-                        enqueue_dt = enqueue_time
-                        if enqueue_dt.tzinfo is None:
-                            enqueue_dt = enqueue_dt.replace(tzinfo=timezone.utc)
-                        elapsed = max(0.0, (current_time - enqueue_dt).total_seconds() / 60)
-                        remaining = max(0, turn - int(elapsed))
-                    except Exception:
-                        remaining = turn
+        """
+        Compute per-queue position/wait metrics for a prospective new booking using
+        calculate_queue_waits() — the same authoritative cursor algorithm as the live queue.
+        SCHEDULED (status=8) users are treated as time-reservations, not active waiting
+        users, so they only affect timing (pushing the new user's slot later) without
+        incorrectly inflating position or wait for an empty queue.
+        """
+        from app.services.realtime.live_queue_manager import calculate_queue_waits, _scheduled_start_dt
+
+        calc = BookingCalculationService(self.db)
+        now = current_time
+        now_ms = int(now.timestamp() * 1000)
+        result: Dict[UUID, Dict[str, Any]] = {}
+
+        for queue in queues:
+            qid = queue.uuid
+            queue_rows = [r for r in raw_rows if r["queue_id"] == qid]
+
+            # New user's total service duration for this queue
+            new_user_turn: float = 15.0
+            if services_by_queue:
+                svcs = services_by_queue.get(qid, [])
+                if svcs:
+                    new_user_turn = float(sum(s.get("duration") or 0 for s in svcs) or 15.0)
+
+            # Get open_dt for the queue's operating hours
+            open_dt = None
+            try:
+                open_time, _, _, _ = calc.get_employee_window(queue, booking_date)
+                open_dt = APP_TZ.localize(datetime.combine(booking_date, open_time))
+            except Exception:
+                pass
+
+            # Run the authoritative cursor algorithm on existing users
+            waits = calculate_queue_waits(queue_rows, now=now, open_dt=open_dt)
+            ordered = waits["ordered_waiting"]
+            wait_data = waits["wait_data"]
+
+            # Derive cursor after all currently ordered users finish
+            if ordered:
+                last_uid = str(ordered[-1]["uuid"])
+                last_wd = wait_data.get(last_uid, {})
+                cursor_end_ms = last_wd.get("expected_end_ts") or now_ms
+                cursor_after = datetime.fromtimestamp(cursor_end_ms / 1000, tz=APP_TZ)
+            else:
+                # No ordered users — check if an in-progress user is still running
+                in_prog_ms = None
+                for row in queue_rows:
+                    if row.get("status") == QUEUE_USER_IN_PROGRESS:
+                        wd = wait_data.get(str(row["uuid"]), {})
+                        in_prog_ms = wd.get("expected_end_ts") or wd.get("expected_at_ts")
+                        break
+                if in_prog_ms:
+                    cursor_after = datetime.fromtimestamp(in_prog_ms / 1000, tz=APP_TZ)
                 else:
-                    remaining = turn
-                result[qid]["total_wait_minutes"] += remaining
-            elif status == QUEUE_USER_SCHEDULED:
-                result[qid]["registered_count"] += 1
-                result[qid]["total_wait_minutes"] += turn
+                    cursor_after = max(now, open_dt) if open_dt else now
+
+            # Build SCHEDULED blocks for conflict simulation
+            sched_blocks = []
+            for row in queue_rows:
+                if row.get("status") == QUEUE_USER_SCHEDULED:
+                    s_dt = _scheduled_start_dt(row, booking_date)
+                    if s_dt is not None:
+                        sched_blocks.append((s_dt, float(row.get("turn_time") or 15.0)))
+            sched_blocks.sort(key=lambda x: x[0])
+
+            # Simulate new walk-in placement after all current ordered users
+            new_start = cursor_after
+            for s_dt, s_turn in sched_blocks:
+                s_end = s_dt + timedelta(minutes=s_turn)
+                if s_end <= new_start:
+                    continue
+                if s_dt < new_start + timedelta(minutes=new_user_turn):
+                    new_start = max(new_start, s_end)
+
+            new_wait_minutes = max(0, int((new_start - now).total_seconds() / 60))
+
+            # SCHEDULED blocks served before the new user contribute to displayed position
+            sched_ahead = sum(1 for s_dt, _ in sched_blocks if now < s_dt <= new_start)
+
+            # in_progress already folded into new_wait_minutes via the cursor; pass 0
+            result[qid] = {
+                "registered_count": len(ordered) + sched_ahead,
+                "in_progress_count": 0,
+                "total_wait_minutes": new_wait_minutes,
+            }
+
         return result
 
     def _build_services_by_queue(self, raw_details: List[dict]) -> Dict[UUID, List[dict]]:
@@ -383,8 +443,11 @@ class QueueController:
 
             raw_users = self.queue_service.get_today_active_queue_user_rows(queue_ids, booking_date)
             raw_services = self.queue_service.get_queue_service_details_for_ids(service_ids)
-            today_metrics = self._build_today_metrics(queue_ids, raw_users, current_time) if booking_date == today else {}
             services_by_queue = self._build_services_by_queue(raw_services)
+            today_metrics = (
+                self._build_queue_preview_metrics(queues, booking_date, current_time, raw_users, services_by_queue)
+                if booking_date == today else {}
+            )
 
             preview = calc_service.calculate_booking_preview(
                 business_id, booking_date, service_ids,
@@ -474,8 +537,11 @@ class QueueController:
                     raw_users = self.queue_service.get_today_active_queue_user_rows(
                         [queue_id], data.queue_date
                     )
-                    today_metrics_single = self._build_today_metrics(
-                        [queue_id], raw_users, current_time
+                    services_by_queue_single = self._build_services_by_queue(
+                        self.queue_service.get_queue_service_details_for_ids(data.service_ids)
+                    )
+                    today_metrics_single = self._build_queue_preview_metrics(
+                        [queue], data.queue_date, current_time, raw_users, services_by_queue_single
                     )
                     metrics = calc_service.calculate_today_queue_metrics(
                         queue_id, data.queue_date, data.service_ids,
@@ -501,8 +567,13 @@ class QueueController:
                     raw_services = self.queue_service.get_queue_service_details_for_ids(
                         data.service_ids
                     )
-                    today_metrics = self._build_today_metrics(qids, raw_users, current_time) if qids else {}
                     services_by_queue = self._build_services_by_queue(raw_services)
+                    today_metrics = (
+                        self._build_queue_preview_metrics(
+                            queues_for_optimal, data.queue_date, current_time, raw_users, services_by_queue
+                        )
+                        if qids else {}
+                    )
                 optimal_queue = calc_service.find_optimal_queue(
                     data.business_id, data.queue_date, data.service_ids,
                     today_metrics=today_metrics,
@@ -732,11 +803,49 @@ class QueueController:
                 )
                 if duration_minutes <= 0:
                     duration_minutes = DEFAULT_AVG_TIME
-                end_dt = datetime.combine(slot_date, start_t) + timedelta(minutes=duration_minutes)
+                # For Approximate appointments the slot is a window [start, end].
+                # The appointment can start as late as window_end, so the latest it
+                # finishes is window_end + duration. Use that as the conservative block end.
+                window_end_t = qu.scheduled_end if qu.scheduled_end else start_t
+                end_dt = datetime.combine(slot_date, window_end_t) + timedelta(minutes=duration_minutes)
                 end_t = end_dt.time()
                 if end_dt.date() > slot_date:
                     end_t = time(23, 59, 59)
                 booking_windows.append((start_t, end_t))
+
+            # Block slots occupied by active walk-in queue (REGISTERED/IN_PROGRESS users).
+            # For today: blocks from now until queue ends.
+            # For future dates: blocks from open_dt until queue ends (pre-booked walk-ins).
+            from app.services.realtime.live_queue_manager import calculate_queue_waits
+            raw_rows = self.queue_service.get_today_active_queue_user_rows([queue_id], slot_date)
+            if raw_rows:
+                today = today_app_date()
+                now_dt = now_app_tz() if slot_date == today else None
+                open_dt = None
+                try:
+                    calc_svc = BookingCalculationService(self.db)
+                    open_time_val, _, _, _ = calc_svc.get_employee_window(queue, slot_date)
+                    open_dt = APP_TZ.localize(datetime.combine(slot_date, open_time_val))
+                except Exception:
+                    pass
+                if now_dt is None:
+                    now_dt = open_dt or APP_TZ.localize(datetime.combine(slot_date, time(0, 0)))
+                waits = calculate_queue_waits(raw_rows, now=now_dt, open_dt=open_dt)
+                ordered = waits["ordered_waiting"]
+                wait_data = waits["wait_data"]
+                queue_cursor_end_ms = None
+                if ordered:
+                    last_wd = wait_data.get(str(ordered[-1]["uuid"]), {})
+                    queue_cursor_end_ms = last_wd.get("expected_end_ts")
+                if queue_cursor_end_ms is None:
+                    for row in raw_rows:
+                        if row.get("status") == QUEUE_USER_IN_PROGRESS:
+                            wd = wait_data.get(str(row["uuid"]), {})
+                            queue_cursor_end_ms = wd.get("expected_end_ts") or wd.get("expected_at_ts")
+                            break
+                if queue_cursor_end_ms:
+                    queue_ends_t = datetime.fromtimestamp(queue_cursor_end_ms / 1000, tz=APP_TZ).time()
+                    booking_windows.append((now_dt.time(), queue_ends_t))
 
             # For today, skip slots that have already started so customers only see future slots.
             today = today_app_date()
@@ -1134,7 +1243,6 @@ class QueueController:
     def build_live_queue_data(
         self, queue: Any, queue_date: date, users_raw: list, employee_on_leave: bool = False
     ) -> LiveQueueData:
-        from app.core.utils import APP_TZ
         open_dt = None
         try:
             calc = BookingCalculationService(self.db)

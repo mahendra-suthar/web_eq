@@ -109,7 +109,8 @@ class EmployeeService:
                 .options(load_only(
                     Employee.uuid, Employee.business_id, Employee.full_name, Employee.email,
                     Employee.phone_number, Employee.country_code, Employee.profile_picture,
-                    Employee.is_verified, Employee.queue_id, Employee.created_at
+                    Employee.is_verified, Employee.queue_id, Employee.created_at,
+                    Employee.invitation_code, Employee.invitation_code_expires_at,
                 ))
                 .filter(Employee.business_id == business_id)
             )
@@ -232,6 +233,38 @@ class EmployeeService:
             )
         except Exception:
             logger.exception("Failed to get_employee_by_invitation_code")
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    def regenerate_invitation_code(self, employee_id: UUID, business_id: UUID) -> Employee:
+        try:
+            employee = (
+                self.db.query(Employee)
+                .filter(Employee.uuid == employee_id, Employee.business_id == business_id)
+                .first()
+            )
+            if not employee:
+                raise HTTPException(status_code=404, detail={"message": "Employee not found"})
+            if employee.is_verified:
+                raise HTTPException(status_code=400, detail={"message": "Employee has already joined — no invitation code needed"})
+            expires_at = now_utc() + timedelta(hours=48)
+            while True:
+                code = generate_invitation_code(length=8, expires_in_hours=48).upper()
+                conflict = self.db.query(Employee).filter(
+                    Employee.invitation_code == code,
+                    Employee.uuid != employee_id,
+                ).first()
+                if not conflict:
+                    break
+            employee.invitation_code = code
+            employee.invitation_code_expires_at = expires_at
+            self.db.commit()
+            self.db.refresh(employee)
+            return employee
+        except HTTPException:
+            raise
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to regenerate_invitation_code (employee_id=%s)", employee_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def activate_employee(self, employee_id: UUID, user_id: UUID) -> Employee:

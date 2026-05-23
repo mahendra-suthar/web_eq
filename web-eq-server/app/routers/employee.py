@@ -52,3 +52,13 @@ async def get_employees(
 ):
     controller = EmployeeController(db)
     return await controller.get_employees(business_id, page, limit, search)
+
+
+@employee_router.post(
+    "/{employee_id}/regenerate-invitation-code",
+    response_model=EmployeeData,
+    dependencies=[Depends(require_roles(["BUSINESS"]))],
+)
+async def regenerate_invitation_code(employee_id: UUID, business_id: UUID, db: Session = Depends(get_db)):
+    controller = EmployeeController(db)
+    return await controller.regenerate_invitation_code(employee_id, business_id)
