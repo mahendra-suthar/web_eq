@@ -6,7 +6,6 @@ import { ServiceService, ServiceData } from "../../services/service/service.serv
 import { EmployeeService, EmployeeResponse } from "../../services/employee/employee.service";
 import { ProfileService } from "../../services/profile/profile.service";
 import { useUserStore } from "../../utils/userStore";
-import { ProfileType } from "../../utils/constants";
 import { RouterConstant } from "../../routers";
 import "./queue-add.scss";
 
@@ -31,7 +30,7 @@ const QueueAdd = () => {
 
     const [name, setName] = useState("");
     const [employeeId, setEmployeeId] = useState<string | null>(null);
-    const [bookingMode, setBookingMode] = useState<"QUEUE" | "FIXED" | "APPROXIMATE" | "HYBRID">("QUEUE");
+    const [bookingMode, setBookingMode] = useState<"QUEUE" | "APPROXIMATE" | "HYBRID">("QUEUE");
     const [maxPerSlot, setMaxPerSlot] = useState<number | "">(1);
     const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
     const [allServices, setAllServices] = useState<ServiceData[]>([]);
@@ -215,12 +214,11 @@ const QueueAdd = () => {
                             disabled={saving}
                         >
                             <option value="QUEUE">Walk-in (Queue)</option>
-                            <option value="FIXED">Fixed time</option>
                             <option value="APPROXIMATE">Approximate time</option>
                             <option value="HYBRID">Hybrid (Walk-in + Scheduled)</option>
                         </select>
                         <p className="form-hint">
-                            Fixed/Approx/Hybrid will generate time slots based on the queue’s minimum service average time.
+                            Approx/Hybrid will generate time slots based on the queue’s minimum service average time.
                         </p>
                     </div>
 

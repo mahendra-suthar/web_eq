@@ -49,6 +49,8 @@ type UIUser = {
   expected_at_label: string;
   est_remaining_label: string;   // for IN_PROGRESS: "~X min remaining" or "Any moment now"
   expected_at_ts?: number | null;
+  service_duration_label: string;  // e.g. "40m service"
+  expected_end_label: string;      // e.g. "11:58 PM"
   position?: number | null;
   appointment_type?: string | null;
   scheduled_start?: string | null;
@@ -115,6 +117,10 @@ function mapLiveData(data: LiveQueueData, t: (k: string) => string): {
       scheduled_end: u.scheduled_end ?? null,
       delay_minutes: u.delay_minutes ?? null,
       is_checked_in: u.is_checked_in ?? false,
+      service_duration_label: u.service_duration_minutes
+        ? `${formatDurationMinutes(u.service_duration_minutes)} service`
+        : "",
+      expected_end_label: u.estimated_end_time ?? "",
     };
 
     if (u.status === QueueUserStatus.COMPLETED) {
@@ -259,6 +265,9 @@ const LiveQueue: React.FC = () => {
   const inProgressCount = liveData?.in_progress_count ?? 0;
   const waitingCount = liveData?.waiting_count ?? 0;
   const completedCount = liveData?.completed_count ?? 0;
+  const queueEndsAt = waiting.length > 0
+    ? waiting[waiting.length - 1]?.expected_end_label || null
+    : null;
   const upcomingCount = liveData?.upcoming_count ?? 0;
   const queueName = liveData?.queue_name ?? "Live Queue";
   const queueStatus = liveData?.queue_status;
@@ -413,10 +422,10 @@ const LiveQueue: React.FC = () => {
               {t("today") || "Today"} · {todayLabel}
               {current && (
                 <>
-                  <span className="lq-sep" aria-hidden />
-                  {t("currentServing") || "Serving"} <strong>{current.token}</strong>
-                  <span className="lq-sep" aria-hidden />
-                  {t("position") || "Position"} <strong>#{current.position}</strong>
+                  {" · "}{t("currentServing") || "Serving"} <strong>{current.token}</strong>
+                  {current.position != null && (
+                    <>{" · "}{t("position") || "Position"} <strong>#{current.position}</strong></>
+                  )}
                 </>
               )}
             </div>
@@ -437,6 +446,14 @@ const LiveQueue: React.FC = () => {
                   <span className="lq-sep" aria-hidden />
                   <span className="lq-counter lq-counter--upcoming">
                     {t("upcoming") || "Upcoming"}: {upcomingCount}
+                  </span>
+                </>
+              )}
+              {queueEndsAt && (
+                <>
+                  <span className="lq-sep" aria-hidden />
+                  <span className="lq-counter lq-counter--ends">
+                    {t("endsAt") || "Ends"} ~{queueEndsAt}
                   </span>
                 </>
               )}
@@ -818,16 +835,22 @@ const LiveQueue: React.FC = () => {
                             {item.user.est_remaining_label}
                           </span>
                         )}
-                        {item.status !== "progress" && item.user.estimated_wait_label && (
+                        {item.status !== "progress" && (item.user.estimated_wait_label || item.user.service_duration_label) && (
                           <span className="lq-row__est">
-                            {t("est") || "Est."} {item.user.estimated_wait_label}
+                            {item.user.estimated_wait_label && `${t("est") || "Est."} ${item.user.estimated_wait_label}`}
+                            {item.user.estimated_wait_label && item.user.service_duration_label && " · "}
+                            {item.user.service_duration_label}
                           </span>
                         )}
-                        {item.user.expected_at_label && (
+                        {item.user.expected_at_label && item.user.expected_end_label ? (
+                          <span className="lq-row__expected">
+                            {item.user.expected_at_label} → {item.user.expected_end_label}
+                          </span>
+                        ) : item.user.expected_at_label ? (
                           <span className="lq-row__expected">
                             {t("expectedAt") || "Expected at"} {item.user.expected_at_label}
                           </span>
-                        )}
+                        ) : null}
                         {item.user.time_label && !item.user.expected_at_label && (
                           <span className="lq-time">{item.user.time_label}</span>
                         )}

@@ -4,8 +4,9 @@ import Button from "../../../../components/button";
 import { EmployeeData } from "../../../../utils/businessRegistrationStore";
 import { useBusinessRegistrationStore } from "../../../../utils/businessRegistrationStore";
 import { useUserStore } from "../../../../utils/userStore";
-import { EmployeeService } from "../../../../services/employee/employee.service";
+import { EmployeeService, EmployeeResponse } from "../../../../services/employee/employee.service";
 import { emailRegex, phoneRegex } from "../../../../utils/utils";
+import { ShareMenu } from "../../../../components/share-menu/ShareMenu";
 import { toast } from "react-toastify";
 import "./business-employees.scss";
 
@@ -41,6 +42,8 @@ export default function BusinessEmployees({
   );
 
   const [loading, setLoading] = useState(false);
+  const [pendingCodes, setPendingCodes] = useState<EmployeeResponse[]>([]);
+  const [pendingFinal, setPendingFinal] = useState<EmployeeData[] | null>(null);
   const [employees, setEmployees] = useState<EmployeeWithPreview[]>(() => {
     const mapped: EmployeeWithPreview[] = initialData?.map((emp) => ({ ...emp, preview: "" })) ?? [];
     if (isSelfEmployee && !mapped.some((e) => e.is_owner)) {
@@ -262,7 +265,16 @@ export default function BusinessEmployees({
         ...createdWithFlags,
       ];
 
-      onNext({ employees: finalEmployees });
+      // Show share modal for newly created unverified employees that have codes
+      const withCodes = (createdResults as EmployeeResponse[]).filter(
+        (e) => e.invitation_code && !e.is_verified
+      );
+      if (withCodes.length > 0) {
+        setPendingCodes(withCodes);
+        setPendingFinal(finalEmployees);
+      } else {
+        onNext({ employees: finalEmployees });
+      }
     } catch (error) {
       console.error("Error saving employees:", error);
       toast.error("Failed to save employees. Please try again.");
@@ -270,6 +282,50 @@ export default function BusinessEmployees({
       setLoading(false);
     }
   };
+
+  const handleContinue = () => {
+    if (pendingFinal) onNext({ employees: pendingFinal });
+  };
+
+  if (pendingCodes.length > 0) {
+    return (
+      <div className="business-employees-page">
+        <div className="be-share-modal">
+          <div className="be-share-modal__icon">🎉</div>
+          <h2 className="be-share-modal__title">Employees Added!</h2>
+          <p className="be-share-modal__sub">
+            Share invitation codes with your new employees so they can join on EaseQueue.
+          </p>
+
+          <div className="be-share-modal__list">
+            {pendingCodes.map((emp) => (
+              <div key={emp.uuid} className="be-share-modal__item">
+                <div className="be-share-modal__item-info">
+                  <span className="be-share-modal__item-name">{emp.full_name}</span>
+                  <span className="be-share-modal__item-code">{emp.invitation_code}</span>
+                </div>
+                <ShareMenu
+                  employeeName={emp.full_name}
+                  code={emp.invitation_code!}
+                  className="be-share-modal__share-btn"
+                />
+              </div>
+            ))}
+          </div>
+
+          <p className="be-share-modal__hint">Codes expire in 48 hours. You can regenerate them anytime from the employee profile.</p>
+
+          <button
+            type="button"
+            className="btn btn-primary be-share-modal__continue"
+            onClick={handleContinue}
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="business-employees-page">

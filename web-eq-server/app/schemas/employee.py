@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from uuid import UUID
+from datetime import datetime
 
 
 class EmployeeCreate(BaseModel):
@@ -36,6 +37,8 @@ class EmployeeData(BaseModel):
     profile_picture: Optional[str] = None
     is_verified: bool
     queue_id: Optional[str] = None
+    invitation_code: Optional[str] = None
+    invitation_code_expires_at: Optional[datetime] = None
 
     @classmethod
     def from_employee(cls, employee) -> "EmployeeData":
@@ -50,6 +53,8 @@ class EmployeeData(BaseModel):
             profile_picture=employee.profile_picture,
             is_verified=employee.is_verified,
             queue_id=str(queue_id) if queue_id else None,
+            invitation_code=getattr(employee, "invitation_code", None),
+            invitation_code_expires_at=getattr(employee, "invitation_code_expires_at", None),
         )
 
     class Config:

@@ -26,6 +26,9 @@ export interface TodayAppointmentResponse {
   current_token?: string | null;        // token currently being served in this queue
   is_checked_in?: boolean;              // customer has tapped "I've Arrived"
   eta_minutes?: number | null;          // self-declared travel time
+  service_duration_minutes?: number | null;  // turn_time in minutes
+  expected_end_ts?: number | null;           // epoch ms when service ends
+  estimated_end_time?: string | null;        // "11:58 PM"
 }
 
 export interface CustomerAppointmentListItem {
@@ -54,6 +57,7 @@ export interface CustomerAppointmentListItem {
   total_fee?: number | null;
   is_checked_in?: boolean;
   eta_minutes?: number | null;
+  estimated_end_time?: string | null;
 }
 
 export interface CustomerAppointmentListResponse {

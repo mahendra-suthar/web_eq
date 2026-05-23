@@ -399,3 +399,114 @@
     }
   }
 }
+// Share codes modal (shown after batch creation)
+.be-share-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px 24px 36px;
+  max-width: 480px;
+  margin: 0 auto;
+
+  &__icon { font-size: 48px; margin-bottom: 16px; }
+
+  &__title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 8px;
+  }
+
+  &__sub {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0 0 28px;
+    line-height: 1.5;
+    max-width: 380px;
+  }
+
+  &__list {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px 16px;
+    text-align: left;
+  }
+
+  &__item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  &__item-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__item-code {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: #16a34a;
+  }
+
+  &__share-btn {
+    flex-shrink: 0;
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: 1.5px solid #3b82f6;
+    background: #fff;
+    color: #3b82f6;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+
+    &:hover:not(:disabled) {
+      background: #3b82f6;
+      color: #fff;
+    }
+
+    &--done {
+      border-color: #16a34a;
+      color: #16a34a;
+      &:hover:not(:disabled) { background: #dcfce7; color: #16a34a; }
+    }
+
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
+  }
+
+  &__hint {
+    font-size: 12px;
+    color: #94a3b8;
+    margin: 4px 0 24px;
+  }
+
+  &__continue {
+    width: 100%;
+    max-width: 320px;
+    padding: 12px;
+    font-size: 15px;
+    border-radius: 10px;
+  }
+}

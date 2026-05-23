@@ -565,6 +565,9 @@ class LiveQueueUserItem(BaseModel):
     scheduled_end: Optional[str] = None
     delay_minutes: Optional[int] = None          # for APPROXIMATE: cascaded delay
     is_checked_in: bool = False                   # customer has tapped "I've Arrived"
+    service_duration_minutes: Optional[int] = None  # turn_time in minutes
+    expected_end_ts: Optional[int] = None           # epoch ms when service ends
+    estimated_end_time: Optional[str] = None        # "11:58 PM"
 
     @classmethod
     def from_user_dict(cls, u: Dict[str, Any], wd: Dict[str, Any] = {}) -> "LiveQueueUserItem":
@@ -609,6 +612,9 @@ class LiveQueueUserItem(BaseModel):
             scheduled_end=u.get("scheduled_end"),
             delay_minutes=u.get("delay_minutes"),
             is_checked_in=bool(u.get("is_checked_in", False)),
+            service_duration_minutes=wd.get("service_duration_minutes"),
+            expected_end_ts=wd.get("expected_end_ts"),
+            estimated_end_time=wd.get("estimated_end_time"),
         )
 
 
@@ -632,6 +638,7 @@ class LiveQueueData(BaseModel):
         queue_date: date,
         users_raw: List[Dict[str, Any]],
         employee_on_leave: bool = False,
+        open_dt: Optional[datetime] = None,
     ) -> "LiveQueueData":
         """Build from queue, date, raw user dicts (e.g. from build_live_queue_users_raw), and leave flag."""
         from app.services.realtime.live_queue_manager import calculate_queue_waits
@@ -641,10 +648,25 @@ class LiveQueueData(BaseModel):
         completed_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_COMPLETED)
         upcoming_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_SCHEDULED)
 
-        # Compute live wait estimates so every broadcast reflects current queue state
-        waits = calculate_queue_waits(users_raw)
+        waits = calculate_queue_waits(users_raw, open_dt=open_dt)
         current_token: Optional[str] = waits["current_token"]
         wait_data: Dict[str, Any] = waits["wait_data"]
+        ordered_waiting = waits["ordered_waiting"]
+        position_map = waits["position_map"]
+
+        waiting_rank = {str(u["uuid"]): i for i, u in enumerate(ordered_waiting)}
+
+        def _display_key(u: dict) -> tuple:
+            s = u.get("status")
+            if s == QUEUE_USER_IN_PROGRESS:
+                return (0, 0, "")
+            if s == QUEUE_USER_REGISTERED:
+                return (1, waiting_rank.get(str(u["uuid"]), 9999), "")
+            if s == QUEUE_USER_SCHEDULED:
+                return (2, 0, u.get("scheduled_start") or "99:99")
+            return (3, 0, "")  # COMPLETED
+
+        display_users = sorted(users_raw, key=_display_key)
 
         return cls(
             queue_id=str(queue.uuid),
@@ -658,8 +680,11 @@ class LiveQueueData(BaseModel):
             current_token=current_token,
             employee_on_leave=employee_on_leave,
             users=[
-                LiveQueueUserItem.from_user_dict(u, wait_data.get(str(u["uuid"]), {}))
-                for u in users_raw
+                LiveQueueUserItem.from_user_dict(
+                    {**u, "position": position_map.get(str(u["uuid"]), u.get("position"))},
+                    wait_data.get(str(u["uuid"]), {}),
+                )
+                for u in display_users
             ],
         )
 
@@ -688,6 +713,9 @@ class CustomerTodayAppointmentResponse(BaseModel):
     current_token: Optional[str] = None         # token currently being served in this queue
     is_checked_in: bool = False                  # customer has tapped "I've Arrived"
     eta_minutes: Optional[int] = None            # customer's self-declared travel time
+    service_duration_minutes: Optional[int] = None  # turn_time in minutes
+    expected_end_ts: Optional[int] = None           # epoch ms when service ends
+    estimated_end_time: Optional[str] = None        # "11:58 PM"
 
     @classmethod
     def from_queue_user_and_metrics(
@@ -702,6 +730,9 @@ class CustomerTodayAppointmentResponse(BaseModel):
         queue_service_uuids: Optional[List[str]] = None,
         expected_at_ts: Optional[int] = None,
         current_token: Optional[str] = None,
+        expected_end_ts: Optional[int] = None,
+        estimated_end_time: Optional[str] = None,
+        service_duration_minutes: Optional[int] = None,
     ) -> "CustomerTodayAppointmentResponse":
         """Build from queue user, queue, business ids/names, computed metrics, service summary, and formatted time."""
         st = getattr(qu, "scheduled_start", None)
@@ -729,6 +760,9 @@ class CustomerTodayAppointmentResponse(BaseModel):
             current_token=current_token,
             is_checked_in=bool(getattr(qu, "is_checked_in", False)),
             eta_minutes=getattr(qu, "eta_minutes", None),
+            expected_end_ts=expected_end_ts,
+            estimated_end_time=estimated_end_time,
+            service_duration_minutes=service_duration_minutes,
         )
 
 

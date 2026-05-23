@@ -7,7 +7,7 @@ No Redis dependency — purely in-memory WebSocket broadcast.
 """
 import logging
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -15,7 +15,8 @@ from fastapi import WebSocket
 from sqlalchemy.orm import Session
 from starlette.websockets import WebSocketState
 
-from app.core.utils import build_live_queue_users_raw, live_queue_key, now_iso
+from app.core.utils import build_live_queue_users_raw, live_queue_key, now_iso, APP_TZ
+from app.services.booking_calculation_service import BookingCalculationService
 from app.services.realtime.live_queue_manager import calculate_queue_waits
 from app.services.queue_service import QueueService
 
@@ -159,9 +160,19 @@ class CustomerQueueManager:
         rows, svc_by_user = svc.get_live_queue_users_raw(UUID(queue_id), queue_date)
         users = build_live_queue_users_raw(rows, svc_by_user)
 
-        waits = calculate_queue_waits(users)
+        open_dt = None
+        queue = svc.get_queue_by_id(UUID(queue_id))
+        if queue:
+            try:
+                open_time, _, _, _ = BookingCalculationService(db).get_employee_window(queue, queue_date)
+                open_dt = APP_TZ.localize(datetime.combine(queue_date, open_time))
+            except Exception:
+                pass
+
+        waits = calculate_queue_waits(users, open_dt=open_dt)
         current_token = waits["current_token"]
         wait_data = waits["wait_data"]
+        position_map = waits["position_map"]
 
         result: Dict[str, Any] = {}
         for u in users:
@@ -169,11 +180,14 @@ class CustomerQueueManager:
             wd = wait_data.get(uid, {})
             result[uid] = {
                 "queue_user_id": uid,
-                "position": u.get("position"),
+                "position": position_map.get(uid, u.get("position")),
                 "status": u.get("status"),
                 "expected_at_ts": wd.get("expected_at_ts"),
+                "expected_end_ts": wd.get("expected_end_ts"),
                 "estimated_wait_minutes": wd.get("estimated_wait_minutes"),
                 "estimated_appointment_time": wd.get("estimated_appointment_time"),
+                "estimated_end_time": wd.get("estimated_end_time"),
+                "service_duration_minutes": wd.get("service_duration_minutes"),
                 "current_token": current_token,
             }
 

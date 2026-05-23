@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "react-toastify";
 import { useLayoutContext } from "../../layouts/general-layout";
 import { RouterConstant } from "../../routers/index";
 import { PhoneNumber } from "../../utils/utils";
@@ -287,7 +286,6 @@ export default function BusinessRegistration() {
       <div className="step-content">
         {renderStep()}
       </div>
-      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 }

@@ -23,6 +23,8 @@ export interface EmployeeResponse {
     profile_picture?: string | null;
     is_verified: boolean;
     queue_id?: string | null;
+    invitation_code?: string | null;
+    invitation_code_expires_at?: string | null;
 }
 
 export interface VerifyInvitationResponse {
@@ -115,6 +117,20 @@ export class EmployeeService extends HttpClient {
             const errorCode = error?.response?.data?.detail?.error_code;
             const customError: any = new Error(errorMessage);
             customError.errorCode = errorCode;
+            throw customError;
+        }
+    }
+
+    async regenerateInvitationCode(employeeId: string, businessId: string): Promise<EmployeeResponse> {
+        try {
+            return await this.post<EmployeeResponse>(
+                `/employee/${employeeId}/regenerate-invitation-code?business_id=${businessId}`,
+                {}
+            );
+        } catch (error: any) {
+            const errorMessage = error?.response?.data?.detail?.message || "Failed to regenerate invitation code";
+            const customError: any = new Error(errorMessage);
+            customError.errorCode = error?.response?.data?.detail?.error_code;
             throw customError;
         }
     }

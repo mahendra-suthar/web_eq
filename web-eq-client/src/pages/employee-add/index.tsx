@@ -1,13 +1,14 @@
 import React, { useState, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { EmployeeService } from "../../services/employee/employee.service";
+import { EmployeeService, EmployeeResponse } from "../../services/employee/employee.service";
 import { EmployeeOverviewForm } from "../../components/employee/EmployeeOverviewForm";
 import type { EmployeeOverviewValues, EmployeeOverviewErrors } from "../../components/employee/EmployeeOverviewForm";
 import { RouterConstant } from "../../routers/index";
 import { useBusinessRegistrationStore } from "../../utils/businessRegistrationStore";
 import { useUserStore } from "../../utils/userStore";
 import { emailRegex } from "../../utils/utils";
+import { ShareMenu } from "../../components/share-menu/ShareMenu";
 import "./employee-add.scss";
 
 const initialValues: EmployeeOverviewValues = {
@@ -46,6 +47,7 @@ const EmployeeAdd = () => {
     const [errors, setErrors] = useState<EmployeeOverviewErrors>({});
     const [saving, setSaving] = useState(false);
     const [submitError, setSubmitError] = useState<string>("");
+    const [createdEmployee, setCreatedEmployee] = useState<EmployeeResponse | null>(null);
 
     const handleChange = (field: keyof EmployeeOverviewValues, value: string) => {
         setValues((prev) => ({ ...prev, [field]: value }));
@@ -84,15 +86,15 @@ const EmployeeAdd = () => {
                     phone_number: values.phoneNumber?.trim() || undefined,
                 },
             ]);
-            const newId = created?.[0]?.uuid;
-            if (newId) {
-                navigate(`${RouterConstant.ROUTERS_PATH.EMPLOYEES}/${newId}`, {
-                    state: { businessId: resolvedBusinessId },
-                });
+            const emp = created?.[0] as EmployeeResponse | undefined;
+            if (emp?.invitation_code) {
+                setCreatedEmployee(emp);
             } else {
-                navigate(RouterConstant.ROUTERS_PATH.EMPLOYEES, {
-                    state: { businessId: resolvedBusinessId },
-                });
+                navigate(emp?.uuid
+                    ? `${RouterConstant.ROUTERS_PATH.EMPLOYEES}/${emp.uuid}`
+                    : RouterConstant.ROUTERS_PATH.EMPLOYEES,
+                    { state: { businessId: resolvedBusinessId } }
+                );
             }
         } catch (err: unknown) {
             const res = (err as { response?: { data?: { detail?: string | { message?: string } } } })?.response?.data?.detail;
@@ -106,6 +108,13 @@ const EmployeeAdd = () => {
         }
     };
 
+    const goToDetail = () => {
+        if (!createdEmployee) return;
+        navigate(`${RouterConstant.ROUTERS_PATH.EMPLOYEES}/${createdEmployee.uuid}`, {
+            state: { businessId: resolvedBusinessId },
+        });
+    };
+
     if (!resolvedBusinessId) {
         return (
             <div className="employee-add-page">
@@ -116,6 +125,45 @@ const EmployeeAdd = () => {
                     <button type="button" className="btn btn-secondary btn-sm" onClick={handleCancel}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t("back")}
                     </button>
+                </div>
+            </div>
+        );
+    }
+
+    // Success panel — shown after creation when employee has an invitation code
+    if (createdEmployee?.invitation_code) {
+        return (
+            <div className="employee-add-page">
+                <div className="content-card">
+                    <div className="emp-add-success">
+                        <div className="emp-add-success__icon">✅</div>
+                        <h2 className="emp-add-success__title">Employee Added!</h2>
+                        <p className="emp-add-success__sub">
+                            Share the invitation code with <strong>{createdEmployee.full_name}</strong> so they can join on EaseQueue.
+                        </p>
+
+                        <div className="emp-add-success__code-card">
+                            <span className="emp-add-success__code-label">Invitation Code</span>
+                            <span className="emp-add-success__code">{createdEmployee.invitation_code}</span>
+                            <p className="emp-add-success__code-hint">Valid for 48 hours</p>
+                        </div>
+
+                        <div className="emp-add-success__actions">
+                            <ShareMenu
+                                employeeName={createdEmployee.full_name}
+                                code={createdEmployee.invitation_code}
+                                label="Share Code"
+                                className="emp-add-success__share-btn"
+                            />
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={goToDetail}
+                            >
+                                Go to Employee Profile
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         );
