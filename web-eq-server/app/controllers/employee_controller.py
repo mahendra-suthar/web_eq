@@ -64,3 +64,13 @@ class EmployeeController:
         except Exception:
             logger.exception("Failed to get_employees (business_id=%s)", business_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    async def regenerate_invitation_code(self, employee_id: UUID, business_id: UUID) -> EmployeeData:
+        try:
+            employee = self.employee_service.regenerate_invitation_code(employee_id, business_id)
+            return EmployeeData.from_employee(employee)
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to regenerate_invitation_code (employee_id=%s)", employee_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})

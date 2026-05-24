@@ -133,7 +133,7 @@ export default function LandingPage() {
     desc:  t(`landing.step${i + 1}Desc`),
   })), [t]);
 
-  useScrollReveal([parentsLoading, featuredLoading, activeSuperTab, categoryRoots]);
+  useScrollReveal([parentsLoading, featuredLoading, activeSuperTab, categoryRoots, activeFilter]);
   const fetchCategoryTree = useCallback(async () => {
     setParentsLoading(true);
     setParentsError(null);
@@ -548,13 +548,21 @@ export default function LandingPage() {
                             )}
                             {timeSummary && (
                               <div className="lp-today-stat">
-                                <span className="lp-today-stat-label">{t("landing.todayExpectedAt")}</span>
+                                <span className="lp-today-stat-label">
+                                  {appt.estimated_end_time
+                                    ? (t("landing.todayYourTurn") || "Your Turn")
+                                    : t("landing.todayExpectedAt")}
+                                </span>
                                 <span className="lp-today-stat-value">
                                   {timeSummary.startsWith("Expected at ")
                                     ? timeSummary.slice("Expected at ".length)
                                     : timeSummary}
                                 </span>
-                                <span className="lp-today-stat-sub">{t("landing.todayToday")}</span>
+                                <span className="lp-today-stat-sub">
+                                  {appt.estimated_end_time
+                                    ? `${t("landing.todayDoneBy") || "Done"} ~${appt.estimated_end_time}`
+                                    : t("landing.todayToday")}
+                                </span>
                               </div>
                             )}
                           </div>

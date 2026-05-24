@@ -9,6 +9,9 @@ export interface CustomerQueueUpdate {
   estimated_wait_minutes: number | null;
   estimated_appointment_time: string | null;    // e.g. "2:30 PM"
   current_token: string | null;                 // token currently being served
+  expected_end_ts?: number | null;              // epoch ms when service ends
+  estimated_end_time?: string | null;           // "11:58 PM"
+  service_duration_minutes?: number | null;     // turn_time in minutes
 }
 
 interface UseCustomerQueueWSOptions {

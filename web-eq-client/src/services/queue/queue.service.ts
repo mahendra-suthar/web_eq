@@ -182,6 +182,9 @@ export interface LiveQueueUserItem {
     scheduled_end?: string | null;
     delay_minutes?: number | null;  // for APPROXIMATE: cascaded delay
     is_checked_in?: boolean;       // customer has physically arrived
+    service_duration_minutes?: number | null;  // turn_time in minutes
+    expected_end_ts?: number | null;           // epoch ms when service ends
+    estimated_end_time?: string | null;        // "11:58 PM"
 }
 
 export interface LiveQueueData {

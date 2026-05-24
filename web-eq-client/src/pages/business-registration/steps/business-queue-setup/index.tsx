@@ -17,7 +17,7 @@ interface QueueBlockState {
   id: string;
   name: string;
   employee_id: string;
-  booking_mode: "QUEUE" | "FIXED" | "APPROXIMATE" | "HYBRID";
+  booking_mode: "QUEUE" | "APPROXIMATE" | "HYBRID";
   slot_interval_minutes: string; // "" = unset
   max_per_slot: string; // default "1"
   selectedServices: string[];
@@ -409,7 +409,6 @@ export default function BusinessQueueSetup({
                       }}
                     >
                       <option value="QUEUE">Walk-in (Queue)</option>
-                      <option value="FIXED">Fixed time</option>
                       <option value="APPROXIMATE">Approximate time</option>
                       <option value="HYBRID">Hybrid (Walk-in + Scheduled)</option>
                     </select>

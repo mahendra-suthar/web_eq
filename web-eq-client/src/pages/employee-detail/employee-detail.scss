@@ -334,3 +334,96 @@
         background: #f8fafc;
     }
 }
+
+// Invitation code section
+.invitation-code-block {
+    .info-block-hint {
+        font-size: 13px;
+        color: #64748b;
+        margin: 4px 0 16px;
+    }
+}
+
+.invitation-loading,
+.invitation-error {
+    font-size: 14px;
+    color: #64748b;
+    padding: 8px 0;
+}
+
+.invitation-error { color: #dc2626; }
+
+.invitation-no-code {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    p { font-size: 14px; color: #64748b; margin: 0; }
+}
+
+.invitation-code-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px 16px;
+    max-width: 400px;
+
+    &__row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    &__code {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: 4px;
+        color: #0f172a;
+        flex: 1;
+    }
+
+    &__meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    &__expiry {
+        font-size: 12px;
+        font-weight: 500;
+        color: #16a34a;
+        background: #dcfce7;
+        padding: 2px 8px;
+        border-radius: 99px;
+
+        &--expired {
+            color: #dc2626;
+            background: #fee2e2;
+        }
+    }
+
+    &__regenerate {
+        background: none;
+        border: none;
+        font-size: 13px;
+        color: #3b82f6;
+        cursor: pointer;
+        padding: 0;
+        text-decoration: underline;
+
+        &:disabled { color: #94a3b8; cursor: not-allowed; text-decoration: none; }
+        &:hover:not(:disabled) { color: #1d4ed8; }
+    }
+}
+
+// Copy + Share action group inside invitation code card
+.invitation-code-card {
+    &__actions {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+}
