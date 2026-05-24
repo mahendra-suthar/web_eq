@@ -133,7 +133,7 @@ export default function LandingPage() {
     desc:  t(`landing.step${i + 1}Desc`),
   })), [t]);
 
-  useScrollReveal([parentsLoading, featuredLoading, activeSuperTab, categoryRoots]);
+  useScrollReveal([parentsLoading, featuredLoading, activeSuperTab, categoryRoots, activeFilter]);
   const fetchCategoryTree = useCallback(async () => {
     setParentsLoading(true);
     setParentsError(null);
