@@ -314,36 +314,6 @@ class QueueService:
             logger.exception("Failed to get_user_upcoming_active_appointments (user_id=%s)", user_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
-    def get_queue_booking_at_estimated_time(
-        self,
-        user_id: UUID,
-        queue_date: date,
-        appointment_time_str: str,
-        tolerance_minutes: int = 30,
-    ) -> Optional[QueueUser]:
-        t = parse_time_string(appointment_time_str)
-        if t is None:
-            return None
-        target_dt = datetime.combine(queue_date, t)
-        window_start = target_dt - timedelta(minutes=tolerance_minutes)
-        window_end = target_dt + timedelta(minutes=tolerance_minutes)
-        try:
-            return (
-                self.db.query(QueueUser)
-                .filter(
-                    QueueUser.user_id == user_id,
-                    QueueUser.queue_date == queue_date,
-                    QueueUser.status.in_([QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS]),
-                    QueueUser.estimated_enqueue_time.isnot(None),
-                    QueueUser.estimated_enqueue_time >= window_start,
-                    QueueUser.estimated_enqueue_time <= window_end,
-                )
-                .first()
-            )
-        except Exception:
-            logger.exception("Failed to get_queue_booking_at_estimated_time (user_id=%s date=%s)", user_id, queue_date)
-            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
-
     def get_booking_at_time(
         self,
         user_id: UUID,
@@ -884,6 +854,7 @@ class QueueService:
             rows = (
                 self.db.query(
                     QueueUser.uuid,
+                    QueueUser.user_id,
                     QueueUser.queue_id,
                     QueueUser.status,
                     QueueUser.turn_time,
@@ -901,6 +872,7 @@ class QueueService:
             return [
                 {
                     "uuid": row.uuid,
+                    "user_id": row.user_id,
                     "queue_id": row.queue_id,
                     "status": row.status,
                     "turn_time": row.turn_time,
@@ -917,14 +889,21 @@ class QueueService:
             logger.exception("Failed to get_today_active_queue_user_rows (date=%s)", booking_date)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
-    def get_future_date_counts_batch(
+    def get_future_date_metrics_batch(
         self, queue_ids: List[UUID], booking_date: date
-    ) -> Dict[UUID, int]:
+    ) -> Dict[UUID, Dict[str, int]]:
+        """Per-queue count and summed service time (turn_time) of active bookings on a
+        future date. The summed turn_time lets wait estimates use the real booked
+        durations of the people ahead instead of a historical per-head average."""
         if not queue_ids:
             return {}
         try:
             rows = (
-                self.db.query(QueueUser.queue_id, func.count(QueueUser.uuid).label("cnt"))
+                self.db.query(
+                    QueueUser.queue_id,
+                    func.count(QueueUser.uuid).label("cnt"),
+                    func.coalesce(func.sum(QueueUser.turn_time), 0).label("total_turn_time"),
+                )
                 .filter(
                     QueueUser.queue_id.in_(queue_ids),
                     QueueUser.queue_date == booking_date,
@@ -933,9 +912,12 @@ class QueueService:
                 .group_by(QueueUser.queue_id)
                 .all()
             )
-            return {row.queue_id: row.cnt for row in rows}
+            return {
+                row.queue_id: {"count": int(row.cnt), "total_turn_time": int(row.total_turn_time or 0)}
+                for row in rows
+            }
         except Exception:
-            logger.exception("Failed to get_future_date_counts_batch (date=%s)", booking_date)
+            logger.exception("Failed to get_future_date_metrics_batch (date=%s)", booking_date)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_historical_percentile_wait_batch(

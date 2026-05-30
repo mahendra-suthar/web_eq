@@ -222,6 +222,52 @@ def serialise_dt(val: Any) -> Optional[str]:
     return str(val)
 
 
+def appointment_window(
+    appointment_type: Optional[str],
+    time_str: Optional[str],
+    scheduled_start: Optional[str],
+    turn_time: Optional[int],
+    on_date: date,
+) -> Optional[Tuple[datetime, datetime]]:
+    """Return (start_dt, end_dt) in the app timezone for an appointment's time window,
+    or None when no time can be resolved.
+
+    FIXED/APPROXIMATE → [scheduled_start, scheduled_start + turn_time]
+    QUEUE             → [time_str - turn_time/2, time_str + turn_time/2]
+    Accepts both '%H:%M' (24h) and '%I:%M %p' (12h) time strings.
+    """
+    turn = max(int(turn_time or 15), 5)
+
+    def _parse(s: Optional[str]) -> Optional[dt_time]:
+        if not s:
+            return None
+        for fmt in ("%H:%M", "%I:%M %p", "%I:%M%p"):
+            try:
+                return datetime.strptime(s.strip(), fmt).time()
+            except ValueError:
+                continue
+        return None
+
+    is_fixed = appointment_type in ("FIXED", "APPROXIMATE") and bool(scheduled_start)
+    t = _parse(scheduled_start) if is_fixed else _parse(time_str)
+    if t is None:
+        return None
+
+    anchor = _APP_TZ.localize(datetime.combine(on_date, t))
+    if is_fixed:
+        return (anchor, anchor + timedelta(minutes=turn))
+    half = timedelta(minutes=turn / 2)
+    return (anchor - half, anchor + half)
+
+
+def windows_overlap(
+    a: Optional[Tuple[datetime, datetime]],
+    b: Optional[Tuple[datetime, datetime]],
+) -> bool:
+    """True when two time windows overlap. Half-open: touching edges do not count."""
+    return bool(a and b and a[0] < b[1] and b[0] < a[1])
+
+
 def sort_key_live_queue_row(row: Tuple[Any, Any]) -> tuple:
     """
     Sort key for live queue (QueueUser, User) rows:

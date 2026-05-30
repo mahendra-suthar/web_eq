@@ -140,13 +140,15 @@ async def get_booking_preview(
     business_id: UUID = Query(..., description="Business UUID"),
     booking_date: date = Query(..., description="Date for booking (YYYY-MM-DD)"),
     service_ids: List[UUID] = Query(..., description="QueueService UUIDs"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     controller = QueueController(db)
     return await controller.get_booking_preview(
         business_id=business_id,
         booking_date=booking_date,
-        service_ids=service_ids
+        service_ids=service_ids,
+        user_id=current_user.uuid,
     )
 
 

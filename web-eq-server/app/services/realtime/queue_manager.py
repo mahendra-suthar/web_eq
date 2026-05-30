@@ -49,11 +49,13 @@ class QueueManager:
             try:
                 # Use redis.asyncio instead of aioredis to avoid TimeoutError conflict
                 from redis import asyncio as aioredis
-                self.redis = await aioredis.from_url(
+                client = await aioredis.from_url(
                     self.redis_url,
                     decode_responses=True,
                     max_connections=10
                 )
+                await client.ping()  # Verify the connection is actually reachable
+                self.redis = client
                 logger.info("Connected to Redis successfully")
             except ImportError:
                 logger.warning("redis package not available. Running without Redis (in-memory mode).")

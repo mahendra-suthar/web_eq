@@ -50,6 +50,8 @@ class CustomerAppointmentListItem(BaseModel):
     total_fee: Optional[float] = None            # sum of service fees for all booked services
     is_checked_in: bool = False
     eta_minutes: Optional[int] = None
+    turn_time: Optional[int] = None  # service duration in minutes (for conflict window calculation)
+    has_conflict: bool = False        # True when another active appointment overlaps this one's time window
 
     @classmethod
     def from_orm_row(
@@ -98,6 +100,7 @@ class CustomerAppointmentListItem(BaseModel):
             total_fee=total_fee,
             is_checked_in=bool(getattr(queue_user, "is_checked_in", False)),
             eta_minutes=getattr(queue_user, "eta_minutes", None),
+            turn_time=getattr(queue_user, "turn_time", None),
         )
 
 

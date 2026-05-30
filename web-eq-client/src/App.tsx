@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useSessionRestore } from "./hooks/useSessionRestore";
+import { useVisibilityRefresh } from "./hooks/useVisibilityRefresh";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { RouterConstant } from "./routers/index";
 import { PrivateRoute } from "./routers/privateRoute";
@@ -57,6 +58,7 @@ const withSuspense = (el: ReactElement) => (
 
 const App = () => {
   useSessionRestore();
+  useVisibilityRefresh();
   return (
   <BrowserRouter>
     <ToastContainer position="top-right" autoClose={3000} />

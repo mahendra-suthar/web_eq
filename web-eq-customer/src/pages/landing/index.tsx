@@ -20,6 +20,8 @@ import AppointmentActions from "../../components/appointment-actions";
 import LoadingSpinner from "../../components/loading-spinner";
 import EmptyState from "../../components/empty-state";
 import ErrorMessage from "../../components/error-message";
+import Modal from "../../components/modal";
+import { computeConflicts } from "../../utils/conflicts";
 import { getCategoryEmoji } from "../../utils/category-emoji";
 import { useScrollReveal } from "../../hooks/useScrollReveal";
 import {
@@ -200,6 +202,34 @@ export default function LandingPage() {
       )
     );
   }, []);
+
+  // Conflicts are derived live from the (WS-updated) appointment list, so they stay
+  // accurate as queue positions/times drift — no extra server round trip.
+  const conflictIds = useMemo(() => computeConflicts(todayAppointments), [todayAppointments]);
+  const conflictingAppointments = useMemo(
+    () => todayAppointments.filter((a) => conflictIds.has(a.queue_user_id)),
+    [todayAppointments, conflictIds]
+  );
+  const [conflictModalOpen, setConflictModalOpen] = useState(false);
+
+  // Popup once when a clash first appears (or changes); a quiet strip stays on the
+  // cards after dismissal. If the clash clears and later returns, it pops again.
+  // Wait for the list to finish loading — the transient empty state during a
+  // (re)mount must not be read as "conflict cleared", which would wipe the
+  // already-shown memory and re-pop on every return to the page.
+  useEffect(() => {
+    if (todayLoading) return;
+    const KEY = "eq_conflict_sig";
+    const signature = [...conflictIds].sort().join("|");
+    if (!signature) {
+      sessionStorage.removeItem(KEY);
+      return;
+    }
+    if (sessionStorage.getItem(KEY) !== signature) {
+      sessionStorage.setItem(KEY, signature);
+      setConflictModalOpen(true);
+    }
+  }, [conflictIds, todayLoading]);
 
   const fetchFeaturedBusinesses = useCallback(async () => {
     setFeaturedLoading(true);
@@ -528,6 +558,16 @@ export default function LandingPage() {
                           </div>
                         )}
 
+                        {conflictIds.has(appt.queue_user_id) && (
+                          <div className="lp-conflict-strip" role="alert">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                              <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                            </svg>
+                            {t("landing.conflictStrip") || "Overlaps another appointment — you can't make both"}
+                          </div>
+                        )}
+
                         {hasStats && (
                           <div className="lp-today-stats">
                             {appt.position != null && (
@@ -633,6 +673,50 @@ export default function LandingPage() {
           </div>
         </section>
       )}
+
+      <Modal
+        open={conflictModalOpen}
+        onClose={() => setConflictModalOpen(false)}
+        role="alertdialog"
+        titleId="lp-conflict-title"
+        contentClassName="lp-conflict-modal"
+      >
+        <div className="lp-conflict-modal__icon" aria-hidden="true">⚠️</div>
+        <h2 id="lp-conflict-title" className="lp-conflict-modal__title">
+          {t("landing.conflictTitle") || "Two appointments at the same time"}
+        </h2>
+        <p className="lp-conflict-modal__sub">
+          {t("landing.conflictSub") || "You can't be in two places at once — you may want to cancel one."}
+        </p>
+        <ul className="lp-conflict-modal__list">
+          {conflictingAppointments.map((a) => (
+            <li key={a.queue_user_id} className="lp-conflict-modal__item">
+              <span className="lp-conflict-modal__biz">{a.business_name}</span>
+              <span className="lp-conflict-modal__meta">
+                {a.queue_name}
+                {(a.scheduled_start || a.estimated_appointment_time) &&
+                  ` · ${a.scheduled_start ?? a.estimated_appointment_time}`}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="lp-conflict-modal__actions">
+          <button
+            type="button"
+            className="lp-conflict-modal__btn lp-conflict-modal__btn--ghost"
+            onClick={() => setConflictModalOpen(false)}
+          >
+            {t("landing.conflictKeepBoth") || "Keep both"}
+          </button>
+          <button
+            type="button"
+            className="lp-conflict-modal__btn lp-conflict-modal__btn--primary"
+            onClick={() => { setConflictModalOpen(false); navigate("/profile?tab=appointments"); }}
+          >
+            {t("landing.conflictManage") || "Manage appointments"}
+          </button>
+        </div>
+      </Modal>
 
       <section className="lp-section" ref={categoriesRef} id="categories">
         <div className="lp-section-container">

@@ -31,7 +31,7 @@ from app.schemas.customer import (
 )
 from app.schemas.auth import UserRegistrationInput
 from app.core.constants import QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_SCHEDULED
-from app.core.utils import today_app_date, format_date_iso, now_app_tz
+from app.core.utils import today_app_date, format_date_iso, now_app_tz, appointment_window, windows_overlap
 
 
 class CustomerController:
@@ -107,12 +107,47 @@ class CustomerController:
                     )
                 )
             has_more = offset + len(result) < total
+            try:
+                self._detect_conflicts(result)
+            except Exception:
+                logger.warning("_detect_conflicts failed (non-critical)", exc_info=True)
             return CustomerAppointmentListResponse(items=result, total=total, has_more=has_more)
         except HTTPException:
             raise
         except Exception:
             logger.exception("Failed to get_appointments (user_id=%s)", user_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    def _detect_conflicts(self, items: list) -> None:
+        ACTIVE = {QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS}
+
+        def _window(item):
+            if item.status not in ACTIVE:
+                return None
+            return appointment_window(
+                item.appointment_type,
+                item.estimated_appointment_time,
+                item.scheduled_start,
+                item.turn_time,
+                item.queue_date,
+            )
+
+        by_date: dict = {}
+        for item in items:
+            if item.status in ACTIVE:
+                by_date.setdefault(item.queue_date, []).append(item)
+
+        for date_items in by_date.values():
+            if len(date_items) < 2:
+                continue
+            windows = [_window(i) for i in date_items]
+            for i, win_a in enumerate(windows):
+                if win_a is None:
+                    continue
+                for j in range(i + 1, len(date_items)):
+                    if windows_overlap(win_a, windows[j]):
+                        date_items[i].has_conflict = True
+                        date_items[j].has_conflict = True
 
     def get_appointment_by_id(
         self, user_id: UUID, queue_user_id: UUID
