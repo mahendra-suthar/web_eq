@@ -127,7 +127,6 @@ export default function BookingPage() {
   const [businessSchedule, setBusinessSchedule] = useState<BusinessScheduleInfo | null>(null);
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
   const [upcomingAppointments, setUpcomingAppointments] = useState<UpcomingAppointmentItem[]>([]);
-
   const [selectedServices, setSelectedServices] = useState<BusinessServiceData[]>(initialSelectedServicesData);
   const [bookingInProgress, setBookingInProgress] = useState(false);
   const [queueOptions, setQueueOptions] = useState<QueueOptionData[]>([]);
@@ -591,6 +590,8 @@ export default function BookingPage() {
     (selectedQueueOption !== null || selectedQueue !== null) &&
     (!needsSlot || (needsSlot && selectedSlot !== null)) &&
     !queueTimeConflict;
+
+  const allBooked = !isReschedule && queueOptions.length > 0 && queueOptions.every((q) => !!q.already_booked);
   const displayQueue = selectedQueueOption ?? selectedQueue;
   const alreadyInQueueData = bookingConfirmation?.already_in_queue ? bookingConfirmation : null;
 
@@ -1041,15 +1042,19 @@ export default function BookingPage() {
           <div className="bk-total-sub">{t("bk.payAtCounter")}</div>
         </div>
 
-        {/* Confirm */}
-        <button className="bk-confirm-btn" onClick={handleConfirm} disabled={!canConfirm || bookingInProgress}>
-          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
-          {bookingInProgress ? t("confirming") : isReschedule ? t("bk.confirmReschedule") : t("fixAppointment")}
-        </button>
-        <div className="bk-guarantee-row">
-          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          {t("bk.freeCancellation")}
-        </div>
+        {/* Confirm — hidden when there's nothing to book (every queue already booked). */}
+        {!allBooked && (
+          <>
+            <button className="bk-confirm-btn" onClick={handleConfirm} disabled={!canConfirm || bookingInProgress}>
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+              {bookingInProgress ? t("confirming") : isReschedule ? t("bk.confirmReschedule") : t("fixAppointment")}
+            </button>
+            <div className="bk-guarantee-row">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              {t("bk.freeCancellation")}
+            </div>
+          </>
+        )}
         <div className="bk-disclaimer">
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           <p>{t("bk.priceDisclaimer")}</p>

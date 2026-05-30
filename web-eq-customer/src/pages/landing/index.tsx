@@ -910,7 +910,7 @@ export default function LandingPage() {
                   className={`lp-testi-card reveal${i === 1 ? " reveal-delay-1" : i === 2 ? " reveal-delay-2" : ""}`}
                 >
                   <StarRating rating={review.rating} size="sm" />
-                  <p className="lp-testi-text">{review.comment}</p>
+                  <p className="lp-testi-text">{`“${review.comment}”`}</p>
                   <div className="lp-testi-author">
                     <div
                       className="lp-testi-avatar"

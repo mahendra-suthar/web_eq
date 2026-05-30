@@ -1488,32 +1488,30 @@ $_tab-colors: (
 .lp-testi-card {
   background: #fff;
   border: 1px solid $border-subtle;
-  border-radius: 20px;
-  padding: 32px;
-  position: relative;
+  border-radius: 18px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 
-  &::before {
-    content: '"';
-    position: absolute;
-    top: 20px;
-    right: 24px;
-    font-family: 'Fraunces', serif !important;
-    font-size: 72px !important;
-    color: $mint;
-    line-height: 1;
-    user-select: none;
+  &:hover {
+    border-color: rgba($jade, 0.35);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 22px rgba(14, 31, 26, 0.05);
   }
 }
 
 .lp-testi-text {
-  font-family: 'DM Sans', sans-serif !important;
-  font-size: 15px !important;
-  font-weight: 300 !important;
-  line-height: 1.7;
+  font-family: 'Fraunces', serif !important;
+  font-size: 17px !important;
+  font-weight: 500 !important;
+  font-style: italic;
+  line-height: 1.55;
   color: $ink-dark;
-  margin: 0 0 24px 0;
-  position: relative;
-  z-index: 1;
+  margin: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid $border-subtle;
 }
 
 .lp-testi-author {
