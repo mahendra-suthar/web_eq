@@ -583,6 +583,7 @@
   &--full { background: rgba(224, 92, 92, 0.08); color: #e05c5c; border: 1px solid rgba(224, 92, 92, 0.2); }
   &--available { background: rgba(46, 204, 138, 0.1); color: #2ecc8a; border: 1px solid rgba(46, 204, 138, 0.2); }
   &--limited { background: rgba($gold, 0.1); color: $gold; border: 1px solid rgba($gold, 0.2); }
+  &--booked { background: rgba(42, 157, 143, 0.1); color: #1f7a6e; border: 1px solid rgba(42, 157, 143, 0.25); }
 }
 
 .bk-queue-stats {
@@ -648,6 +649,49 @@
   color: $muted-green;
   font-style: italic;
   margin: 0;
+}
+
+.bk-queue-booked {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bk-queue-booked-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 14px !important;
+}
+
+.bk-queue-booked-pos {
+  font-weight: 700;
+  color: $forest;
+
+  &--next { color: #1f7a6e; }
+}
+
+.bk-queue-booked-time {
+  color: $muted-green;
+  font-weight: 500;
+}
+
+.bk-queue-booked-btn {
+  align-self: flex-start;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(42, 157, 143, 0.3);
+  background: #fff;
+  color: #1f7a6e;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer;
+  transition: all 0.18s ease;
+
+  &:hover { background: #f0faf8; border-color: #1f7a6e; }
 }
 
 .bk-conflict-banner {

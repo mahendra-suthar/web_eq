@@ -240,6 +240,13 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, [fetchData]);
 
+  // Refetch immediately when the user returns to the tab after being away.
+  useEffect(() => {
+    const onResumed = () => fetchData(true);
+    window.addEventListener("app:resumed", onResumed);
+    return () => window.removeEventListener("app:resumed", onResumed);
+  }, [fetchData]);
+
   useEffect(() => {
     if (!lastUpdated) return;
     const tick = () => setLastUpdatedLabel(formatLastUpdated(lastUpdated));

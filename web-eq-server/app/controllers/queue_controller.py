@@ -27,6 +27,8 @@ from app.core.utils import (
     now_app_tz,
     format_date_iso,
     appointment_time_to_enqueue_dequeue,
+    appointment_window,
+    windows_overlap,
 )
 from app.services.queue_service import QueueService
 from app.services.business_service import BusinessService
@@ -309,6 +311,7 @@ class QueueController:
         current_time: datetime,
         raw_rows: List[dict],
         services_by_queue: Optional[Dict] = None,
+        exclude_user_id: Optional[UUID] = None,
     ) -> Dict[UUID, Dict[str, Any]]:
         """
         Compute per-queue position/wait metrics for a prospective new booking using
@@ -326,7 +329,11 @@ class QueueController:
 
         for queue in queues:
             qid = queue.uuid
-            queue_rows = [r for r in raw_rows if r["queue_id"] == qid]
+            queue_rows = [
+                r for r in raw_rows
+                if r["queue_id"] == qid
+                and (exclude_user_id is None or r.get("user_id") != exclude_user_id)
+            ]
 
             # New user's total service duration for this queue
             new_user_turn: float = 15.0
@@ -415,11 +422,56 @@ class QueueController:
             })
         return result
 
+    def _find_booking_time_conflict(
+        self,
+        user_id: UUID,
+        queue_date: date,
+        new_window: Optional[tuple],
+        calc_service: BookingCalculationService,
+    ) -> Optional[tuple]:
+        """Return the first (queue_user, queue, business) whose CURRENT time window
+        overlaps new_window on the same date, or None. Uses fresh metrics (not stale
+        stored times) so it reflects how the queues actually stand right now."""
+        if new_window is None:
+            return None
+        for qu, queue, business in self.queue_service.get_user_upcoming_active_appointments(user_id):
+            if qu.queue_date != queue_date:
+                continue
+            appt_time = calc_service.get_existing_queue_user_metrics(qu).get("appointment_time")
+            sched = qu.scheduled_start.strftime("%H:%M") if getattr(qu, "scheduled_start", None) else None
+            existing_window = appointment_window(
+                getattr(qu, "appointment_type", None),
+                appt_time,
+                sched,
+                getattr(qu, "turn_time", None),
+                queue_date,
+            )
+            if windows_overlap(new_window, existing_window):
+                return (qu, queue, business)
+        return None
+
+    def _raise_time_conflict(self, conflict: tuple, calc_service: BookingCalculationService) -> None:
+        """Raise a structured 409 describing the clashing appointment."""
+        cqu, cqueue, cbiz = conflict
+        ctime = calc_service.get_existing_queue_user_metrics(cqu).get("appointment_time") or ""
+        biz_name = cbiz.name if cbiz else ""
+        around = f" around {ctime}" if ctime else ""
+        raise HTTPException(status_code=409, detail={
+            "message": f"This overlaps your {biz_name} booking{around}. Please pick another time.",
+            "conflict": {
+                "business_name": biz_name,
+                "queue_name": cqueue.name if cqueue else "",
+                "time": ctime,
+                "queue_user_id": str(cqu.uuid),
+            },
+        })
+
     async def get_booking_preview(
         self,
         business_id: UUID,
         booking_date: date,
-        service_ids: List[UUID]
+        service_ids: List[UUID],
+        user_id: Optional[UUID] = None,
     ) -> BookingPreviewData:
         try:
             calc_service = BookingCalculationService(self.db)
@@ -445,14 +497,31 @@ class QueueController:
             raw_services = self.queue_service.get_queue_service_details_for_ids(service_ids)
             services_by_queue = self._build_services_by_queue(raw_services)
             today_metrics = (
-                self._build_queue_preview_metrics(queues, booking_date, current_time, raw_users, services_by_queue)
+                self._build_queue_preview_metrics(
+                    queues, booking_date, current_time, raw_users, services_by_queue,
+                    exclude_user_id=user_id,
+                )
                 if booking_date == today else {}
             )
+
+            # Queues the user is already booked in (so the UI shows "You're already here"
+            # with the real position + expected time, and a link to that appointment).
+            already_booked: Dict[UUID, Dict[str, Any]] = {}
+            if user_id is not None:
+                queue_id_set = set(queue_ids)
+                for qu, _q, _b in self.queue_service.get_user_upcoming_active_appointments(user_id):
+                    if qu.queue_date == booking_date and qu.queue_id in queue_id_set:
+                        m = calc_service.get_existing_queue_user_metrics(qu)
+                        already_booked[qu.queue_id] = {
+                            "position": m.get("position"),
+                            "appointment_time": m.get("appointment_time"),
+                        }
 
             preview = calc_service.calculate_booking_preview(
                 business_id, booking_date, service_ids,
                 today_metrics=today_metrics,
                 services_by_queue=services_by_queue,
+                already_booked=already_booked,
             )
             return BookingPreviewData(**preview)
 
@@ -629,17 +698,14 @@ class QueueController:
 
             if appointment_type == "QUEUE" and metrics.get("appointment_time") and not is_walk_in:
                 preliminary_service_time = sum((qs.avg_service_time or 5) for qs in queue_services)
-                queue_time_conflict = self.queue_service.get_queue_booking_at_estimated_time(
-                    user_id=booking_user_id,
-                    queue_date=data.queue_date,
-                    appointment_time_str=metrics["appointment_time"],
-                    tolerance_minutes=max(preliminary_service_time, 15),
+                new_window = appointment_window(
+                    "QUEUE", metrics["appointment_time"], None, preliminary_service_time, data.queue_date
                 )
-                if queue_time_conflict:
-                    raise HTTPException(
-                        status_code=409,
-                        detail="You already have an appointment around this time. Please choose a different date or time.",
-                    )
+                conflict = self._find_booking_time_conflict(
+                    booking_user_id, data.queue_date, new_window, calc_service
+                )
+                if conflict:
+                    self._raise_time_conflict(conflict, calc_service)
 
             if appointment_type in ("FIXED", "APPROXIMATE") and slot_id:
                 slot = self.queue_service.get_slot_by_id(slot_id)
@@ -650,16 +716,19 @@ class QueueController:
                 if slot.is_blocked:
                     raise HTTPException(status_code=409, detail="Slot is not available")
                 if not is_walk_in:
-                    conflict = self.queue_service.get_booking_at_time(
-                        user_id=booking_user_id,
-                        queue_date=data.queue_date,
-                        slot_start=slot.slot_start,
+                    slot_service_time = sum((qs.avg_service_time or 5) for qs in queue_services)
+                    new_window = appointment_window(
+                        "FIXED",
+                        None,
+                        slot.slot_start.strftime("%H:%M") if slot.slot_start else None,
+                        slot_service_time,
+                        data.queue_date,
+                    )
+                    conflict = self._find_booking_time_conflict(
+                        booking_user_id, data.queue_date, new_window, calc_service
                     )
                     if conflict:
-                        raise HTTPException(
-                            status_code=409,
-                            detail="You already have an appointment at this time. Please choose a different time slot.",
-                        )
+                        self._raise_time_conflict(conflict, calc_service)
                 reserved = self.queue_service.reserve_slot_atomic(slot_id)
                 if not reserved:
                     raise HTTPException(status_code=409, detail="Slot is full")

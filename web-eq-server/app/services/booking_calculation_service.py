@@ -163,6 +163,7 @@ class BookingCalculationService:
         queue_service_ids: List[UUID],
         today_metrics: Optional[Dict] = None,
         services_by_queue: Optional[Dict] = None,
+        already_booked: Optional[Dict] = None,
     ) -> Dict:
         queue_options = self.get_queue_options(
             business_id, booking_date, queue_service_ids,
@@ -177,10 +178,21 @@ class BookingCalculationService:
                 "recommended_queue_id": None,
             }
 
-        # Only available queues (employee present and slot not full) are eligible
-        # for recommendation. Unavailable ones stay as-is at the end of the list.
-        available = [o for o in queue_options if o["available"]]
-        unavailable = [o for o in queue_options if not o["available"]]
+        # Flag queues the user is already booked in — the UI shows the real position +
+        # expected time (and a link to that appointment), instead of a misleading
+        # prospective position, and disables re-booking.
+        booked = {str(k): v for k, v in (already_booked or {}).items()}
+        for o in queue_options:
+            info = booked.get(o["queue_id"])
+            if info is not None:
+                o["already_booked"] = True
+                o["your_position"] = info.get("position")
+                o["your_appointment_time"] = info.get("appointment_time")
+
+        # Only available queues (employee present, slot not full, and not already booked)
+        # are eligible for recommendation. Others stay as-is at the end of the list.
+        available = [o for o in queue_options if o["available"] and not o.get("already_booked")]
+        rest = [o for o in queue_options if not (o["available"] and not o.get("already_booked"))]
 
         recommended_queue_id = None
         if available:
@@ -191,7 +203,7 @@ class BookingCalculationService:
         return {
             "business_id": str(business_id),
             "date": booking_date.isoformat(),
-            "queues": available + unavailable,
+            "queues": available + rest,
             "recommended_queue_id": recommended_queue_id,
         }
 
@@ -259,10 +271,10 @@ class BookingCalculationService:
                 for queue in queues
             ]
 
-        future_counts = self.queue.get_future_date_counts_batch(queue_ids, booking_date)
+        future_metrics = self.queue.get_future_date_metrics_batch(queue_ids, booking_date)
         return [
             self.build_future_option(
-                queue, future_counts, percentile_map, booking_date, services_by_queue,
+                queue, future_metrics, percentile_map, booking_date, services_by_queue,
                 schedule_map, exception_map,
             )
             for queue in queues
@@ -336,16 +348,19 @@ class BookingCalculationService:
     def build_future_option(
         self,
         queue: Any,
-        future_counts: Dict[UUID, int],
+        future_metrics: Dict[UUID, Dict[str, int]],
         percentile_map: Dict[UUID, float],
         booking_date: date,
         services_by_queue: Dict,
         schedule_map: Optional[Dict[UUID, Any]] = None,
         exception_map: Optional[Dict[UUID, Any]] = None,
     ) -> Dict:
-        scheduled_count = future_counts.get(queue.uuid, 0)
+        qm = future_metrics.get(queue.uuid, {})
+        scheduled_count = qm.get("count", 0)
+        total_turn_time = qm.get("total_turn_time", 0)
         position, wait_minutes, wait_range = self.compute_future_wait(
-            scheduled_count, percentile_map.get(queue.uuid, DEFAULT_AVG_TIME), buffer_pct=0.20,
+            scheduled_count, percentile_map.get(queue.uuid, DEFAULT_AVG_TIME),
+            buffer_pct=0.20, total_wait=total_turn_time,
         )
 
         open_time, close_time, breaks, employee_available = self.get_employee_window(
@@ -429,13 +444,15 @@ class BookingCalculationService:
         queue_service_ids: List[UUID],
     ) -> Dict:
         """Estimated metrics for one queue on a future date."""
-        counts = self.queue.get_future_date_counts_batch([queue_id], booking_date)
-        scheduled_count = counts.get(queue_id, 0)
+        metrics_by_queue = self.queue.get_future_date_metrics_batch([queue_id], booking_date)
+        qm = metrics_by_queue.get(queue_id, {})
+        scheduled_count = qm.get("count", 0)
+        total_turn_time = qm.get("total_turn_time", 0)
         percentile_wait = self.queue.get_historical_percentile_wait_single(
             queue_id, booking_date, 0.75, float(DEFAULT_AVG_TIME)
         )
         position, wait_minutes, wait_range = self.compute_future_wait(
-            scheduled_count, percentile_wait, buffer_pct=0.20,
+            scheduled_count, percentile_wait, buffer_pct=0.20, total_wait=total_turn_time,
         )
 
         queue = self.queue.get_queue_by_id_with_employees(queue_id)
@@ -549,14 +566,27 @@ class BookingCalculationService:
         scheduled_count: int,
         percentile_wait: float,
         buffer_pct: float,
+        total_wait: int = 0,
     ) -> Tuple[int, int, str]:
-        """Compute (position, wait_minutes, wait_range) for a future booking."""
+        """Compute (position, wait_minutes, wait_range) for a future booking.
+
+        Wait is driven by people AHEAD, not position — so an empty future queue
+        (position #1) waits 0 and is served at the day's opening time. When the actual
+        summed service time of those people is known (total_wait), use it; otherwise
+        fall back to count × historical percentile. Mirrors compute_wait().
+        """
         position = scheduled_count + 1
-        wait_minutes = int(position * percentile_wait)
-        buffer = int(wait_minutes * buffer_pct)
+        if total_wait > 0:
+            base_wait = int(total_wait)                          # real booked minutes ahead
+        else:
+            base_wait = int(scheduled_count * percentile_wait)   # fallback estimate
+        if base_wait == 0:
+            return position, 0, ""
+        buffer = max(1, int(base_wait * buffer_pct))
+        wait_minutes = base_wait + buffer
         wait_min = max(0, wait_minutes - buffer)
         wait_max = wait_minutes + buffer
-        return position, wait_minutes, f"{wait_min}-{wait_max} min"
+        return position, wait_minutes, f"{wait_min}–{wait_max} min"
 
     def resolve_today_appointment(
         self, queue: Optional[Any], current_time: datetime, wait_minutes: int

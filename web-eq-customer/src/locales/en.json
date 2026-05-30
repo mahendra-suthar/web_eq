@@ -105,6 +105,11 @@
     "tagNA": "N/A",
     "tagRecommended": "Recommended",
     "tagAvailable": "Available",
+    "tagBooked": "Booked",
+    "alreadyHere": "You're already here",
+    "nextUp": "Next up",
+    "inLine": "in line",
+    "viewMyAppointment": "View my appointment",
     "statPosition": "Position",
     "statEstWait": "Est. wait",
     "statExpectedAt": "Expected at",
@@ -203,7 +208,7 @@
 
   "footer": {
     "tagline": "Book smarter. Wait less. Discover local businesses and lock in your slot in minutes — no back-and-forth required.",
-    "copyright": "© {{year}} EaseQueue — Book appointments quickly.",
+    "copyright": "© {{year}} EaseQueue",
     "product": "Product",
     "business": "Business",
     "company": "Company",
@@ -220,6 +225,11 @@
   },
 
   "landing": {
+    "conflictStrip": "Overlaps another appointment, you can't make both",
+    "conflictTitle": "Two appointments at the same time",
+    "conflictSub": "You can't be in two places at once, you may want to cancel one.",
+    "conflictKeepBoth": "Keep both",
+    "conflictManage": "Manage appointments",
     "badgeLive": "Live · {{count}} categories · Real-time queues",
     "badgeDefault": "Real-time Queue Management",
     "heroTitle": "Book smarter,",

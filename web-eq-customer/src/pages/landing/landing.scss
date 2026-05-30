@@ -903,6 +903,81 @@
   color: #166534;
 }
 
+.lp-conflict-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  margin: -4px 0 16px;
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: #92400e;
+  line-height: 1.4;
+
+  svg { flex-shrink: 0; color: #f59e0b; }
+}
+
+.lp-conflict-modal {
+  max-width: 420px;
+  text-align: center;
+
+  &__icon { font-size: 34px; line-height: 1; }
+
+  &__title {
+    font-family: 'Fraunces', serif !important;
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    color: #0e1f1a;
+    margin: 12px 0 6px;
+    letter-spacing: -0.4px;
+  }
+
+  &__sub {
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 13.5px !important;
+    color: #4b5f59;
+    margin: 0 0 16px;
+    line-height: 1.5;
+  }
+
+  &__list { list-style: none; margin: 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+  &__item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 10px;
+    text-align: left;
+  }
+
+  &__biz { font-family: 'DM Sans', sans-serif !important; font-weight: 700; font-size: 13.5px; color: #0e1f1a; }
+  &__meta { font-family: 'DM Sans', sans-serif !important; font-size: 12.5px; color: #6b7d77; }
+
+  &__actions { display: flex; gap: 10px; }
+
+  &__btn {
+    flex: 1;
+    padding: 11px 14px;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 13.5px !important;
+    font-weight: 600 !important;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    border: 1px solid transparent;
+
+    &--ghost { background: #fff; border-color: #d7e0dd; color: #344742; &:hover { border-color: #1a7a56; } }
+    &--primary { background: #1a7a56; color: #fff; &:hover { background: #14633f; } }
+  }
+}
+
 .lp-today-serving-dot {
   width: 9px;
   height: 9px;
@@ -1413,32 +1488,30 @@ $_tab-colors: (
 .lp-testi-card {
   background: #fff;
   border: 1px solid $border-subtle;
-  border-radius: 20px;
-  padding: 32px;
-  position: relative;
+  border-radius: 18px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 
-  &::before {
-    content: '"';
-    position: absolute;
-    top: 20px;
-    right: 24px;
-    font-family: 'Fraunces', serif !important;
-    font-size: 72px !important;
-    color: $mint;
-    line-height: 1;
-    user-select: none;
+  &:hover {
+    border-color: rgba($jade, 0.35);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 22px rgba(14, 31, 26, 0.05);
   }
 }
 
 .lp-testi-text {
-  font-family: 'DM Sans', sans-serif !important;
-  font-size: 15px !important;
-  font-weight: 300 !important;
-  line-height: 1.7;
+  font-family: 'Fraunces', serif !important;
+  font-size: 17px !important;
+  font-weight: 500 !important;
+  font-style: italic;
+  line-height: 1.55;
   color: $ink-dark;
-  margin: 0 0 24px 0;
-  position: relative;
-  z-index: 1;
+  margin: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid $border-subtle;
 }
 
 .lp-testi-author {

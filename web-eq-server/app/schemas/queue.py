@@ -324,6 +324,9 @@ class QueueOptionData(BaseModel):
     services: List[QueueServiceInfo] = []
     # Multi-mode: QUEUE (walk-in), FIXED, APPROXIMATE, HYBRID (supports walk-in + scheduled)
     booking_mode: Optional[str] = "QUEUE"
+    already_booked: bool = False
+    your_position: Optional[int] = None
+    your_appointment_time: Optional[str] = None  # the user's real expected time (HH:MM) for their existing booking
 
 
 class AvailableSlotData(BaseModel):

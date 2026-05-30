@@ -127,7 +127,6 @@ export default function BookingPage() {
   const [businessSchedule, setBusinessSchedule] = useState<BusinessScheduleInfo | null>(null);
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
   const [upcomingAppointments, setUpcomingAppointments] = useState<UpcomingAppointmentItem[]>([]);
-
   const [selectedServices, setSelectedServices] = useState<BusinessServiceData[]>(initialSelectedServicesData);
   const [bookingInProgress, setBookingInProgress] = useState(false);
   const [queueOptions, setQueueOptions] = useState<QueueOptionData[]>([]);
@@ -141,7 +140,18 @@ export default function BookingPage() {
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const [slotPickerOpen, setSlotPickerOpen] = useState(false);
-  const [etaMinutes, setEtaMinutes] = useState<number>(0);
+  const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
+
+  const visibleEtaOptions = useMemo(() => {
+    const wait = selectedQueueOption?.estimated_wait_minutes ?? 0;
+    return ([0, 15, 30, 60, 90] as const).filter((m) => m === 0 || m <= wait);
+  }, [selectedQueueOption?.estimated_wait_minutes]);
+
+  useEffect(() => {
+    if (etaMinutes !== null && !(visibleEtaOptions as readonly number[]).includes(etaMinutes)) {
+      setEtaMinutes(null);
+    }
+  }, [visibleEtaOptions, etaMinutes]);
 
   useQueueWebSocket({
     businessId: businessId || "",
@@ -537,7 +547,7 @@ export default function BookingPage() {
         ...((appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && selectedSlot?.uuid
           ? { appointment_type: appointmentMode, slot_id: selectedSlot.uuid }
           : {}),
-        ...(isToday && appointmentMode === "QUEUE" ? { eta_minutes: etaMinutes } : {}),
+        ...(isToday && appointmentMode === "QUEUE" && etaMinutes !== null ? { eta_minutes: etaMinutes } : {}),
       });
       if (result.already_in_queue) {
         setBookingConfirmation(result);
@@ -547,8 +557,9 @@ export default function BookingPage() {
       navigate("/");
     } catch (err: any) {
       console.error(isReschedule ? "Reschedule failed:" : "Booking failed:", err);
+      const detail = err.response?.data?.detail;
       const errorMsg =
-        err.response?.data?.detail ||
+        (typeof detail === "string" ? detail : detail?.message) ||
         (isReschedule ? t("bk.rescheduleFailed") : t("bookingFailed"));
       setError(errorMsg);
       if (err.response?.status === HttpStatus.UNAUTHORIZED) { 
@@ -579,6 +590,8 @@ export default function BookingPage() {
     (selectedQueueOption !== null || selectedQueue !== null) &&
     (!needsSlot || (needsSlot && selectedSlot !== null)) &&
     !queueTimeConflict;
+
+  const allBooked = !isReschedule && queueOptions.length > 0 && queueOptions.every((q) => !!q.already_booked);
   const displayQueue = selectedQueueOption ?? selectedQueue;
   const alreadyInQueueData = bookingConfirmation?.already_in_queue ? bookingConfirmation : null;
 
@@ -785,25 +798,53 @@ export default function BookingPage() {
             ) : (
               <div className="bk-queue-grid">
                 {queueOptions.map((option) => {
-                  const isSelected = selectedQueueOption?.queue_id === option.queue_id;
+                  const isBooked = !!option.already_booked;
+                  const isSelected = !isBooked && selectedQueueOption?.queue_id === option.queue_id;
                   const isFull = !option.available;
-                  const tagClass = isFull ? "bk-tag--full" : option.is_recommended ? "bk-tag--available" : option.position <= 2 ? "bk-tag--limited" : "bk-tag--available";
-                  const tagLabel = isFull ? t("bk.tagFull") : option.unavailability_reason === "employee_not_available" ? t("bk.tagNA") : option.is_recommended ? t("bk.tagRecommended") : t("bk.tagAvailable");
+                  const disabled = isFull || isBooked;
+                  const tagClass = isBooked ? "bk-tag--booked" : isFull ? "bk-tag--full" : option.is_recommended ? "bk-tag--available" : option.position <= 2 ? "bk-tag--limited" : "bk-tag--available";
+                  const tagLabel = isBooked ? (t("bk.tagBooked") || "Booked") : isFull ? t("bk.tagFull") : option.unavailability_reason === "employee_not_available" ? t("bk.tagNA") : option.is_recommended ? t("bk.tagRecommended") : t("bk.tagAvailable");
                   return (
                     <div
                       key={option.queue_id}
-                      className={`bk-queue-card${isSelected ? " bk-queue-card--selected" : ""}${isFull ? " bk-queue-card--full" : ""}`}
-                      onClick={() => !isFull && handleQueueOptionSelect(option)}
+                      className={`bk-queue-card${isSelected ? " bk-queue-card--selected" : ""}${disabled ? " bk-queue-card--full" : ""}`}
+                      onClick={() => !disabled && handleQueueOptionSelect(option)}
                       role="radio"
                       aria-checked={isSelected}
-                      tabIndex={isFull ? -1 : 0}
-                      onKeyDown={(e) => e.key === "Enter" && !isFull && handleQueueOptionSelect(option)}
+                      tabIndex={disabled ? -1 : 0}
+                      onKeyDown={(e) => e.key === "Enter" && !disabled && handleQueueOptionSelect(option)}
                     >
                       <div className="bk-queue-head">
                         <div className="bk-queue-name">{option.queue_name}</div>
                         <div className={`bk-queue-tag ${tagClass}`}>{tagLabel}</div>
                       </div>
-                      {option.unavailability_reason === "employee_not_available" ? (
+                      {isBooked ? (
+                        <div className="bk-queue-booked">
+                          <div className="bk-queue-booked-line">
+                            {(option.your_position ?? 1) === 1 ? (
+                              <span className="bk-queue-booked-pos bk-queue-booked-pos--next">
+                                ⚡ #1 · {t("bk.nextUp") || "Next up"}
+                              </span>
+                            ) : (
+                              <span className="bk-queue-booked-pos">
+                                #{option.your_position} {t("bk.inLine") || "in line"}
+                              </span>
+                            )}
+                            {option.your_appointment_time && (
+                              <span className="bk-queue-booked-time">
+                                · {formatTimeToDisplay(option.your_appointment_time)}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            className="bk-queue-booked-btn"
+                            onClick={(e) => { e.stopPropagation(); navigate("/profile?tab=appointments"); }}
+                          >
+                            {t("bk.viewMyAppointment") || "View my appointment"} →
+                          </button>
+                        </div>
+                      ) : option.unavailability_reason === "employee_not_available" ? (
                         <p className="bk-queue-unavail">{t("employeeNotAvailableOnDay")}</p>
                       ) : (
                         <div className="bk-queue-stats">
@@ -898,8 +939,9 @@ export default function BookingPage() {
           </section>
         )}
 
-        {/* ETA — only for today's bookings in QUEUE mode */}
-        {selectedDate === new Date().toISOString().split("T")[0] && appointmentMode === "QUEUE" && !isReschedule && (
+        {/* ETA — today QUEUE only, and only when wait ≥ 15 min (smallest meaningful travel option) */}
+        {selectedDate === new Date().toISOString().split("T")[0] && appointmentMode === "QUEUE" && !isReschedule &&
+          selectedQueueOption != null && (selectedQueueOption.estimated_wait_minutes ?? 0) >= 15 && (
           <section className="bk-section bk-section--eta">
             <div className="bk-section-head">
               <div>
@@ -908,7 +950,7 @@ export default function BookingPage() {
               </div>
             </div>
             <div className="bk-eta-options" role="group" aria-label={t("bk.howFarAreYou")}>
-              {([0, 15, 30, 60, 90] as const).map((mins) => (
+              {visibleEtaOptions.map((mins) => (
                 <button
                   key={mins}
                   type="button"
@@ -1000,15 +1042,19 @@ export default function BookingPage() {
           <div className="bk-total-sub">{t("bk.payAtCounter")}</div>
         </div>
 
-        {/* Confirm */}
-        <button className="bk-confirm-btn" onClick={handleConfirm} disabled={!canConfirm || bookingInProgress}>
-          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
-          {bookingInProgress ? t("confirming") : isReschedule ? t("bk.confirmReschedule") : t("fixAppointment")}
-        </button>
-        <div className="bk-guarantee-row">
-          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          {t("bk.freeCancellation")}
-        </div>
+        {/* Confirm — hidden when there's nothing to book (every queue already booked). */}
+        {!allBooked && (
+          <>
+            <button className="bk-confirm-btn" onClick={handleConfirm} disabled={!canConfirm || bookingInProgress}>
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+              {bookingInProgress ? t("confirming") : isReschedule ? t("bk.confirmReschedule") : t("fixAppointment")}
+            </button>
+            <div className="bk-guarantee-row">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              {t("bk.freeCancellation")}
+            </div>
+          </>
+        )}
         <div className="bk-disclaimer">
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           <p>{t("bk.priceDisclaimer")}</p>

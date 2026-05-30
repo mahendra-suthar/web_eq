@@ -41,6 +41,9 @@ export interface QueueOptionData {
   services: QueueServiceInfo[];
   /** QUEUE | FIXED | APPROXIMATE | HYBRID — whether queue supports scheduled slots */
   booking_mode?: string;
+  already_booked?: boolean;
+  your_position?: number | null;
+  your_appointment_time?: string | null;
 }
 
 // Time-slot for FIXED/APPROXIMATE booking (from GET /queue/slots)
