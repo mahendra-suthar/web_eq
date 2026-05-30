@@ -141,7 +141,18 @@ export default function BookingPage() {
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const [slotPickerOpen, setSlotPickerOpen] = useState(false);
-  const [etaMinutes, setEtaMinutes] = useState<number>(0);
+  const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
+
+  const visibleEtaOptions = useMemo(() => {
+    const wait = selectedQueueOption?.estimated_wait_minutes ?? 0;
+    return ([0, 15, 30, 60, 90] as const).filter((m) => m === 0 || m <= wait);
+  }, [selectedQueueOption?.estimated_wait_minutes]);
+
+  useEffect(() => {
+    if (etaMinutes !== null && !(visibleEtaOptions as readonly number[]).includes(etaMinutes)) {
+      setEtaMinutes(null);
+    }
+  }, [visibleEtaOptions, etaMinutes]);
 
   useQueueWebSocket({
     businessId: businessId || "",
@@ -537,7 +548,7 @@ export default function BookingPage() {
         ...((appointmentMode === "FIXED" || appointmentMode === "APPROXIMATE") && selectedSlot?.uuid
           ? { appointment_type: appointmentMode, slot_id: selectedSlot.uuid }
           : {}),
-        ...(isToday && appointmentMode === "QUEUE" ? { eta_minutes: etaMinutes } : {}),
+        ...(isToday && appointmentMode === "QUEUE" && etaMinutes !== null ? { eta_minutes: etaMinutes } : {}),
       });
       if (result.already_in_queue) {
         setBookingConfirmation(result);
@@ -938,7 +949,7 @@ export default function BookingPage() {
               </div>
             </div>
             <div className="bk-eta-options" role="group" aria-label={t("bk.howFarAreYou")}>
-              {([0, 15, 30, 60, 90] as const).map((mins) => (
+              {visibleEtaOptions.map((mins) => (
                 <button
                   key={mins}
                   type="button"
