@@ -58,6 +58,8 @@ export interface CustomerAppointmentListItem {
   is_checked_in?: boolean;
   eta_minutes?: number | null;
   estimated_end_time?: string | null;
+  turn_time?: number | null;
+  has_conflict?: boolean;
 }
 
 export interface CustomerAppointmentListResponse {

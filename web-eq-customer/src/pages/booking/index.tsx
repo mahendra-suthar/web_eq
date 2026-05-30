@@ -547,8 +547,9 @@ export default function BookingPage() {
       navigate("/");
     } catch (err: any) {
       console.error(isReschedule ? "Reschedule failed:" : "Booking failed:", err);
+      const detail = err.response?.data?.detail;
       const errorMsg =
-        err.response?.data?.detail ||
+        (typeof detail === "string" ? detail : detail?.message) ||
         (isReschedule ? t("bk.rescheduleFailed") : t("bookingFailed"));
       setError(errorMsg);
       if (err.response?.status === HttpStatus.UNAUTHORIZED) { 
@@ -785,25 +786,53 @@ export default function BookingPage() {
             ) : (
               <div className="bk-queue-grid">
                 {queueOptions.map((option) => {
-                  const isSelected = selectedQueueOption?.queue_id === option.queue_id;
+                  const isBooked = !!option.already_booked;
+                  const isSelected = !isBooked && selectedQueueOption?.queue_id === option.queue_id;
                   const isFull = !option.available;
-                  const tagClass = isFull ? "bk-tag--full" : option.is_recommended ? "bk-tag--available" : option.position <= 2 ? "bk-tag--limited" : "bk-tag--available";
-                  const tagLabel = isFull ? t("bk.tagFull") : option.unavailability_reason === "employee_not_available" ? t("bk.tagNA") : option.is_recommended ? t("bk.tagRecommended") : t("bk.tagAvailable");
+                  const disabled = isFull || isBooked;
+                  const tagClass = isBooked ? "bk-tag--booked" : isFull ? "bk-tag--full" : option.is_recommended ? "bk-tag--available" : option.position <= 2 ? "bk-tag--limited" : "bk-tag--available";
+                  const tagLabel = isBooked ? (t("bk.tagBooked") || "Booked") : isFull ? t("bk.tagFull") : option.unavailability_reason === "employee_not_available" ? t("bk.tagNA") : option.is_recommended ? t("bk.tagRecommended") : t("bk.tagAvailable");
                   return (
                     <div
                       key={option.queue_id}
-                      className={`bk-queue-card${isSelected ? " bk-queue-card--selected" : ""}${isFull ? " bk-queue-card--full" : ""}`}
-                      onClick={() => !isFull && handleQueueOptionSelect(option)}
+                      className={`bk-queue-card${isSelected ? " bk-queue-card--selected" : ""}${disabled ? " bk-queue-card--full" : ""}`}
+                      onClick={() => !disabled && handleQueueOptionSelect(option)}
                       role="radio"
                       aria-checked={isSelected}
-                      tabIndex={isFull ? -1 : 0}
-                      onKeyDown={(e) => e.key === "Enter" && !isFull && handleQueueOptionSelect(option)}
+                      tabIndex={disabled ? -1 : 0}
+                      onKeyDown={(e) => e.key === "Enter" && !disabled && handleQueueOptionSelect(option)}
                     >
                       <div className="bk-queue-head">
                         <div className="bk-queue-name">{option.queue_name}</div>
                         <div className={`bk-queue-tag ${tagClass}`}>{tagLabel}</div>
                       </div>
-                      {option.unavailability_reason === "employee_not_available" ? (
+                      {isBooked ? (
+                        <div className="bk-queue-booked">
+                          <div className="bk-queue-booked-line">
+                            {(option.your_position ?? 1) === 1 ? (
+                              <span className="bk-queue-booked-pos bk-queue-booked-pos--next">
+                                ⚡ #1 · {t("bk.nextUp") || "Next up"}
+                              </span>
+                            ) : (
+                              <span className="bk-queue-booked-pos">
+                                #{option.your_position} {t("bk.inLine") || "in line"}
+                              </span>
+                            )}
+                            {option.your_appointment_time && (
+                              <span className="bk-queue-booked-time">
+                                · {formatTimeToDisplay(option.your_appointment_time)}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            className="bk-queue-booked-btn"
+                            onClick={(e) => { e.stopPropagation(); navigate("/profile?tab=appointments"); }}
+                          >
+                            {t("bk.viewMyAppointment") || "View my appointment"} →
+                          </button>
+                        </div>
+                      ) : option.unavailability_reason === "employee_not_available" ? (
                         <p className="bk-queue-unavail">{t("employeeNotAvailableOnDay")}</p>
                       ) : (
                         <div className="bk-queue-stats">
@@ -898,8 +927,9 @@ export default function BookingPage() {
           </section>
         )}
 
-        {/* ETA — only for today's bookings in QUEUE mode */}
-        {selectedDate === new Date().toISOString().split("T")[0] && appointmentMode === "QUEUE" && !isReschedule && (
+        {/* ETA — today QUEUE only, and only when wait ≥ 15 min (smallest meaningful travel option) */}
+        {selectedDate === new Date().toISOString().split("T")[0] && appointmentMode === "QUEUE" && !isReschedule &&
+          selectedQueueOption != null && (selectedQueueOption.estimated_wait_minutes ?? 0) >= 15 && (
           <section className="bk-section bk-section--eta">
             <div className="bk-section-head">
               <div>

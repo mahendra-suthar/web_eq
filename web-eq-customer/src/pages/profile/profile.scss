@@ -757,6 +757,25 @@
   color: $ink-dark;
 }
 
+// Conflict warning strip
+.ac-conflict-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 16px 12px;
+  padding: 9px 12px;
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #92400e;
+  line-height: 1.4;
+
+  svg { flex-shrink: 0; color: #f59e0b; }
+}
+
 // Footer
 .ac-appt-footer {
   display: flex;
