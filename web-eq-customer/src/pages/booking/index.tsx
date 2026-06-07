@@ -803,7 +803,7 @@ export default function BookingPage() {
                   const isFull = !option.available;
                   const disabled = isFull || isBooked;
                   const tagClass = isBooked ? "bk-tag--booked" : isFull ? "bk-tag--full" : option.is_recommended ? "bk-tag--available" : option.position <= 2 ? "bk-tag--limited" : "bk-tag--available";
-                  const tagLabel = isBooked ? (t("bk.tagBooked") || "Booked") : isFull ? t("bk.tagFull") : option.unavailability_reason === "employee_not_available" ? t("bk.tagNA") : option.is_recommended ? t("bk.tagRecommended") : t("bk.tagAvailable");
+                  const tagLabel = isBooked ? (t("bk.tagBooked")) : isFull ? t("bk.tagFull") : option.unavailability_reason === "employee_not_available" ? t("bk.tagNA") : option.is_recommended ? t("bk.tagRecommended") : t("bk.tagAvailable");
                   return (
                     <div
                       key={option.queue_id}
@@ -823,11 +823,11 @@ export default function BookingPage() {
                           <div className="bk-queue-booked-line">
                             {(option.your_position ?? 1) === 1 ? (
                               <span className="bk-queue-booked-pos bk-queue-booked-pos--next">
-                                ⚡ #1 · {t("bk.nextUp") || "Next up"}
+                                ⚡ #1 · {t("bk.nextUp")}
                               </span>
                             ) : (
                               <span className="bk-queue-booked-pos">
-                                #{option.your_position} {t("bk.inLine") || "in line"}
+                                #{option.your_position} {t("bk.inLine")}
                               </span>
                             )}
                             {option.your_appointment_time && (
@@ -841,7 +841,7 @@ export default function BookingPage() {
                             className="bk-queue-booked-btn"
                             onClick={(e) => { e.stopPropagation(); navigate("/profile?tab=appointments"); }}
                           >
-                            {t("bk.viewMyAppointment") || "View my appointment"} →
+                            {t("bk.viewMyAppointment")} →
                           </button>
                         </div>
                       ) : option.unavailability_reason === "employee_not_available" ? (

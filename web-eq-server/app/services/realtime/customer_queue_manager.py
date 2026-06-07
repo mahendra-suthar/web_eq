@@ -161,15 +161,16 @@ class CustomerQueueManager:
         users = build_live_queue_users_raw(rows, svc_by_user)
 
         open_dt = None
+        breaks: list = []
         queue = svc.get_queue_by_id(UUID(queue_id))
         if queue:
             try:
-                open_time, _, _, _ = BookingCalculationService(db).get_employee_window(queue, queue_date)
+                open_time, _, breaks, _ = BookingCalculationService(db).get_employee_window(queue, queue_date)
                 open_dt = APP_TZ.localize(datetime.combine(queue_date, open_time))
             except Exception:
                 pass
 
-        waits = calculate_queue_waits(users, open_dt=open_dt)
+        waits = calculate_queue_waits(users, open_dt=open_dt, breaks=breaks)
         current_token = waits["current_token"]
         wait_data = waits["wait_data"]
         position_map = waits["position_map"]

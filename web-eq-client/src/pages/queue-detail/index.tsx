@@ -62,7 +62,7 @@ const QueueDetail = () => {
             })
             .catch((err: unknown) => {
                 const e = err as { response?: { data?: { detail?: string } }; message?: string };
-                setError(e?.response?.data?.detail || (e?.message as string) || t("failedToLoadQueue") || "Failed to load queue");
+                setError(e?.response?.data?.detail || (e?.message as string) || t("failedToLoadQueue"));
                 setData(null);
             })
             .finally(() => setLoading(false));
@@ -79,7 +79,7 @@ const QueueDetail = () => {
 
     useEffect(() => {
         if (!data?.business_id) return;
-        employeeService.getEmployees(data.business_id, 1, 500, "").then(setEmployees).catch(() => setEmployees([]));
+        employeeService.getEmployees(data.business_id, 1, 500, "").then((res) => setEmployees(res.items)).catch(() => setEmployees([]));
     }, [data?.business_id, employeeService]);
 
     const handleSaveQueue = async () => {
@@ -107,7 +107,7 @@ const QueueDetail = () => {
             setEditingQueue(false);
         } catch (err: unknown) {
             const e = err as { response?: { data?: { detail?: string } }; message?: string };
-            setQueueSaveError(e?.response?.data?.detail || (e?.message as string) || t("failedToSave") || "Failed to save");
+            setQueueSaveError(e?.response?.data?.detail || (e?.message as string) || t("failedToSave"));
         } finally {
             setSavingQueue(false);
         }
@@ -119,11 +119,11 @@ const QueueDetail = () => {
         const feeNum = addFee === "" ? NaN : Number(addFee);
         const avgTimeNum = addAvgTime === "" ? NaN : Number(addAvgTime);
         if (isNaN(feeNum) || feeNum < 0) {
-            setAddServiceError(t("addServiceFeeRequired") || "Fee is required when adding a service.");
+            setAddServiceError(t("addServiceFeeRequired"));
             return;
         }
         if (isNaN(avgTimeNum) || avgTimeNum < 1) {
-            setAddServiceError(t("addServiceAvgTimeRequired") || "Average service time (minutes) is required when adding a service.");
+            setAddServiceError(t("addServiceAvgTimeRequired"));
             return;
         }
         setSavingService(true);
@@ -156,11 +156,11 @@ const QueueDetail = () => {
         const feeNum = editSvcFee === "" ? NaN : Number(editSvcFee);
         const avgTimeNum = editSvcAvgTime === "" ? NaN : Number(editSvcAvgTime);
         if (isNaN(feeNum) || feeNum < 0) {
-            setEditServiceError(t("addServiceFeeRequired") || "Fee is required.");
+            setEditServiceError(t("addServiceFeeRequired"));
             return;
         }
         if (isNaN(avgTimeNum) || avgTimeNum < 1) {
-            setEditServiceError(t("addServiceAvgTimeRequired") || "Average service time (minutes) is required.");
+            setEditServiceError(t("addServiceAvgTimeRequired"));
             return;
         }
         setEditServiceError("");
@@ -179,7 +179,7 @@ const QueueDetail = () => {
     };
 
     const handleRemoveService = async (queueServiceId: string) => {
-        if (!window.confirm(t("confirmRemoveService") || "Remove this service from the queue?")) return;
+        if (!window.confirm(t("confirmRemoveService"))) return;
         setSavingService(true);
         try {
             await queueService.deleteQueueService(queueServiceId);
@@ -258,7 +258,7 @@ const QueueDetail = () => {
 
                 <div className="queue-detail-content">
                     <div className="info-block queue-details-block">
-                        <h3 className="info-block-title">{t("queueInformation") || "Queue information"}</h3>
+                        <h3 className="info-block-title">{t("queueInformation")}</h3>
                         {editingQueue ? (
                             <div className="queue-edit-form">
                                 <div className="form-row">
@@ -292,14 +292,14 @@ const QueueDetail = () => {
                                     />
                                 </div>
                                 <div className="form-row">
-                                    <label className="form-label">{t("assignToEmployee") || "Assign to employee"}</label>
+                                    <label className="form-label">{t("assignToEmployee")}</label>
                                     <select
                                         className="form-input form-select"
                                         value={editEmployeeId ?? ""}
                                         onChange={(e) => setEditEmployeeId(e.target.value || null)}
                                         disabled={savingQueue}
                                     >
-                                        <option value="">— {t("none") || "None"} —</option>
+                                        <option value="">— {t("none")} —</option>
                                         {employees.map((emp) => (
                                             <option key={emp.uuid} value={emp.uuid}>
                                                 {emp.full_name}
@@ -393,7 +393,7 @@ const QueueDetail = () => {
                     </div>
 
                     <div className="info-block queue-services-block">
-                        <h3 className="info-block-title">{t("queueServices") || "Queue services"}</h3>
+                        <h3 className="info-block-title">{t("queueServices")}</h3>
 
                         {/* Add Queue Service: services from business category as selectable buttons; selecting adds to queue */}
                         {availableToAdd.length > 0 && (
@@ -408,7 +408,7 @@ const QueueDetail = () => {
                                         <input
                                             type="number"
                                             className="form-input small"
-                                            placeholder={t("enterFee") || "0.00"}
+                                            placeholder={t("enterFee")}
                                             value={addFee}
                                             onChange={(e) => {
                                                 setAddFee(e.target.value === "" ? "" : Number(e.target.value));
@@ -453,16 +453,16 @@ const QueueDetail = () => {
                         )}
 
                         {services.length === 0 ? (
-                            <p className="info-value">{t("noServicesAssigned") || "No services assigned to this queue."}</p>
+                            <p className="info-value">{t("noServicesAssigned")}</p>
                         ) : (
                             <div className="queue-services-table-wrap">
                                 <table className="data-table queue-services-table">
                                     <thead>
                                         <tr>
                                             <th>{t("serviceName")}</th>
-                                            <th>{t("serviceDescription") || "Description"}</th>
+                                            <th>{t("serviceDescription")}</th>
                                             <th>{t("fee")}</th>
-                                            <th>{t("averageServiceTime") || "Avg. time (min)"}</th>
+                                            <th>{t("averageServiceTime")}</th>
                                             <th>{t("actions")}</th>
                                         </tr>
                                     </thead>

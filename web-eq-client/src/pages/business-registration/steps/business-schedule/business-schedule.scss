@@ -228,6 +228,168 @@
       }
     }
   }
+
+  .error-text {
+    color: #FF5630;
+    font-size: 12px;
+    font-weight: 500;
+  }
+}
+
+.breaks-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(145, 158, 171, 0.3);
+
+  .breaks-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .breaks-label {
+    color: $primary-dark;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .add-break-button {
+    background: transparent;
+    border: 1px solid $primary;
+    color: $primary;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover:not(:disabled) {
+      background: rgba($primary, 0.08);
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  }
+
+  .breaks-empty {
+    color: #919EAB;
+    font-family: "Noto Sans Hebrew", serif;
+    font-size: 12px;
+    margin: 0;
+    font-style: italic;
+  }
+
+  .break-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .break-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 6px;
+    border: 1px solid rgba(145, 158, 171, 0.2);
+    transition: border-color 0.2s ease;
+
+    &.has-error {
+      border-color: #FF5630;
+      background: rgba(255, 86, 48, 0.04);
+    }
+  }
+
+  .break-time-inputs {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+
+    .time-input-group {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+
+      label {
+        color: $primary-dark;
+        font-family: "Noto Sans Hebrew", serif;
+        font-size: 11px;
+        font-weight: 500;
+      }
+
+      input[type="time"] {
+        width: 100%;
+        border-radius: 6px;
+        background: rgba(145, 158, 171, 0.08);
+        height: 40px;
+        padding: 0 10px;
+        border: 2px solid transparent;
+        color: $primary-dark;
+        font-family: "Noto Sans Hebrew", serif;
+        font-size: 14px;
+        transition: all 0.2s ease;
+
+        &:focus {
+          outline: none;
+          border-color: $primary;
+          background: rgba(145, 158, 171, 0.12);
+        }
+      }
+    }
+  }
+
+  .remove-break-button {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 86, 48, 0.3);
+    background: rgba(255, 86, 48, 0.06);
+    color: #FF5630;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(255, 86, 48, 0.12);
+      border-color: #FF5630;
+    }
+  }
+
+  .error-text {
+    color: #FF5630;
+    font-size: 12px;
+    font-weight: 500;
+  }
+}
+
+.submit-error {
+  background: rgba(255, 86, 48, 0.08);
+  color: #B71D18;
+  border: 1px solid rgba(255, 86, 48, 0.3);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-family: "Noto Sans Hebrew", serif;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .business-schedule-form-action {

@@ -1,8 +1,12 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useLayoutContext } from "../../../../layouts/general-layout";
 import Button from "../../../../components/button";
-import { DaySchedule } from "../../../../utils/businessRegistrationStore";
-import { BusinessService, ScheduleInput } from "../../../../services/business/business.service";
+import { BreakTime, DaySchedule } from "../../../../utils/businessRegistrationStore";
+import {
+  BreakTimeInput,
+  BusinessService,
+  ScheduleInput,
+} from "../../../../services/business/business.service";
 import { DayOfWeek, DAYS_IN_WEEK, DAYS_OF_WEEK } from "../../../../utils/constants";
 import { uiDowToBackendDow } from "../../../../utils/utils";
 import "./business-schedule.scss";
@@ -20,6 +24,24 @@ interface BusinessScheduleProps {
   };
 }
 
+type DayErrors = {
+  range?: string;
+  breaks?: Record<number, string>;
+};
+
+const toMinutes = (t: string): number => {
+  if (!t || !/^\d{2}:\d{2}$/.test(t)) return NaN;
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+};
+
+const overlaps = (
+  aStart: number,
+  aEnd: number,
+  bStart: number,
+  bEnd: number
+): boolean => aStart < bEnd && bStart < aEnd;
+
 export default function BusinessSchedule({
   onNext,
   onBack,
@@ -27,9 +49,9 @@ export default function BusinessSchedule({
   initialData,
 }: BusinessScheduleProps) {
   const { t } = useLayoutContext();
-  const businessService = new BusinessService();
+  const businessService = useMemo(() => new BusinessService(), []);
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
+  const [submitError, setSubmitError] = useState<string>("");
 
   const [isAlwaysOpen, setIsAlwaysOpen] = useState<boolean>(
     initialData?.is_always_open || false
@@ -52,37 +74,132 @@ export default function BusinessSchedule({
       is_open: false,
       opening_time: "",
       closing_time: "",
+      break_times: [],
     }));
   };
 
   const getInitialSchedule = (): DaySchedule[] => {
     if (initialData?.schedule && initialData.schedule.length === DAYS_IN_WEEK) {
-      return initialData.schedule;
+      return initialData.schedule.map((d) => ({
+        ...d,
+        break_times: d.break_times ?? [],
+      }));
     }
     return getDefaultSchedule();
   };
 
   const [schedule, setSchedule] = useState<DaySchedule[]>(getInitialSchedule());
-
-  const [errors, setErrors] = useState<{ schedule?: string }>({});
+  const [globalError, setGlobalError] = useState<string>("");
+  const [dayErrors, setDayErrors] = useState<Record<number, DayErrors>>({});
   const [touched, setTouched] = useState<boolean>(false);
 
-  const handleDayToggle = (dayIndex: number) => {
-    const updatedSchedule = schedule.map((day, index) => {
-      if (index === dayIndex) {
-        return {
-          ...day,
-          is_open: !day.is_open,
-          opening_time: !day.is_open ? "09:00" : "",
-          closing_time: !day.is_open ? "18:00" : "",
-        };
-      }
-      return day;
-    });
-    setSchedule(updatedSchedule);
-    if (touched) {
-      validateSchedule(updatedSchedule);
+  const validateSchedule = (
+    scheduleData: DaySchedule[]
+  ): { ok: boolean; global: string; perDay: Record<number, DayErrors> } => {
+    const perDay: Record<number, DayErrors> = {};
+    const hasOpenDays = scheduleData.some((d) => d.is_open);
+
+    if (!isAlwaysOpen && !hasOpenDays) {
+      return { ok: false, global: t("selectAtLeastOneDay"), perDay };
     }
+
+    if (isAlwaysOpen) return { ok: true, global: "", perDay };
+
+    let ok = true;
+
+    for (const day of scheduleData) {
+      if (!day.is_open) continue;
+      const dayErr: DayErrors = { breaks: {} };
+      const openMin = toMinutes(day.opening_time);
+      const closeMin = toMinutes(day.closing_time);
+
+      if (
+        !day.opening_time ||
+        !day.closing_time ||
+        isNaN(openMin) ||
+        isNaN(closeMin) ||
+        openMin >= closeMin
+      ) {
+        dayErr.range = t("invalidTimeRange");
+        ok = false;
+      }
+
+      const breaks = day.break_times ?? [];
+      const validIntervals: Array<{ start: number; end: number; idx: number }> = [];
+
+      breaks.forEach((br, idx) => {
+        const bStart = toMinutes(br.break_start);
+        const bEnd = toMinutes(br.break_end);
+
+        if (!br.break_start || !br.break_end || isNaN(bStart) || isNaN(bEnd)) {
+          dayErr.breaks![idx] = t("breakTimesRequired");
+          ok = false;
+          return;
+        }
+        if (bStart >= bEnd) {
+          dayErr.breaks![idx] = t("breakStartBeforeEnd");
+          ok = false;
+          return;
+        }
+        if (!isNaN(openMin) && bStart <= openMin) {
+          dayErr.breaks![idx] = t("breakAfterOpening");
+          ok = false;
+          return;
+        }
+        if (!isNaN(closeMin) && bEnd >= closeMin) {
+          dayErr.breaks![idx] = t("breakBeforeClosing");
+          ok = false;
+          return;
+        }
+
+        const conflict = validIntervals.find((iv) =>
+          overlaps(iv.start, iv.end, bStart, bEnd)
+        );
+        if (conflict) {
+          dayErr.breaks![idx] = t("breakOverlaps");
+          ok = false;
+          return;
+        }
+        validIntervals.push({ start: bStart, end: bEnd, idx });
+      });
+
+      if (dayErr.range || Object.keys(dayErr.breaks!).length > 0) {
+        perDay[day.day_of_week] = dayErr;
+      }
+    }
+
+    return { ok, global: "", perDay };
+  };
+
+  const runValidation = (next: DaySchedule[]) => {
+    const result = validateSchedule(next);
+    setGlobalError(result.global);
+    setDayErrors(result.perDay);
+    return result.ok;
+  };
+
+  const updateSchedule = (
+    next: DaySchedule[],
+    revalidate: boolean = touched
+  ) => {
+    setSchedule(next);
+    if (revalidate) runValidation(next);
+  };
+
+  const handleDayToggle = (dayIndex: number) => {
+    const next = schedule.map((day, index) => {
+      if (index !== dayIndex) return day;
+      const opening = !day.is_open ? "09:00" : "";
+      const closing = !day.is_open ? "18:00" : "";
+      return {
+        ...day,
+        is_open: !day.is_open,
+        opening_time: opening,
+        closing_time: closing,
+        break_times: !day.is_open ? day.break_times ?? [] : [],
+      };
+    });
+    updateSchedule(next);
   };
 
   const handleTimeChange = (
@@ -90,103 +207,199 @@ export default function BusinessSchedule({
     field: "opening_time" | "closing_time",
     value: string
   ) => {
-    const updatedSchedule = schedule.map((day, index) => {
-      if (index === dayIndex) {
-        return { ...day, [field]: value };
-      }
-      return day;
+    const next = schedule.map((day, index) =>
+      index === dayIndex ? { ...day, [field]: value } : day
+    );
+    updateSchedule(next);
+  };
+
+  const handleAddBreak = (dayIndex: number) => {
+    const next = schedule.map((day, index) => {
+      if (index !== dayIndex) return day;
+      const breaks = [...(day.break_times ?? [])];
+      breaks.push({ break_start: "", break_end: "" });
+      return { ...day, break_times: breaks };
     });
-    setSchedule(updatedSchedule);
-    if (touched) {
-      validateSchedule(updatedSchedule);
-    }
+    updateSchedule(next, false); // don't validate on add — new break has empty times
   };
 
-  const validateSchedule = (scheduleData: DaySchedule[]): boolean => {
-    const hasOpenDays = scheduleData.some((day) => day.is_open);
-    
-    if (!isAlwaysOpen && !hasOpenDays) {
-      setErrors({ schedule: t("selectAtLeastOneDay") });
-      return false;
-    }
-
-    if (!isAlwaysOpen) {
-      const invalidDays = scheduleData.filter(
-        (day) =>
-          day.is_open &&
-          (!day.opening_time || !day.closing_time || day.opening_time >= day.closing_time)
+  const handleBreakChange = (
+    dayIndex: number,
+    breakIndex: number,
+    field: "break_start" | "break_end",
+    value: string
+  ) => {
+    const next = schedule.map((day, index) => {
+      if (index !== dayIndex) return day;
+      const breaks = (day.break_times ?? []).map((br, i) =>
+        i === breakIndex ? { ...br, [field]: value } : br
       );
-
-      if (invalidDays.length > 0) {
-        setErrors({ schedule: t("invalidTimeRange") });
-        return false;
-      }
-    }
-
-    setErrors({});
-    return true;
+      return { ...day, break_times: breaks };
+    });
+    updateSchedule(next);
   };
+
+  const handleRemoveBreak = (dayIndex: number, breakIndex: number) => {
+    const next = schedule.map((day, index) => {
+      if (index !== dayIndex) return day;
+      const breaks = (day.break_times ?? []).filter((_, i) => i !== breakIndex);
+      return { ...day, break_times: breaks };
+    });
+    updateSchedule(next);
+  };
+
+  const handleAlwaysOpenToggle = (checked: boolean) => {
+    setIsAlwaysOpen(checked);
+    if (checked) {
+      const next = getDefaultSchedule().map((d) => ({ ...d, is_open: true }));
+      setSchedule(next);
+      setDayErrors({});
+      setGlobalError("");
+    } else {
+      const next = getDefaultSchedule();
+      setSchedule(next);
+      if (touched) runValidation(next);
+    }
+  };
+
+  const buildBreaksPayload = (breaks: BreakTime[] = []): BreakTimeInput[] =>
+    breaks
+      .filter((br) => br.break_start && br.break_end)
+      .map((br) => ({ break_start: br.break_start, break_end: br.break_end }));
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     setTouched(true);
+    setSubmitError("");
 
-    if (!isAlwaysOpen && !validateSchedule(schedule)) {
+    if (!isAlwaysOpen && !runValidation(schedule)) return;
+
+    if (!businessId) {
+      onNext({ is_always_open: isAlwaysOpen, schedule });
       return;
     }
 
-    if (businessId) {
-      setLoading(true);
-      setError("");
+    setLoading(true);
+    try {
+      const scheduleInputs: ScheduleInput[] = isAlwaysOpen
+        ? []
+        : schedule.map((day) => ({
+            day_of_week: uiDowToBackendDow(day.day_of_week),
+            opening_time: day.is_open && day.opening_time ? day.opening_time : null,
+            closing_time: day.is_open && day.closing_time ? day.closing_time : null,
+            is_open: day.is_open,
+            break_times: day.is_open ? buildBreaksPayload(day.break_times) : [],
+          }));
 
-      try {
-        const scheduleInputs: ScheduleInput[] = isAlwaysOpen
-          ? []
-          : schedule.map((day) => ({
-              day_of_week: uiDowToBackendDow(day.day_of_week),
-              opening_time: day.is_open && day.opening_time ? day.opening_time : null,
-              closing_time: day.is_open && day.closing_time ? day.closing_time : null,
-              is_open: day.is_open,
-            }));
+      await businessService.createBusinessSchedules(
+        businessId,
+        scheduleInputs,
+        isAlwaysOpen
+      );
 
-        await businessService.createBusinessSchedules(
-          businessId,
-          scheduleInputs,
-          isAlwaysOpen
-        );
-
-        onNext({
-          is_always_open: isAlwaysOpen,
-          schedule: schedule,
-        });
-      } catch (err: any) {
-        let errorMessage = t("scheduleCreationFailed");
-        
-        if (err?.errorCode === "BUSINESS_NOT_FOUND") {
-          errorMessage = t("businessNotFound");
-        } else if (err?.message) {
-          errorMessage = err.message;
-        } else if (err?.response?.data?.detail?.message) {
-          errorMessage = err.response.data.detail.message;
-        }
-        
-        setError(errorMessage);
-      } finally {
-        setLoading(false);
+      onNext({ is_always_open: isAlwaysOpen, schedule });
+    } catch (err: any) {
+      let message = t("scheduleCreationFailed");
+      if (err?.errorCode === "BUSINESS_NOT_FOUND") {
+        message = t("businessNotFound");
+      } else if (err?.message) {
+        message = err.message;
+      } else if (err?.response?.data?.detail?.message) {
+        message = err.response.data.detail.message;
       }
-    } else {
-      onNext({
-        is_always_open: isAlwaysOpen,
-        schedule: schedule,
-      });
+      setSubmitError(message);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const renderBreaks = (day: DaySchedule, dayIndex: number) => {
+    const breaks = day.break_times ?? [];
+    const errs = dayErrors[day.day_of_week]?.breaks ?? {};
+    const canAddBreak = Boolean(day.opening_time && day.closing_time);
+
+    return (
+      <div className="breaks-section">
+        <div className="breaks-header">
+          <span className="breaks-label">{t("breaks")}</span>
+          <button
+            type="button"
+            className="add-break-button"
+            onClick={() => handleAddBreak(dayIndex)}
+            disabled={!canAddBreak}
+            aria-label={t("addBreak")}
+            title={!canAddBreak ? t("setOpeningClosingFirst") : undefined}
+          >
+            + {t("addBreak")}
+          </button>
+        </div>
+
+        {breaks.length === 0 ? (
+          <p className="breaks-empty">{t("noBreaksHelp")}</p>
+        ) : (
+          <ul className="break-list">
+            {breaks.map((br, idx) => (
+              <li key={idx} className={`break-item ${errs[idx] ? "has-error" : ""}`}>
+                <div className="break-time-inputs">
+                  <div className="time-input-group">
+                    <label htmlFor={`break-start-${dayIndex}-${idx}`}>
+                      {t("breakStart")}
+                    </label>
+                    <input
+                      id={`break-start-${dayIndex}-${idx}`}
+                      type="time"
+                      value={br.break_start}
+                      min={day.opening_time || undefined}
+                      max={day.closing_time || undefined}
+                      onChange={(e) =>
+                        handleBreakChange(dayIndex, idx, "break_start", e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="time-input-group">
+                    <label htmlFor={`break-end-${dayIndex}-${idx}`}>
+                      {t("breakEnd")}
+                    </label>
+                    <input
+                      id={`break-end-${dayIndex}-${idx}`}
+                      type="time"
+                      value={br.break_end}
+                      min={br.break_start || day.opening_time || undefined}
+                      max={day.closing_time || undefined}
+                      onChange={(e) =>
+                        handleBreakChange(dayIndex, idx, "break_end", e.target.value)
+                      }
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="remove-break-button"
+                    onClick={() => handleRemoveBreak(dayIndex, idx)}
+                    aria-label={t("removeBreak")}
+                    title={t("removeBreak")}
+                  >
+                    ×
+                  </button>
+                </div>
+                {errs[idx] && <div className="error-text">{errs[idx]}</div>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
   };
 
   return (
     <div className="business-schedule-page">
       <div className="business-schedule-header">
         {onBack && (
-          <button className="back-button" onClick={onBack}>
+          <button
+            type="button"
+            className="back-button"
+            onClick={onBack}
+            aria-label={t("back")}
+          >
             ←
           </button>
         )}
@@ -196,28 +409,19 @@ export default function BusinessSchedule({
         </div>
       </div>
 
-      <form className="business-schedule-form" onSubmit={handleSubmit}>
+      <form className="business-schedule-form" onSubmit={handleSubmit} noValidate>
         <div className="business-schedule-form-fields">
-          {/* Always Open Toggle */}
           <div className="form-field-wrapper">
             <div className="always-open-row">
-              <label className="form-label" htmlFor="reg-always-open-toggle">{t("alwaysOpen")}</label>
+              <label className="form-label" htmlFor="reg-always-open-toggle">
+                {t("alwaysOpen")}
+              </label>
               <label className="toggle-switch">
                 <input
                   id="reg-always-open-toggle"
                   type="checkbox"
                   checked={isAlwaysOpen}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setIsAlwaysOpen(checked);
-                    if (checked) {
-                      setSchedule(getDefaultSchedule().map((day) => ({ ...day, is_open: true })));
-                      setErrors({});
-                    } else {
-                      setSchedule(getDefaultSchedule());
-                      if (touched) validateSchedule(getDefaultSchedule());
-                    }
-                  }}
+                  onChange={(e) => handleAlwaysOpenToggle(e.target.checked)}
                 />
                 <span className="toggle-track" />
               </label>
@@ -226,10 +430,11 @@ export default function BusinessSchedule({
 
           {!isAlwaysOpen && (
             <>
-              {/* Day Selection */}
               <div className="form-field-wrapper">
                 <label className="form-label">{t("selectDays")} *</label>
-                <div className={`day-selection ${touched && errors.schedule ? "error" : ""}`}>
+                <div
+                  className={`day-selection ${touched && globalError ? "error" : ""}`}
+                >
                   <div className="day-buttons">
                     {schedule.map((day, index) => (
                       <button
@@ -237,54 +442,62 @@ export default function BusinessSchedule({
                         type="button"
                         className={`day-button ${day.is_open ? "selected" : ""}`}
                         onClick={() => handleDayToggle(index)}
+                        aria-pressed={day.is_open}
                       >
                         {day.day_name}
                       </button>
                     ))}
                   </div>
-                  {touched && errors.schedule && (
-                    <div className="error-text">{errors.schedule}</div>
+                  {touched && globalError && (
+                    <div className="error-text">{globalError}</div>
                   )}
                 </div>
               </div>
 
-              {/* Time Selection for Selected Days */}
               {schedule.some((day) => day.is_open) && (
                 <div className="time-selection-section">
                   <label className="form-label">{t("businessHours")}</label>
                   <div className="time-slots">
-                    {schedule.map(
-                      (day, index) =>
-                        day.is_open && (
-                          <div key={day.day_of_week} className="time-slot">
-                            <div className="day-name">{day.day_name}</div>
-                            <div className="time-inputs">
-                              <div className="time-input-group">
-                                <label>{t("openingTime")}</label>
-                                <input
-                                  type="time"
-                                  value={day.opening_time}
-                                  onChange={(e) =>
-                                    handleTimeChange(index, "opening_time", e.target.value)
-                                  }
-                                  required
-                                />
-                              </div>
-                              <div className="time-input-group">
-                                <label>{t("closingTime")}</label>
-                                <input
-                                  type="time"
-                                  value={day.closing_time}
-                                  onChange={(e) =>
-                                    handleTimeChange(index, "closing_time", e.target.value)
-                                  }
-                                  required
-                                />
-                              </div>
+                    {schedule.map((day, index) => {
+                      if (!day.is_open) return null;
+                      const dayErr = dayErrors[day.day_of_week];
+                      return (
+                        <div key={day.day_of_week} className="time-slot">
+                          <div className="day-name">{day.day_name}</div>
+                          <div className="time-inputs">
+                            <div className="time-input-group">
+                              <label htmlFor={`open-${index}`}>{t("openingTime")}</label>
+                              <input
+                                id={`open-${index}`}
+                                type="time"
+                                value={day.opening_time}
+                                onChange={(e) =>
+                                  handleTimeChange(index, "opening_time", e.target.value)
+                                }
+                                required
+                              />
+                            </div>
+                            <div className="time-input-group">
+                              <label htmlFor={`close-${index}`}>{t("closingTime")}</label>
+                              <input
+                                id={`close-${index}`}
+                                type="time"
+                                value={day.closing_time}
+                                min={day.opening_time || undefined}
+                                onChange={(e) =>
+                                  handleTimeChange(index, "closing_time", e.target.value)
+                                }
+                                required
+                              />
                             </div>
                           </div>
-                        )
-                    )}
+                          {touched && dayErr?.range && (
+                            <div className="error-text">{dayErr.range}</div>
+                          )}
+                          {renderBreaks(day, index)}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -292,9 +505,9 @@ export default function BusinessSchedule({
           )}
         </div>
 
-        {error && (
-          <div className="error-message" style={{ color: "red", marginBottom: "1rem", padding: "0.5rem" }}>
-            {error}
+        {submitError && (
+          <div className="submit-error" role="alert">
+            {submitError}
           </div>
         )}
 

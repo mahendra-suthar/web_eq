@@ -29,6 +29,10 @@ export interface TodayAppointmentResponse {
   service_duration_minutes?: number | null;  // turn_time in minutes
   expected_end_ts?: number | null;           // epoch ms when service ends
   estimated_end_time?: string | null;        // "11:58 PM"
+  on_break_until?: string | null;            // 12h label when employee is currently on break
+  on_break_until_ts?: number | null;         // epoch ms of current break's end
+  spans_break?: boolean;                     // true when the service window crosses a break
+  break_during_label?: string | null;        // "1:00 PM – 2:00 PM" — the break the service spans
 }
 
 export interface CustomerAppointmentListItem {

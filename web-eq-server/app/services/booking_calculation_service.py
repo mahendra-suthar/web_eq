@@ -10,10 +10,27 @@ from app.core.constants import (
     DEFAULT_OPEN_TIME,
     APPOINTMENT_TYPE_APPROXIMATE,
 )
-from app.core.utils import today_app_date, now_app_tz, APP_TZ
+from app.core.utils import today_app_date, now_app_tz, APP_TZ, advance_work_minutes, shift_wait_range
 from app.models.schedule import ScheduleEntityType
 from app.services.queue_service import QueueService
 from app.services.schedule_service import ScheduleService
+
+
+def _reconcile_wait_with_breaks(
+    base_dt: datetime,
+    appointment_dt: datetime,
+    wait_minutes: int,
+    wait_range: str,
+) -> Tuple[int, str]:
+    """Shift a break-unaware wait estimate so "Est wait" matches the break-aware
+    "Expected at".  The break is a deterministic fixed gap — it shifts the central
+    estimate and both range bounds equally (the uncertainty band is unchanged).
+    """
+    raw_finish = base_dt + timedelta(minutes=wait_minutes)
+    break_gap = int(round((appointment_dt - raw_finish).total_seconds() / 60))
+    if break_gap <= 0:
+        return wait_minutes, wait_range
+    return wait_minutes + break_gap, shift_wait_range(wait_range, break_gap)
 
 
 class BookingCalculationService:
@@ -102,55 +119,6 @@ class BookingCalculationService:
             return queue.start_time, queue.end_time if queue.end_time is not None else BIZ_LATEST_TIME, [], True
 
         return DEFAULT_OPEN_TIME, BIZ_LATEST_TIME, [], True
-
-    # ──────────────────────────────────────────────────────────────────────────
-    # Break-aware clock-time calculation (supports multiple breaks)
-    # ──────────────────────────────────────────────────────────────────────────
-
-    def work_minutes_to_clock_time(
-        self,
-        base_dt: datetime,
-        work_minutes: int,
-        breaks: List[Tuple[time, time]],
-    ) -> datetime:
-        """Convert *work_minutes* of productive time starting at *base_dt* into a
-        wall-clock datetime, skipping all break windows on the same calendar day.
-
-        *breaks* is a list of (break_start, break_end) time tuples, sorted ascending.
-        Works with both tz-aware (today / IST) and tz-naive (future dates) datetimes.
-        """
-        if not breaks:
-            return base_dt + timedelta(minutes=work_minutes)
-
-        base_date = base_dt.date()
-        is_aware = base_dt.tzinfo is not None
-
-        def to_dt(t: time) -> datetime:
-            if is_aware:
-                return APP_TZ.localize(datetime.combine(base_date, t))
-            return datetime.combine(base_date, t)
-
-        break_dts = [(to_dt(bs), to_dt(be)) for bs, be in breaks]
-
-        current = base_dt
-        remaining = work_minutes
-
-        for bk_start, bk_end in break_dts:
-            if bk_start <= current < bk_end:
-                current = bk_end
-                continue
-
-            if bk_end <= current:
-                continue
-
-            minutes_before_break = int((bk_start - current).total_seconds() / 60)
-            if remaining <= minutes_before_break:
-                return current + timedelta(minutes=remaining)
-
-            remaining -= minutes_before_break
-            current = bk_end
-
-        return current + timedelta(minutes=remaining)
 
     # ──────────────────────────────────────────────────────────────────────────
     # Public booking-preview entry points
@@ -326,8 +294,11 @@ class BookingCalculationService:
         close_dt = APP_TZ.localize(datetime.combine(today_date, close_time))
         base_dt = max(current_time, open_dt)
 
-        appointment_dt = self.work_minutes_to_clock_time(base_dt, wait_minutes, breaks)
+        appointment_dt = advance_work_minutes(base_dt, wait_minutes, breaks)
         appointment_time = appointment_dt.strftime(TIME_FORMAT_HM)
+        wait_minutes, wait_range = _reconcile_wait_with_breaks(
+            base_dt, appointment_dt, wait_minutes, wait_range
+        )
 
         available = appointment_dt <= close_dt and position < (queue.limit or 50)
 
@@ -387,8 +358,11 @@ class BookingCalculationService:
         base_dt = datetime.combine(booking_date, open_time)
         close_dt = datetime.combine(booking_date, close_time)
 
-        appointment_dt = self.work_minutes_to_clock_time(base_dt, wait_minutes, breaks)
+        appointment_dt = advance_work_minutes(base_dt, wait_minutes, breaks)
         appointment_time = appointment_dt.strftime(TIME_FORMAT_HM)
+        wait_minutes, wait_range = _reconcile_wait_with_breaks(
+            base_dt, appointment_dt, wait_minutes, wait_range
+        )
 
         available = appointment_dt <= close_dt and position < (queue.limit or 50)
 
@@ -429,7 +403,10 @@ class BookingCalculationService:
 
         current_time = now_app_tz()
         queue = self.queue.get_queue_by_id_with_employees(queue_id)
-        appointment_dt = self.resolve_today_appointment(queue, current_time, wait_minutes)
+        appointment_dt, base_dt = self.resolve_today_appointment(queue, current_time, wait_minutes)
+        wait_minutes, wait_range = _reconcile_wait_with_breaks(
+            base_dt, appointment_dt, wait_minutes, wait_range
+        )
         return {
             "position": position,
             "wait_minutes": wait_minutes,
@@ -456,7 +433,10 @@ class BookingCalculationService:
         )
 
         queue = self.queue.get_queue_by_id_with_employees(queue_id)
-        appointment_dt = self.resolve_future_appointment(queue, booking_date, wait_minutes)
+        appointment_dt, base_dt = self.resolve_future_appointment(queue, booking_date, wait_minutes)
+        wait_minutes, wait_range = _reconcile_wait_with_breaks(
+            base_dt, appointment_dt, wait_minutes, wait_range
+        )
         return {
             "position": position,
             "wait_minutes": wait_minutes,
@@ -512,9 +492,13 @@ class BookingCalculationService:
 
         appt_date = existing_queue_user.queue_date
         if isinstance(appt_date, date) and appt_date > current_time.date():
-            appointment_dt = self.resolve_future_appointment(queue, appt_date, wait_minutes)
+            appointment_dt, base_dt = self.resolve_future_appointment(queue, appt_date, wait_minutes)
         else:
-            appointment_dt = self.resolve_today_appointment(queue, current_time, wait_minutes)
+            appointment_dt, base_dt = self.resolve_today_appointment(queue, current_time, wait_minutes)
+
+        wait_minutes, wait_range = _reconcile_wait_with_breaks(
+            base_dt, appointment_dt, wait_minutes, wait_range
+        )
 
         return {
             "position": position,
@@ -590,24 +574,29 @@ class BookingCalculationService:
 
     def resolve_today_appointment(
         self, queue: Optional[Any], current_time: datetime, wait_minutes: int
-    ) -> datetime:
-        """Return the tz-aware IST appointment datetime for a today booking."""
+    ) -> Tuple[datetime, datetime]:
+        """Return (appointment_dt, base_dt) for a today booking (tz-aware IST).
+
+        *base_dt* (the moment service could begin) is returned so callers can
+        reconcile their break-unaware "Est wait" against the break-aware time.
+        """
         if queue is None:
-            return current_time + timedelta(minutes=wait_minutes)
+            return current_time + timedelta(minutes=wait_minutes), current_time
 
         today_date = current_time.date()
         open_time, _close, breaks, _ = self.get_employee_window(queue, today_date)
         open_dt = APP_TZ.localize(datetime.combine(today_date, open_time))
         base_dt = max(current_time, open_dt)
-        return self.work_minutes_to_clock_time(base_dt, wait_minutes, breaks)
+        return advance_work_minutes(base_dt, wait_minutes, breaks), base_dt
 
     def resolve_future_appointment(
         self, queue: Optional[Any], booking_date: date, wait_minutes: int
-    ) -> datetime:
-        """Return the tz-naive appointment datetime for a future booking."""
+    ) -> Tuple[datetime, datetime]:
+        """Return (appointment_dt, base_dt) for a future booking (tz-naive)."""
         if queue is None:
-            return datetime.combine(booking_date, DEFAULT_OPEN_TIME) + timedelta(minutes=wait_minutes)
+            base_dt = datetime.combine(booking_date, DEFAULT_OPEN_TIME)
+            return base_dt + timedelta(minutes=wait_minutes), base_dt
 
         open_time, _close, breaks, _ = self.get_employee_window(queue, booking_date)
         base_dt = datetime.combine(booking_date, open_time)
-        return self.work_minutes_to_clock_time(base_dt, wait_minutes, breaks)
+        return advance_work_minutes(base_dt, wait_minutes, breaks), base_dt

@@ -1,12 +1,18 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
+export interface BreakTime {
+    break_start: string; // HH:MM
+    break_end: string;   // HH:MM
+}
+
 export interface DaySchedule {
     day_of_week: number;
     day_name: string;
     is_open: boolean;
     opening_time: string;
     closing_time: string;
+    break_times?: BreakTime[];
 }
 
 export interface AddressData {

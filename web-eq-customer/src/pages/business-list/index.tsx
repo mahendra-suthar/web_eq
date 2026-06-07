@@ -28,7 +28,7 @@ export default function BusinessListPage() {
 
   const error = categoryError || businessError;
 
-  useScrollReveal([loading || categoryLoading]);
+  useScrollReveal();
 
   useEffect(() => {
     setCategoryError(null);

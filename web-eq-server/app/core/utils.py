@@ -35,6 +35,20 @@ def normalize_email(email: Optional[str]) -> Optional[str]:
     return normalized if normalized else None
 
 
+def normalize_phone(phone: Optional[str]) -> Optional[str]:
+    """Trim whitespace from phone numbers. Returns None for empty/None input."""
+    if not phone:
+        return None
+    return phone.strip() or None
+
+
+def normalize_country_code(country_code: Optional[str]) -> Optional[str]:
+    """Trim whitespace from country codes. Returns None for empty/None input."""
+    if not country_code:
+        return None
+    return country_code.strip() or None
+
+
 def now_utc() -> datetime:
     """Return current UTC time (timezone-aware)."""
     return datetime.now(timezone.utc)
@@ -164,6 +178,76 @@ def format_time_12h(dt: Optional[datetime]) -> str:
         return s.lstrip("0") if s[0] == "0" else s  # "04:30 PM" -> "4:30 PM"
     except Exception:
         return ""
+
+
+def advance_work_minutes(
+    base_dt: datetime,
+    work_minutes: float,
+    breaks: Optional[List[Tuple[dt_time, dt_time]]] = None,
+) -> datetime:
+    """Add ``work_minutes`` of *productive* time to ``base_dt``, skipping any break
+    windows that fall on the same calendar day.
+
+    This is the single source of truth for break-aware clock-time projection,
+    shared by the booking-preview engine (BookingCalculationService) and the live
+    queue engine (calculate_queue_waits) so the two can never drift apart.
+
+    ``breaks`` is a list of ``(start, end)`` time tuples (order/validity not
+    assumed — they are sorted and start>=end entries are ignored). Works for both
+    tz-aware (today / IST) and tz-naive (future dates) datetimes; break boundaries
+    inherit ``base_dt``'s tzinfo.
+    """
+    if not breaks:
+        return base_dt + timedelta(minutes=work_minutes)
+
+    base_date = base_dt.date()
+    is_aware = base_dt.tzinfo is not None
+
+    def to_dt(t: dt_time) -> datetime:
+        naive = datetime.combine(base_date, t)
+        return _APP_TZ.localize(naive) if is_aware else naive
+
+    break_dts = sorted(
+        ((to_dt(bs), to_dt(be)) for bs, be in breaks if bs < be),
+        key=lambda b: b[0],
+    )
+
+    current = base_dt
+    remaining = work_minutes
+    for bk_start, bk_end in break_dts:
+        # Break already fully behind the cursor — ignore.
+        if bk_end <= current:
+            continue
+        # Cursor sits inside this break — jump to its end and continue.
+        if bk_start <= current < bk_end:
+            current = bk_end
+            continue
+        minutes_before_break = (bk_start - current).total_seconds() / 60
+        if remaining <= minutes_before_break:
+            return current + timedelta(minutes=remaining)
+        remaining -= minutes_before_break
+        current = bk_end
+
+    return current + timedelta(minutes=remaining)
+
+
+def shift_wait_range(wait_range: str, delta_minutes: int) -> str:
+    """Shift both bounds of a ``"<lo>–<hi> min"`` range string by ``delta_minutes``.
+
+    Used to align a raw wait estimate with a break-aware ``Expected at`` time.
+    Returns the input unchanged when it isn't in the expected format, so callers
+    never need to special-case the "served immediately" or missing-range cases.
+    """
+    if not wait_range or "–" not in wait_range:
+        return wait_range
+    try:
+        lo_str, rest = wait_range.split("–", 1)
+        hi_str = rest.replace("min", "").strip()
+        lo = max(0, int(lo_str.strip()) + delta_minutes)
+        hi = int(hi_str) + delta_minutes
+        return f"{lo}–{hi} min"
+    except (ValueError, AttributeError):
+        return wait_range
 
 
 def wait_minutes_from_now(estimated_enqueue_time: Optional[datetime]) -> Optional[int]:

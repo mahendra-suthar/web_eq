@@ -72,6 +72,8 @@ export enum QueueUserStatus {
   FAILED = 4,
   CANCELLED = 5,
   PRIORITY_REQUESTED = 6,
+  EXPIRED = 7,
+  SCHEDULED = 8,
 }
 
 // ============================================================================

@@ -264,6 +264,8 @@
     "todayYourTurn": "Your Turn",
     "todayDoneBy": "Done",
     "todayToday": "Today",
+    "todayOnBreakUntil": "On break · Service resumes at {{time}}",
+    "todaySpansBreak": "Your service includes a {{time}} break",
     "todayPayAtCounter": "Pay at counter",
     "todayNothingTitle": "Nothing else today",
     "todayNothingSub": "You're all caught up. Explore businesses near you to book your next appointment.",

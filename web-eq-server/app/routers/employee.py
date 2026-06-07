@@ -6,7 +6,7 @@ from app.db.database import get_db
 from app.middleware.permissions import get_current_user, require_roles
 from app.models.user import User
 from app.controllers.employee_controller import EmployeeController
-from app.schemas.employee import BusinessEmployeesInput, EmployeeData, EmployeeUpdate
+from app.schemas.employee import BusinessEmployeesInput, EmployeeData, EmployeePageResponse, EmployeeUpdate
 
 
 employee_router = APIRouter()
@@ -44,14 +44,14 @@ async def update_my_profile(
 
 @employee_router.get(
     "/get_employees/{business_id}",
-    response_model=list[EmployeeData],
+    response_model=EmployeePageResponse,
     dependencies=[Depends(require_roles(["BUSINESS"]))],
 )
 async def get_employees(
     business_id: UUID, page: int = 1, limit: int = 10, search: str = "", db: Session = Depends(get_db)
 ):
     controller = EmployeeController(db)
-    return await controller.get_employees(business_id, page, limit, search)
+    return await controller.get_employees(business_id, page, limit, search or None)
 
 
 @employee_router.post(

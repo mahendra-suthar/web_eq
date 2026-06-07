@@ -33,6 +33,7 @@ def get_users_appointments(
     queue_id: UUID | None = Query(None, description="Filter by queue UUID"),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
+    search: str | None = Query(None, max_length=100),
     db: Session = Depends(get_db),
 ):
     controller = UserController(db)
@@ -41,6 +42,7 @@ def get_users_appointments(
         queue_id=queue_id,
         page=page,
         limit=limit,
+        search=search,
     )
 
 

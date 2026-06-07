@@ -1,4 +1,5 @@
 import logging
+import math
 from sqlalchemy import func, extract, or_, and_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.exc import SQLAlchemyError
@@ -1382,7 +1383,8 @@ class QueueService:
         page: int,
         limit: int,
         search: str | None,
-    ) -> list[tuple[QueueUser, User]]:
+        status: int | None,
+    ) -> tuple[list[tuple[QueueUser, User]], int, int]:
         try:
             query = (
                 self.db.query(QueueUser, User)
@@ -1399,6 +1401,9 @@ class QueueService:
             if employee_id is not None:
                 query = query.join(Employee, Employee.queue_id == QueueUser.queue_id).filter(Employee.uuid == employee_id)
 
+            if status is not None:
+                query = query.filter(QueueUser.status == status)
+
             if search:
                 search_text = f"%{search}%"
                 query = query.filter(
@@ -1408,10 +1413,15 @@ class QueueService:
                     | (QueueUser.token_number.ilike(search_text))
                 )
 
+            total: int = query.count()
+            pages: int = math.ceil(total / limit) if total else 1
             offset = (page - 1) * limit
-            query = query.order_by(QueueUser.enqueue_time.desc().nullslast())
+            query = query.order_by(
+                QueueUser.queue_date.desc().nullslast(),
+                QueueUser.enqueue_time.desc().nullslast(),
+            )
             result = query.offset(offset).limit(limit).all()
-            return cast(list[tuple[QueueUser, User]], result)
+            return cast(list[tuple[QueueUser, User]], result), total, pages
         except Exception:
             logger.exception("Failed to get_queue_users (business_id=%s page=%s)", business_id, page)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
