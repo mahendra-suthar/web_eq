@@ -79,16 +79,16 @@ const MyQueueCard: React.FC<MyQueueCardProps> = ({ appointment }) => {
             <div className="mqc__status-row">
               {isInProgress ? (
                 <span className="mqc__badge mqc__badge--active">
-                  {t("youreBeingServed") || "You're being served"}
+                  {t("youreBeingServed")}
                 </span>
               ) : liveData.position != null ? (
                 <span className="mqc__badge mqc__badge--waiting">
-                  #{liveData.position} {t("inLine") || "in line"}
+                  #{liveData.position} {t("inLine")}
                 </span>
               ) : null}
               {liveData.current_token && !isInProgress && (
                 <span className="mqc__serving">
-                  {t("nowServing") || "Now serving"}: <strong>{liveData.current_token}</strong>
+                  {t("nowServing")}: <strong>{liveData.current_token}</strong>
                 </span>
               )}
             </div>
@@ -111,7 +111,7 @@ const MyQueueCard: React.FC<MyQueueCardProps> = ({ appointment }) => {
             <div className="mqc__time">
               {liveData.estimated_end_time
                 ? `${liveData.estimated_appointment_time} → ${liveData.estimated_end_time}`
-                : `${t("expectedAt") || "Expected at"} ${liveData.estimated_appointment_time}`}
+                : `${t("expectedAt")} ${liveData.estimated_appointment_time}`}
             </div>
           )}
         </div>

@@ -213,12 +213,12 @@ export default function AddressMap({
 
   return (
     <div className="address-map-container">
-      <label className="form-label">{t("selectLocationOnMap") || "Select Location on Map"}</label>
+      <label className="form-label">{t("selectLocationOnMap")}</label>
       <div className="map-wrapper">
         <div ref={mapContainer} className="map-container" />
         {!isLoaded && !error && (
           <div className="map-loading">
-            {t("loadingMap") || "Loading map..."}
+            {t("loadingMap")}
           </div>
         )}
         {error && (
@@ -228,7 +228,7 @@ export default function AddressMap({
         )}
       </div>
       <p className="map-hint">
-        {t("mapHint") || "Click on the map to select a location. You can drag the marker to adjust the position."}
+        {t("mapHint")}
       </p>
     </div>
   );

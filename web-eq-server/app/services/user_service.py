@@ -188,6 +188,7 @@ class UserService:
         queue_id: Optional[UUID] = None,
         page: int = 1,
         limit: int = 20,
+        search: Optional[str] = None,
     ) -> Tuple[List[AppointmentUserItem], int]:
         base = (
             self.db.query(
@@ -206,6 +207,16 @@ class UserService:
             base = base.filter(Queue.merchant_id == business_id)
         else:
             base = base.filter(Queue.uuid == queue_id)
+
+        if search:
+            s = f"%{search}%"
+            base = base.filter(
+                or_(
+                    User.full_name.ilike(s),
+                    User.email.ilike(s),
+                    User.phone_number.ilike(s),
+                )
+            )
 
         base_grouped = base.group_by(User.uuid, User.full_name, User.email, User.country_code, User.phone_number)
         rows, total = paginate_query(

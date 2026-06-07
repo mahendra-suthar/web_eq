@@ -221,6 +221,13 @@ class QueueUserData(BaseModel):
         from_attributes = True
 
 
+class QueueUsersPageResponse(BaseModel):
+    items: List["QueueUserData"]
+    total: int
+    page: int
+    pages: int
+
+
 class QueueUserDetailUserInfo(BaseModel):
     full_name: Optional[str] = None
     email: Optional[str] = None
@@ -633,6 +640,8 @@ class LiveQueueData(BaseModel):
     users: List[LiveQueueUserItem]        # ordered: completed → in_progress → waiting → scheduled
     upcoming_count: int = 0              # SCHEDULED (pre-active) appointments not yet in live queue
     employee_on_leave: bool = False     # True when queue's employee has no schedule / closed exception for this date
+    on_break_until: Optional[str] = None     # 12h label (e.g. "2:00 PM") when the employee is *currently* on break
+    on_break_until_ts: Optional[int] = None  # epoch ms of the current break's end (for client countdown)
 
     @classmethod
     def from_build(
@@ -642,6 +651,7 @@ class LiveQueueData(BaseModel):
         users_raw: List[Dict[str, Any]],
         employee_on_leave: bool = False,
         open_dt: Optional[datetime] = None,
+        breaks: Optional[List[Any]] = None,
     ) -> "LiveQueueData":
         """Build from queue, date, raw user dicts (e.g. from build_live_queue_users_raw), and leave flag."""
         from app.services.realtime.live_queue_manager import calculate_queue_waits
@@ -651,7 +661,7 @@ class LiveQueueData(BaseModel):
         completed_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_COMPLETED)
         upcoming_count = sum(1 for u in users_raw if u.get("status") == QUEUE_USER_SCHEDULED)
 
-        waits = calculate_queue_waits(users_raw, open_dt=open_dt)
+        waits = calculate_queue_waits(users_raw, open_dt=open_dt, breaks=breaks)
         current_token: Optional[str] = waits["current_token"]
         wait_data: Dict[str, Any] = waits["wait_data"]
         ordered_waiting = waits["ordered_waiting"]
@@ -682,6 +692,8 @@ class LiveQueueData(BaseModel):
             upcoming_count=upcoming_count,
             current_token=current_token,
             employee_on_leave=employee_on_leave,
+            on_break_until=waits.get("on_break_until"),
+            on_break_until_ts=waits.get("on_break_until_ts"),
             users=[
                 LiveQueueUserItem.from_user_dict(
                     {**u, "position": position_map.get(str(u["uuid"]), u.get("position"))},
@@ -719,6 +731,10 @@ class CustomerTodayAppointmentResponse(BaseModel):
     service_duration_minutes: Optional[int] = None  # turn_time in minutes
     expected_end_ts: Optional[int] = None           # epoch ms when service ends
     estimated_end_time: Optional[str] = None        # "11:58 PM"
+    on_break_until: Optional[str] = None             # 12h label when employee is currently on break
+    on_break_until_ts: Optional[int] = None          # epoch ms of current break's end
+    spans_break: bool = False                        # True when the service window crosses a break
+    break_during_label: Optional[str] = None         # "1:00 PM – 2:00 PM" — which break the service spans
 
     @classmethod
     def from_queue_user_and_metrics(
@@ -736,6 +752,10 @@ class CustomerTodayAppointmentResponse(BaseModel):
         expected_end_ts: Optional[int] = None,
         estimated_end_time: Optional[str] = None,
         service_duration_minutes: Optional[int] = None,
+        on_break_until: Optional[str] = None,
+        on_break_until_ts: Optional[int] = None,
+        spans_break: bool = False,
+        break_during_label: Optional[str] = None,
     ) -> "CustomerTodayAppointmentResponse":
         """Build from queue user, queue, business ids/names, computed metrics, service summary, and formatted time."""
         st = getattr(qu, "scheduled_start", None)
@@ -766,6 +786,10 @@ class CustomerTodayAppointmentResponse(BaseModel):
             expected_end_ts=expected_end_ts,
             estimated_end_time=estimated_end_time,
             service_duration_minutes=service_duration_minutes,
+            on_break_until=on_break_until,
+            on_break_until_ts=on_break_until_ts,
+            spans_break=spans_break,
+            break_during_label=break_during_label,
         )
 
 

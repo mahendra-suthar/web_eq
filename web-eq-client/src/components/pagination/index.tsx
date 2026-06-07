@@ -10,6 +10,10 @@ export interface PaginationProps {
     showFirstLast?: boolean;
     className?: string;
     disabled?: boolean;
+    total?: number;
+    limit?: number;
+    onLimitChange?: (limit: number) => void;
+    limitOptions?: number[];
 }
 
 const Pagination: React.FC<PaginationProps> = ({
@@ -20,15 +24,16 @@ const Pagination: React.FC<PaginationProps> = ({
     showFirstLast = false,
     className = '',
     disabled = false,
+    total,
+    limit,
+    onLimitChange,
+    limitOptions = [10, 20, 50],
 }) => {
     const { t } = useTranslation();
 
-    // Don't render if only one page or no pages
-    if (totalPages <= 1) {
-        return null;
-    }
+    const showCount = total !== undefined && limit !== undefined && total > 0;
 
-    // Generate page numbers to display
+    // Generate page numbers to display — must be before any early return (rules of hooks)
     const pageNumbers = useMemo(() => {
         const pages: (number | string)[] = [];
 
@@ -81,6 +86,9 @@ const Pagination: React.FC<PaginationProps> = ({
         return pages;
     }, [currentPage, totalPages, maxVisible]);
 
+    const hasMultiplePages = totalPages > 1;
+    if (!hasMultiplePages && !onLimitChange && !showCount) return null;
+
     const handlePageChange = (page: number) => {
         if (!disabled && page >= 1 && page <= totalPages && page !== currentPage) {
             onPageChange(page);
@@ -111,8 +119,35 @@ const Pagination: React.FC<PaginationProps> = ({
         }
     };
 
+    const rangeStart = showCount ? (currentPage - 1) * limit! + 1 : 0;
+    const rangeEnd = showCount ? Math.min(currentPage * limit!, total!) : 0;
+
     return (
         <div className={`pagination ${className}`.trim()}>
+            {onLimitChange && (
+                <div className="pagination-limit">
+                    <label className="pagination-limit-label" htmlFor="pg-limit">
+                        {t('perPage') || 'Per page'}
+                    </label>
+                    <select
+                        id="pg-limit"
+                        className="pagination-limit-select"
+                        value={limit}
+                        onChange={(e) => onLimitChange(Number(e.target.value))}
+                        disabled={disabled}
+                        aria-label={t('perPage') || 'Per page'}
+                    >
+                        {limitOptions.map((n) => (
+                            <option key={n} value={n}>{n}</option>
+                        ))}
+                    </select>
+                </div>
+            )}
+            {showCount && (
+                <span className="pagination-count">
+                    {rangeStart}–{rangeEnd} of {total}
+                </span>
+            )}
             {showFirstLast && (
                 <button
                     className="page-btn page-btn-nav"
@@ -121,7 +156,7 @@ const Pagination: React.FC<PaginationProps> = ({
                     aria-label={t("firstPage")}
                     title={t("firstPage")}
                 >
-                    ««
+                    «
                 </button>
             )}
             <button
@@ -131,7 +166,7 @@ const Pagination: React.FC<PaginationProps> = ({
                 aria-label={t("previousPage")}
                 title={t("previousPage")}
             >
-                ←
+                ‹
             </button>
             {pageNumbers.map((page, index) => {
                 if (page === '...') {
@@ -167,7 +202,7 @@ const Pagination: React.FC<PaginationProps> = ({
                 aria-label={t("nextPage")}
                 title={t("nextPage")}
             >
-                →
+                ›
             </button>
             {showFirstLast && (
                 <button
@@ -177,7 +212,7 @@ const Pagination: React.FC<PaginationProps> = ({
                     aria-label={t("lastPage")}
                     title={t("lastPage")}
                 >
-                    »»
+                    »
                 </button>
             )}
         </div>

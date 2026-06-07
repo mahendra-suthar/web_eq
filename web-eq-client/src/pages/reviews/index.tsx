@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ReviewService, ReviewData } from '../../services/review/review.service';
 import { ProfileService } from '../../services/profile/profile.service';
@@ -48,6 +48,8 @@ const ReviewsPage = ({ showBusiness = false }: ReviewsPageProps) => {
   const [reviewCount, setReviewCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
+  // Tracks when profile is known (cached or just fetched) so we only fetch once
+  const [profileReady, setProfileReady] = useState(!!profile);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -56,7 +58,10 @@ const ReviewsPage = ({ showBusiness = false }: ReviewsPageProps) => {
   const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
-    if (profile) return;
+    if (profile) {
+      setProfileReady(true);
+      return;
+    }
     const fetchProfile = async () => {
       try {
         setLoadingProfile(true);
@@ -66,6 +71,7 @@ const ReviewsPage = ({ showBusiness = false }: ReviewsPageProps) => {
         setError(t('failedToLoadBusinessId') || 'Failed to load profile');
       } finally {
         setLoadingProfile(false);
+        setProfileReady(true);
       }
     };
     fetchProfile();
@@ -79,13 +85,18 @@ const ReviewsPage = ({ showBusiness = false }: ReviewsPageProps) => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  // loadingProfile intentionally excluded from deps — guard moved to the trigger effect below
   const fetchReviews = useCallback(async () => {
-    if (loadingProfile) return;
     setLoading(true);
     setError('');
     try {
       const offset = (currentPage - 1) * PAGE_LIMIT;
-      const data = await reviewService.getMyReviews(PAGE_LIMIT, offset);
+      const data = await reviewService.getMyReviews(
+        PAGE_LIMIT,
+        offset,
+        debouncedSearch || undefined,
+        ratingFilter > 0 ? ratingFilter : undefined,
+      );
       setReviews(data.reviews);
       setAvgRating(data.avg_rating);
       setReviewCount(data.review_count);
@@ -100,28 +111,13 @@ const ReviewsPage = ({ showBusiness = false }: ReviewsPageProps) => {
     } finally {
       setLoading(false);
     }
-  }, [loadingProfile, currentPage, reviewService, t]);
+  }, [currentPage, debouncedSearch, ratingFilter, reviewService, t]);
 
+  // Only fetch after profile is known — prevents double call when profile was not cached
   useEffect(() => {
+    if (!profileReady) return;
     fetchReviews();
-  }, [fetchReviews]);
-
-  const filtered = useMemo(() => {
-    let list = reviews;
-    if (ratingFilter > 0) {
-      list = list.filter((r) => Math.round(r.rating) === ratingFilter);
-    }
-    if (debouncedSearch) {
-      const q = debouncedSearch.toLowerCase();
-      list = list.filter(
-        (r) =>
-          r.user_name?.toLowerCase().includes(q) ||
-          r.comment?.toLowerCase().includes(q) ||
-          (showBusiness && r.business_name?.toLowerCase().includes(q))
-      );
-    }
-    return list;
-  }, [reviews, ratingFilter, debouncedSearch, showBusiness]);
+  }, [fetchReviews, profileReady]);
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '';
@@ -136,59 +132,80 @@ const ReviewsPage = ({ showBusiness = false }: ReviewsPageProps) => {
     }
   };
 
+  const summaryLoading = (loading || loadingProfile) && reviewCount === 0;
+
   return (
     <div className="reviews-page">
-      {/* Summary */}
+      {/* Summary card */}
       <div className="content-card rv-summary">
         <div className="rv-summary-inner">
-          <span className="rv-summary-num">{avgRating.toFixed(1)}</span>
-          <StarDisplay rating={avgRating} />
-          <span className="rv-summary-label">
-            {reviewCount} {reviewCount === 1 ? 'review' : 'reviews'}
-          </span>
+          {summaryLoading ? (
+            <>
+              <div className="rv-sk rv-sk--rating" />
+              <div className="rv-sk rv-sk--stars" />
+              <div className="rv-sk rv-sk--label" />
+            </>
+          ) : (
+            <>
+              <span className="rv-summary-num">{avgRating.toFixed(1)}</span>
+              <StarDisplay rating={avgRating} />
+              <span className="rv-summary-label">
+                {reviewCount} {reviewCount === 1 ? (t('review') || 'review') : (t('reviews') || 'reviews')}
+              </span>
+            </>
+          )}
         </div>
       </div>
 
-      {/* List */}
+      {/* List card */}
       <div className="content-card">
         <div className="card-header">
           <h2 className="card-title">
-            {showBusiness ? 'All Reviews' : 'My Reviews'}
+            {showBusiness ? (t('allReviews') || 'All Reviews') : (t('myReviews') || 'My Reviews')}
           </h2>
-          <PageToolbar
-            filters={
-              <>
-                <input
-                  type="text"
-                  className="filter-input"
-                  placeholder={showBusiness ? 'Search by name, comment, or business…' : 'Search by name or comment…'}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  disabled={loading}
-                />
-                <select
-                  className="filter-select"
-                  value={ratingFilter}
-                  onChange={(e) => {
-                    setRatingFilter(Number(e.target.value));
-                    setCurrentPage(DEFAULT_PAGE);
-                  }}
-                  disabled={loading}
-                >
-                  <option value={0}>All ratings</option>
-                  {[5, 4, 3, 2, 1].map((n) => (
-                    <option key={n} value={n}>{n} Star{n > 1 ? 's' : ''}</option>
-                  ))}
-                </select>
-              </>
-            }
-          />
         </div>
+
+        <PageToolbar
+          filters={
+            <>
+              <input
+                type="text"
+                className="filter-input"
+                placeholder={
+                  showBusiness
+                    ? (t('searchByNameCommentBusiness') || 'Search by name, comment, or business…')
+                    : (t('searchByNameComment') || 'Search by name or comment…')
+                }
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                disabled={loading}
+              />
+              <select
+                className="filter-select"
+                value={ratingFilter}
+                onChange={(e) => {
+                  setRatingFilter(Number(e.target.value));
+                  setCurrentPage(DEFAULT_PAGE);
+                }}
+                disabled={loading}
+              >
+                <option value={0}>{t('allRatings') || 'All ratings'}</option>
+                {[5, 4, 3, 2, 1].map((n) => (
+                  <option key={n} value={n}>
+                    {n} {n > 1 ? (t('stars') || 'Stars') : (t('star') || 'Star')}
+                  </option>
+                ))}
+              </select>
+            </>
+          }
+        />
 
         {error && (
           <div className="rv-error">
             <span>{error}</span>
-            <button className="rv-retry-btn" onClick={fetchReviews}>Retry</button>
+            <button className="rv-retry-btn" onClick={fetchReviews}>
+              {t('retry') || 'Retry'}
+            </button>
           </div>
         )}
 
@@ -210,19 +227,21 @@ const ReviewsPage = ({ showBusiness = false }: ReviewsPageProps) => {
               </div>
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : reviews.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">⭐</div>
-            <div className="empty-state-title">No reviews yet</div>
+            <div className="empty-state-title">
+              {t('noReviewsYet') || 'No reviews yet'}
+            </div>
             <div className="empty-state-sub">
               {debouncedSearch || ratingFilter > 0
-                ? 'No reviews match your filter.'
-                : 'Customer reviews will appear here after appointments.'}
+                ? (t('noReviewsMatchFilter') || 'No reviews match your filter.')
+                : (t('reviewsWillAppear') || 'Customer reviews will appear here after appointments.')}
             </div>
           </div>
         ) : (
           <div className="rv-list">
-            {filtered.map((review) => (
+            {reviews.map((review) => (
               <div key={review.uuid} className="rv-card">
                 <div className="rv-card-header">
                   <div className="rv-user">
@@ -231,12 +250,10 @@ const ReviewsPage = ({ showBusiness = false }: ReviewsPageProps) => {
                     </div>
                     <div className="rv-user-info">
                       <span className="rv-user-name">
-                        {review.user_name || 'Anonymous'}
+                        {review.user_name || (t('anonymous') || 'Anonymous')}
                       </span>
                       {showBusiness && review.business_name && (
-                        <span className="rv-business-tag">
-                          {review.business_name}
-                        </span>
+                        <span className="rv-business-tag">{review.business_name}</span>
                       )}
                       <span className="rv-date">{formatDate(review.created_at)}</span>
                     </div>
@@ -254,12 +271,14 @@ const ReviewsPage = ({ showBusiness = false }: ReviewsPageProps) => {
           </div>
         )}
 
-        {!loading && !error && totalPages > 1 && (
+        {!loading && !error && (
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
             disabled={loading}
+            total={reviewCount}
+            limit={PAGE_LIMIT}
           />
         )}
       </div>

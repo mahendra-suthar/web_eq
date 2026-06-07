@@ -6,15 +6,15 @@ No Redis dependency – purely in-memory WebSocket broadcast + DB read for state
 """
 import logging
 from collections import defaultdict
-from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import date, datetime, time, timedelta
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import WebSocket
 from sqlalchemy.orm import Session
 from starlette.websockets import WebSocketState
 
 import pytz
-from app.core.utils import build_live_queue_users_raw, live_queue_key, now_iso, now_app_tz, format_time_12h, serialise_dt, json_safe
+from app.core.utils import build_live_queue_users_raw, live_queue_key, now_iso, now_app_tz, format_time_12h, serialise_dt, json_safe, advance_work_minutes
 from app.core.constants import (
     TIMEZONE,
     QUEUE_USER_REGISTERED,
@@ -53,6 +53,7 @@ def calculate_queue_waits(
     users: List[dict],
     now: Optional[datetime] = None,
     open_dt: Optional[datetime] = None,
+    breaks: Optional[List[Tuple[time, time]]] = None,
 ) -> Dict[str, Any]:
     """
     Cursor-based wait estimation for mixed queues (Fixed + Approximate + Walk-in).
@@ -61,6 +62,9 @@ def calculate_queue_waits(
     fixed slots but only when they can finish before the next fixed start time.
     SCHEDULED (not-yet-activated) blocks are treated as time reservations that
     walk-ins must not overlap.
+
+    *breaks* (sorted (start, end) time tuples) are skipped when projecting every
+    service window, so the live timeline matches the break-aware booking preview.
 
     Returns:
         {
@@ -76,6 +80,29 @@ def calculate_queue_waits(
 
     ref_date = open_dt.date() if open_dt is not None else now.date()
     cursor = max(now, open_dt) if open_dt is not None else now
+
+    def advance(start_dt: datetime, work_minutes: float) -> datetime:
+        """Project *work_minutes* of service from *start_dt*, skipping break windows."""
+        return advance_work_minutes(start_dt, work_minutes, breaks)
+
+    def begin_after_breaks(start_dt: datetime) -> datetime:
+        """A turn can never *begin* inside a break — if it lands in one, push it to
+        the break's end. (Projecting zero work minutes performs exactly this bump.)
+        This also corrects the displayed wait, since wait = start − now."""
+        return advance_work_minutes(start_dt, 0, breaks)
+
+    def _spans_break_info(start_dt: datetime, end_dt: datetime) -> tuple:
+        """Return (True, '1:00 PM – 2:00 PM') when a break *starts* inside the service
+        window [start_dt, end_dt).  This means the employee begins serving the customer,
+        then hits a break mid-service, and resumes after the break ends."""
+        for bs, be in (breaks or []):
+            if bs >= be:
+                continue
+            bs_dt = _APP_TZ.localize(datetime.combine(ref_date, bs))
+            be_dt = _APP_TZ.localize(datetime.combine(ref_date, be))
+            if start_dt < bs_dt < end_dt:
+                return True, f"{format_time_12h(bs_dt)} – {format_time_12h(be_dt)}"
+        return False, None
 
     # Self-adapting fallback turn_time
     completed_times = [
@@ -94,6 +121,7 @@ def calculate_queue_waits(
 
     # ── IN_PROGRESS ────────────────────────────────────────────────────────────
     current_token: Optional[str] = None
+    in_progress_start_dt: Optional[datetime] = None
     in_progress_finish_dt: Optional[datetime] = None
 
     for u in users:
@@ -107,7 +135,8 @@ def calculate_queue_waits(
                     et = _APP_TZ.localize(et)
                 else:
                     et = et.astimezone(_APP_TZ)
-                in_progress_finish_dt = et + timedelta(minutes=turn_time)
+                in_progress_start_dt = et
+                in_progress_finish_dt = advance(et, turn_time)
             break
 
     if in_progress_finish_dt:
@@ -134,10 +163,10 @@ def calculate_queue_waits(
         # Skip condition: s_end <= cursor_dt means block has fully finished — safe.
         # Using s_end (not s_dt) correctly handles cursor landing inside a block.
         for s_dt, s_turn in sched_blocks:
-            s_end = s_dt + timedelta(minutes=s_turn)
+            s_end = advance(s_dt, s_turn)
             if s_end <= cursor_dt:
                 continue
-            if s_dt < cursor_dt + timedelta(minutes=wu_turn):
+            if s_dt < advance(cursor_dt, wu_turn):
                 cursor_dt = max(cursor_dt, s_end)
         return cursor_dt
 
@@ -175,17 +204,17 @@ def calculate_queue_waits(
         if fi >= len(fixed_reg):
             wu = walkins[wi]
             wu_turn = float(wu.get("turn_time") or fallback_turn_time)
-            adjusted = _advance_past_conflicts(cursor_val, wu_turn)
-            expected_dts[str(wu["uuid"])] = adjusted
-            cursor_val = adjusted + timedelta(minutes=wu_turn)
+            start = begin_after_breaks(_advance_past_conflicts(cursor_val, wu_turn))
+            expected_dts[str(wu["uuid"])] = start
+            cursor_val = advance(start, wu_turn)
             ordered.append(wu)
             wi += 1
         elif wi >= len(walkins):
             fu = fixed_reg[fi]
             fu_turn = float(fu.get("turn_time") or fallback_turn_time)
-            expected = max(cursor_val, sched_dts[str(fu["uuid"])])
-            expected_dts[str(fu["uuid"])] = expected
-            cursor_val = expected + timedelta(minutes=fu_turn)
+            start = begin_after_breaks(max(cursor_val, sched_dts[str(fu["uuid"])]))
+            expected_dts[str(fu["uuid"])] = start
+            cursor_val = advance(start, fu_turn)
             ordered.append(fu)
             fi += 1
         else:
@@ -195,17 +224,18 @@ def calculate_queue_waits(
             fu_turn = float(fu.get("turn_time") or fallback_turn_time)
             fixed_start = sched_dts[str(fu["uuid"])]
             adjusted = _advance_past_conflicts(cursor_val, wu_turn)
-            if adjusted + timedelta(minutes=wu_turn) <= fixed_start:
+            if advance(adjusted, wu_turn) <= fixed_start:
                 # Walk-in fits in gap before next fixed slot — serve it first
-                expected_dts[str(wu["uuid"])] = adjusted
-                cursor_val = adjusted + timedelta(minutes=wu_turn)
+                start = begin_after_breaks(adjusted)
+                expected_dts[str(wu["uuid"])] = start
+                cursor_val = advance(start, wu_turn)
                 ordered.append(wu)
                 wi += 1
             else:
                 # Fixed appointment takes priority over walk-in
-                expected = max(cursor_val, fixed_start)
-                expected_dts[str(fu["uuid"])] = expected
-                cursor_val = expected + timedelta(minutes=fu_turn)
+                start = begin_after_breaks(max(cursor_val, fixed_start))
+                expected_dts[str(fu["uuid"])] = start
+                cursor_val = advance(start, fu_turn)
                 ordered.append(fu)
                 fi += 1
 
@@ -215,6 +245,10 @@ def calculate_queue_waits(
     for u in users:
         if u["status"] == QUEUE_USER_IN_PROGRESS:
             in_progress_turn = float(u.get("turn_time") or fallback_turn_time)
+            ip_spans, ip_break_label = (
+                _spans_break_info(in_progress_start_dt, in_progress_finish_dt)
+                if (in_progress_start_dt and in_progress_finish_dt) else (False, None)
+            )
             wait_data[str(u["uuid"])] = {
                 "expected_at_ts": _to_epoch_ms(in_progress_finish_dt),
                 "expected_end_ts": _to_epoch_ms(in_progress_finish_dt),
@@ -222,15 +256,21 @@ def calculate_queue_waits(
                 "estimated_appointment_time": format_time_12h(in_progress_finish_dt) if in_progress_finish_dt else None,
                 "estimated_end_time": format_time_12h(in_progress_finish_dt) if in_progress_finish_dt else None,
                 "service_duration_minutes": int(in_progress_turn),
+                "spans_break": ip_spans,
+                "break_during_label": ip_break_label,
             }
 
     for u in ordered:
         exp_dt = expected_dts.get(str(u["uuid"]))
         tu = float(u.get("turn_time") or fallback_turn_time)
-        exp_end_dt = exp_dt + timedelta(minutes=tu) if exp_dt else None
+        exp_end_dt = advance(exp_dt, tu) if exp_dt else None
         wait_mins = (
             max(0, int(round((exp_dt - now).total_seconds() / 60)))
             if exp_dt else None
+        )
+        spans, break_label = (
+            _spans_break_info(exp_dt, exp_end_dt)
+            if (exp_dt and exp_end_dt) else (False, None)
         )
         wait_data[str(u["uuid"])] = {
             "expected_at_ts": _to_epoch_ms(exp_dt),
@@ -239,6 +279,8 @@ def calculate_queue_waits(
             "estimated_appointment_time": format_time_12h(exp_dt),
             "estimated_end_time": format_time_12h(exp_end_dt),
             "service_duration_minutes": int(tu),
+            "spans_break": spans,
+            "break_during_label": break_label,
         }
 
     for u in users:
@@ -265,11 +307,24 @@ def calculate_queue_waits(
         )
         position_map[str(u["uuid"])] = i + 1 + sched_ahead
 
+    # ── Are we *currently* inside a break? Surface "on break until …" to the UI ─
+    on_break_until_dt: Optional[datetime] = None
+    for bs, be in (breaks or []):
+        if bs >= be:
+            continue
+        be_dt = _APP_TZ.localize(datetime.combine(ref_date, be))
+        bs_dt = _APP_TZ.localize(datetime.combine(ref_date, bs))
+        if bs_dt <= now < be_dt:
+            on_break_until_dt = be_dt
+            break
+
     return {
         "current_token": current_token,
         "wait_data": wait_data,
         "ordered_waiting": ordered,
         "position_map": position_map,
+        "on_break_until": format_time_12h(on_break_until_dt) if on_break_until_dt else None,
+        "on_break_until_ts": _to_epoch_ms(on_break_until_dt),
     }
 
 
@@ -376,14 +431,15 @@ class LiveQueueManager:
 
         employee_on_leave = False
         open_dt: Optional[datetime] = None
+        breaks: list = []
         if queue:
             calc = BookingCalculationService(db)
-            open_time, _, _, employee_available = calc.get_employee_window(queue, queue_date)
+            open_time, _, breaks, employee_available = calc.get_employee_window(queue, queue_date)
             employee_on_leave = not employee_available
             open_dt = _APP_TZ.localize(datetime.combine(queue_date, open_time))
 
         # Dynamic wait estimation via shared helper
-        waits = calculate_queue_waits(users, open_dt=open_dt)
+        waits = calculate_queue_waits(users, open_dt=open_dt, breaks=breaks)
         current_token   = waits["current_token"]
         wait_data       = waits["wait_data"]
         ordered_waiting = waits["ordered_waiting"]
@@ -429,6 +485,8 @@ class LiveQueueManager:
             "completed_count": completed_count,
             "current_token": current_token,
             "employee_on_leave": employee_on_leave,
+            "on_break_until": waits.get("on_break_until"),
+            "on_break_until_ts": waits.get("on_break_until_ts"),
             "users": [_user_payload(u) for u in display_users],
         }
 

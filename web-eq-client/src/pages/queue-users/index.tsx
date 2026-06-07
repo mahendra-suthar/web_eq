@@ -27,6 +27,7 @@ const QueueUsers = () => {
     const [searchTerm, setSearchTerm] = useState<string>("");
     const [currentPage, setCurrentPage] = useState<number>(DEFAULT_PAGE);
     const [totalPages, setTotalPages] = useState<number>(1);
+    const [total, setTotal] = useState<number>(0);
     const [limit] = useState<number>(DEFAULT_PAGE_LIMIT);
     const [debouncedSearch, setDebouncedSearch] = useState<string>("");
 
@@ -34,6 +35,7 @@ const QueueUsers = () => {
     const employeeId = getEmployeeId() || "";
     const isEmployee = !!employeeId;
     const [queueId, setQueueId] = useState<string>("");
+    const [statusFilter, setStatusFilter] = useState<string>("");
     const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
     const [showExportModal, setShowExportModal] = useState(false);
     const [exporting, setExporting] = useState<'pdf' | 'xlsx' | null>(null);
@@ -51,13 +53,13 @@ const QueueUsers = () => {
                 setProfile(fetchedProfile);
                 
                 if (fetchedProfile.profile_type === ProfileType.BUSINESS && !fetchedProfile.business?.uuid) {
-                    setError(t("noBusinessFound") || "No business found for current user");
+                    setError(t("noBusinessFound"));
                 } else if (fetchedProfile.profile_type === ProfileType.EMPLOYEE && !fetchedProfile.employee?.business_id) {
-                    setError(t("noBusinessFound") || "No business found for current user");
+                    setError(t("noBusinessFound"));
                 }
             } catch (err: any) {
                 console.error("Failed to fetch profile:", err);
-                setError(t("failedToLoadBusinessId") || "Failed to load business information");
+                setError(t("failedToLoadBusinessId"));
             } finally {
                 setLoadingProfile(false);
             }
@@ -90,23 +92,21 @@ const QueueUsers = () => {
             setError("");
 
             try {
-                const data = await queueService.getQueueUsers(
+                const res = await queueService.getQueueUsers(
                     businessId,
                     queueId || undefined,
                     employeeId || undefined,
                     currentPage,
                     limit,
-                    debouncedSearch || undefined
+                    debouncedSearch || undefined,
+                    statusFilter !== "" ? Number(statusFilter) : undefined
                 );
-                setQueueUsers(data);
-                if (data.length < limit) {
-                    setTotalPages(currentPage);
-                } else {
-                    setTotalPages(currentPage + 1);
-                }
+                setQueueUsers(res.items);
+                setTotal(res.total);
+                setTotalPages(res.pages);
             } catch (err: any) {
                 console.error("Failed to fetch queue users:", err);
-                let errorMessage = t("failedToLoadQueueUsers") || "Failed to load queue users";
+                let errorMessage = t("failedToLoadQueueUsers");
                 
                 if (err?.response?.data?.detail?.message) {
                     errorMessage = err.response.data.detail.message;
@@ -124,7 +124,7 @@ const QueueUsers = () => {
         };
 
         fetchQueueUsers();
-    }, [businessId, queueId, employeeId, currentPage, limit, debouncedSearch, queueService, t, loadingProfile]);
+    }, [businessId, queueId, employeeId, currentPage, limit, debouncedSearch, statusFilter, queueService, t, loadingProfile]);
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
@@ -174,6 +174,10 @@ const QueueUsers = () => {
                 return <span className="status-badge cancelled">{t("cancelled")}</span>;
             case QueueUserStatus.PRIORITY_REQUESTED:
                 return <span className="status-badge priority">{t("priority")}</span>;
+            case QueueUserStatus.EXPIRED:
+                return <span className="status-badge expired">{t("expired")}</span>;
+            case QueueUserStatus.SCHEDULED:
+                return <span className="status-badge scheduled">{t("scheduled")}</span>;
             default:
                 return <span className="status-badge unknown">{t("unknown")}</span>;
         }
@@ -189,7 +193,7 @@ const QueueUsers = () => {
                             <input
                                 type="text"
                                 className="filter-input"
-                                placeholder={t("searchQueueUsers") || "Search by name, email, phone, or token..."}
+                                placeholder={t("searchQueueUsers")}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 disabled={loading}
@@ -204,12 +208,30 @@ const QueueUsers = () => {
                                     }}
                                     disabled={loading}
                                 >
-                                    <option value="">{t("allQueues") || "All queues"}</option>
+                                    <option value="">{t("allQueues")}</option>
                                     {queues.map((q) => (
                                         <option key={q.uuid} value={q.uuid}>{q.name}</option>
                                     ))}
                                 </select>
                             )}
+                            <select
+                                className="filter-select"
+                                value={statusFilter}
+                                onChange={(e) => {
+                                    setStatusFilter(e.target.value);
+                                    setCurrentPage(DEFAULT_PAGE);
+                                }}
+                                disabled={loading}
+                            >
+                                <option value="">{t("allStatuses")}</option>
+                                <option value={QueueUserStatus.REGISTERED}>{t("registered")}</option>
+                                <option value={QueueUserStatus.IN_PROGRESS}>{t("inProgress")}</option>
+                                <option value={QueueUserStatus.COMPLETED}>{t("completed")}</option>
+                                <option value={QueueUserStatus.CANCELLED}>{t("cancelled")}</option>
+                                <option value={QueueUserStatus.FAILED}>{t("failed")}</option>
+                                <option value={QueueUserStatus.SCHEDULED}>{t("scheduled")}</option>
+                                <option value={QueueUserStatus.EXPIRED}>{t("expired")}</option>
+                            </select>
                         </>
                     }
                     actions={
@@ -241,8 +263,8 @@ const QueueUsers = () => {
                     ) : queueUsers.length === 0 ? (
                         <div className="empty-state" style={{ padding: "2rem", textAlign: "center" }}>
                             {debouncedSearch 
-                                ? t("noQueueUsersFoundSearch") || "No queue users found matching your search."
-                                : t("noQueueUsersFound") || "No queue users found."
+                                ? t("noQueueUsersFoundSearch")
+                                : t("noQueueUsersFound")
                             }
                         </div>
                     ) : (
@@ -250,7 +272,7 @@ const QueueUsers = () => {
                             <thead>
                                 <tr>
                                     <th>{t("user")}</th>
-                                    <th>{t("phoneNumber") || "Phone Number"}</th>
+                                    <th>{t("phoneNumber")}</th>
                                     <th>{t("tokenNumber")}</th>
                                     <th>{t("queueDate")}</th>
                                     <th>{t("enqueueTime")}</th>
@@ -322,6 +344,8 @@ const QueueUsers = () => {
                         totalPages={totalPages}
                         onPageChange={handlePageChange}
                         disabled={loading}
+                        total={total}
+                        limit={limit}
                     />
                 )}
             </div>

@@ -6,6 +6,8 @@ import {
   QueueService, QueueData, LiveQueueData, QueueUserData,
 } from '../../services/queue/queue.service';
 import { EmployeeService } from '../../services/employee/employee.service';
+import { ProfileService } from '../../services/profile/profile.service';
+import { UserService } from '../../services/user/user.service';
 import type { UnifiedProfileResponse } from '../../services/profile/profile.service';
 import { getInitials, getAvatarBackground } from '../../utils/utils';
 import { RouterConstant } from '../../routers';
@@ -15,6 +17,7 @@ interface BusinessData {
   queues: QueueData[];
   liveQueues: Record<string, LiveQueueData>;
   employeeCount: number;
+  totalCustomers: number | null; // unique users with any appointment; null if the count fetch failed
   recentUsers: QueueUserData[];
 }
 
@@ -123,13 +126,15 @@ function isBusinessOpenToday(profile: UnifiedProfileResponse | null): boolean | 
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { profile, getProfileType, getBusinessId, getEmployeeId } = useUserStore();
+  const { profile, setProfile, getProfileType, getBusinessId, getEmployeeId } = useUserStore();
   const profileType = getProfileType();
   const businessId = getBusinessId();
   const employeeId = getEmployeeId();
   const employeeQueueId = profile?.employee?.queue_id ?? null;
   const queueService = useMemo(() => new QueueService(), []);
   const employeeService = useMemo(() => new EmployeeService(), []);
+  const profileService = useMemo(() => new ProfileService(), []);
+  const userService = useMemo(() => new UserService(), []);
   const [businessData, setBusinessData] = useState<BusinessData | null>(null);
   const [empData, setEmpData] = useState<EmployeeQueueData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -150,9 +155,15 @@ const Dashboard = () => {
 
     try {
       if (profileType === ProfileType.BUSINESS) {
-        const [fetchedQueues, fetchedEmployees] = await Promise.all([
+        const [fetchedQueues, fetchedEmployees, customersTotal] = await Promise.all([
           queueService.getQueues(businessId),
-          employeeService.getEmployees(businessId, 1, 50),
+          employeeService.getEmployees(businessId, 1, 50).then((r) => r.items),
+          // Unique customers (any appointment status). Secondary stat — never fatal:
+          // limit:1 keeps the payload minimal since only the `total` count is needed.
+          userService
+            .getUsersAppointments({ business_id: businessId, page: 1, limit: 1 })
+            .then((r) => r.total)
+            .catch(() => null),
         ]);
 
         if (gen !== genRef.current) return;
@@ -169,51 +180,40 @@ const Dashboard = () => {
           if (r.status === 'fulfilled') liveMap[fetchedQueues[i].uuid] = r.value;
         });
 
-        const recentUsers = await queueService.getQueueUsers(
+        const recentUsers = (await queueService.getQueueUsers(
           businessId, undefined, undefined, 1, 8
-        );
+        )).items;
 
         if (gen !== genRef.current) return;
 
         setBusinessData({
-          queues:        fetchedQueues,
-          liveQueues:    liveMap,
-          employeeCount: fetchedEmployees.length,
+          queues:         fetchedQueues,
+          liveQueues:     liveMap,
+          employeeCount:  fetchedEmployees.length,
+          totalCustomers: customersTotal,
           recentUsers,
         });
 
       } else if (profileType === ProfileType.EMPLOYEE) {
-        const promises: Promise<LiveQueueData | QueueUserData[]>[] = [];
         const hasQueue = !!employeeQueueId;
 
-        if (hasQueue) {
-          promises.push(queueService.getLiveQueue(employeeQueueId!));
-        }
-        promises.push(
+        const [liveResult, usersResult] = await Promise.allSettled([
+          hasQueue ? queueService.getLiveQueue(employeeQueueId!) : Promise.resolve(null),
           queueService.getQueueUsers(
             businessId,
-            employeeQueueId  || undefined,
-            employeeId       || undefined,
+            employeeQueueId || undefined,
+            employeeId      || undefined,
             1,
             8
-          )
-        );
+          ),
+        ]);
 
-        const results = await Promise.allSettled(promises);
         if (gen !== genRef.current) return;
 
-        let liveQueue: LiveQueueData | null = null;
-        let recentUsers: QueueUserData[]    = [];
-
-        if (hasQueue) {
-          if (results[0].status === 'fulfilled')
-            liveQueue   = results[0].value as LiveQueueData;
-          if (results[1]?.status === 'fulfilled')
-            recentUsers = results[1].value as QueueUserData[];
-        } else {
-          if (results[0]?.status === 'fulfilled')
-            recentUsers = results[0].value as QueueUserData[];
-        }
+        const liveQueue: LiveQueueData | null =
+          liveResult.status === 'fulfilled' ? (liveResult.value as LiveQueueData | null) : null;
+        const recentUsers: QueueUserData[] =
+          usersResult.status === 'fulfilled' ? (usersResult.value as { items: QueueUserData[] }).items : [];
 
         setEmpData({ liveQueue, recentUsers });
       }
@@ -232,7 +232,7 @@ const Dashboard = () => {
         setRefreshing(false);
       }
     }
-  }, [businessId, employeeId, employeeQueueId, profileType, queueService, employeeService]);
+  }, [businessId, employeeId, employeeQueueId, profileType, queueService, employeeService, userService]);
 
   useEffect(() => {
     fetchData();
@@ -246,6 +246,24 @@ const Dashboard = () => {
     window.addEventListener("app:resumed", onResumed);
     return () => window.removeEventListener("app:resumed", onResumed);
   }, [fetchData]);
+
+  // Refresh profile on mount and on tab resume so business.status is always current.
+  // Profile changes are rare (admin approval), so polling every 60s would be wasteful.
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => {
+      profileService.getProfile()
+        .then((fresh) => { if (!cancelled) setProfile(fresh); })
+        .catch(() => {});
+    };
+    refresh();
+    const onResumed = () => refresh();
+    window.addEventListener("app:resumed", onResumed);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("app:resumed", onResumed);
+    };
+  }, [profileService, setProfile]);
 
   useEffect(() => {
     if (!lastUpdated) return;
@@ -261,11 +279,6 @@ const Dashboard = () => {
         (sum, lq) => sum + lq.waiting_count + lq.in_progress_count + lq.completed_count,
         0
       ),
-    [businessData]
-  );
-
-  const runningQueuesCount = useMemo(
-    () => (businessData?.queues ?? []).filter(q => q.status === QueueStatus.RUNNING).length,
     [businessData]
   );
 
@@ -290,21 +303,25 @@ const Dashboard = () => {
     businessData?.queues.find((q) => q.uuid === ownerQueueId)?.name ||
     'My Queue';
 
-  const RefreshBar = () =>
-    lastUpdated ? (
-      <div className="dashboard-refresh-bar">
-        <span className="refresh-time">Updated {lastUpdatedLabel}</span>
-        <button
-          type="button"
-          className={`btn btn-secondary refresh-btn${refreshing ? ' spinning' : ''}`}
-          onClick={() => fetchData(true)}
-          disabled={refreshing}
-          aria-label="Refresh dashboard"
-        >
-          ↻&nbsp;{refreshing ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </div>
-    ) : null;
+  const DashboardTopBar = ({ statusLeft }: { statusLeft?: React.ReactNode }) => (
+    <div className="dashboard-top-bar">
+      <div className="dashboard-top-bar__left">{statusLeft}</div>
+      {lastUpdated && (
+        <div className="dashboard-top-bar__right">
+          <span className="refresh-time">Updated {lastUpdatedLabel}</span>
+          <button
+            type="button"
+            className={`btn btn-secondary refresh-btn${refreshing ? ' spinning' : ''}`}
+            onClick={() => fetchData(true)}
+            disabled={refreshing}
+            aria-label="Refresh dashboard"
+          >
+            ↻&nbsp;{refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   const UsersTable = ({
     users,
@@ -380,9 +397,8 @@ const Dashboard = () => {
         <div className="stats-grid">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="stat-card skeleton-card">
-              <div className="sk sk-icon" />
-              <div className="sk sk-value" />
               <div className="sk sk-label" />
+              <div className="sk sk-value" />
             </div>
           ))}
         </div>
@@ -423,7 +439,14 @@ const Dashboard = () => {
 
     return (
       <div className="dashboard-page">
-        <RefreshBar />
+        <DashboardTopBar statusLeft={
+          isOpen !== null ? (
+            <div className={`biz-status-pill ${isOpen ? 'open' : 'closed'}`}>
+              <span className="status-dot" />
+              {isOpen ? 'Open today' : 'Closed today — customers will not be queued'}
+            </div>
+          ) : undefined
+        } />
 
         {/* Approval status banner */}
         {showApprovalBanner && bizStatus !== null && (
@@ -433,16 +456,6 @@ const Dashboard = () => {
               <strong>{approvalBannerTitle(bizStatus)}</strong>
               <p>{approvalBannerBody(bizStatus)}</p>
             </div>
-          </div>
-        )}
-
-        {/* Business open / closed banner */}
-        {isOpen !== null && (
-          <div className={`business-status-banner ${isOpen ? 'open' : 'closed'}`}>
-            <span className="status-dot" />
-            {isOpen
-              ? 'Your business is open today'
-              : 'Your business is closed today — customers will not be queued'}
           </div>
         )}
 
@@ -457,36 +470,24 @@ const Dashboard = () => {
         )}
 
         <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <div className="stat-icon blue">👥</div>
-            </div>
-            <div className="stat-value">{totalCustomersToday}</div>
-            <div className="stat-label">Customers Today</div>
+          <div className="stat-card stat-card--teal">
+            <span className="stat-label">Total Customers</span>
+            <span className="stat-value">{businessData.totalCustomers ?? '—'}</span>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <div className="stat-icon green">▶</div>
-            </div>
-            <div className="stat-value">{runningQueuesCount}</div>
-            <div className="stat-label">Queues Running</div>
+          <div className="stat-card stat-card--orange">
+            <span className="stat-label">Total Employees</span>
+            <span className="stat-value">{businessData.employeeCount}</span>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <div className="stat-icon orange">👤</div>
-            </div>
-            <div className="stat-value">{businessData.employeeCount}</div>
-            <div className="stat-label">Total Employees</div>
+          <div className="stat-card stat-card--blue">
+            <span className="stat-label">Customers Today</span>
+            <span className="stat-value">{totalCustomersToday}</span>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <div className="stat-icon teal">✓</div>
-            </div>
-            <div className="stat-value">{completedToday}</div>
-            <div className="stat-label">Completed Today</div>
+          <div className="stat-card stat-card--green">
+            <span className="stat-label">Completed Today</span>
+            <span className="stat-value">{completedToday}</span>
           </div>
         </div>
 
@@ -559,11 +560,13 @@ const Dashboard = () => {
               </button>
             </div>
           ) : (
-            <div className="queue-cards-grid">
+            <div className={`queue-cards-grid${
+              businessData.queues.length === 1 ? ' queue-cards-grid--single' : ''
+            }`}>
               {businessData.queues.map(q => {
                 const live = businessData.liveQueues[q.uuid];
                 return (
-                  <div key={q.uuid} className="queue-status-card">
+                  <div key={q.uuid} className={`queue-status-card queue-status-card--${getQueueStatusCls(q.status) || 'default'}`}>
                     <div className="queue-card-top">
                       <span className="queue-card-name">{q.name}</span>
                       <span className={`status-badge ${getQueueStatusCls(q.status)}`}>
@@ -658,7 +661,7 @@ const Dashboard = () => {
 
     return (
       <div className="dashboard-page">
-        <RefreshBar />
+        <DashboardTopBar />
 
         {error && (
           <div className="inline-error">
@@ -684,40 +687,26 @@ const Dashboard = () => {
 
         {/* Stat cards */}
         <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <div className="stat-icon orange">⏳</div>
-            </div>
-            <div className="stat-value">{lq?.waiting_count ?? '—'}</div>
-            <div className="stat-label">Waiting</div>
+          <div className="stat-card stat-card--orange">
+            <span className="stat-label">Waiting</span>
+            <span className="stat-value">{lq?.waiting_count ?? '—'}</span>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <div className="stat-icon blue">▶</div>
-            </div>
-            <div className="stat-value">{lq?.in_progress_count ?? '—'}</div>
-            <div className="stat-label">In Progress</div>
+          <div className="stat-card stat-card--blue">
+            <span className="stat-label">In Progress</span>
+            <span className="stat-value">{lq?.in_progress_count ?? '—'}</span>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <div className="stat-icon teal">✓</div>
-            </div>
-            <div className="stat-value">{lq?.completed_count ?? '—'}</div>
-            <div className="stat-label">Completed Today</div>
+          <div className="stat-card stat-card--green">
+            <span className="stat-label">Completed Today</span>
+            <span className="stat-value">{lq?.completed_count ?? '—'}</span>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <div className={`stat-icon ${lq?.employee_on_leave ? 'red' : 'green'}`}>
-                {lq?.employee_on_leave ? '🚫' : '✓'}
-              </div>
-            </div>
-            <div className="stat-value stat-value-sm">
+          <div className={`stat-card stat-card--${lq?.employee_on_leave ? 'red' : 'teal'}`}>
+            <span className="stat-label">Your Status</span>
+            <span className="stat-value stat-value-sm">
               {lq === null ? '—' : lq.employee_on_leave ? 'On Leave' : 'Available'}
-            </div>
-            <div className="stat-label">Your Status</div>
+            </span>
           </div>
         </div>
 

@@ -491,7 +491,7 @@ class AuthController:
     def get_schedule_info(
         self, entity_id: UUID, entity_type: ScheduleEntityType, is_always_open: bool
     ) -> Optional[ScheduleInfo]:
-        schedules = self.schedule_service.get_schedules_by_entity(entity_id, entity_type)
+        schedules = self.schedule_service.get_schedules_with_breaks(entity_id, entity_type)
         if not schedules:
             return None
         if entity_type == ScheduleEntityType.EMPLOYEE:

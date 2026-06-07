@@ -169,7 +169,7 @@ export default function BusinessEmployees({
       if (!emp.is_owner && emp.phone_number?.trim()) {
         const digits = emp.phone_number.replace(/\D/g, "");
         if (!phoneRegex.test(digits)) {
-          errs.phone_number = t("invalidPhoneFormat") || "Invalid phone number";
+          errs.phone_number = t("invalidPhoneFormat");
           isValid = false;
         }
       }
@@ -431,7 +431,7 @@ export default function BusinessEmployees({
                   {/* Phone */}
                   <div className="form-field-wrapper form-field-row">
                     <div className="form-field-half">
-                      <label className="form-label">{t("countryCode") || "Country code"}</label>
+                      <label className="form-label">{t("countryCode")}</label>
                       <div className="form-field">
                         <input
                           type="text"
@@ -448,7 +448,7 @@ export default function BusinessEmployees({
                       <div className={`form-field ${errors[index]?.phone_number ? "error" : ""}`}>
                         <input
                           type="tel"
-                          placeholder={t("enterPhoneNumber") || "10-digit number"}
+                          placeholder={t("enterPhoneNumber")}
                           value={employee.phone_number ?? ""}
                           onChange={(e) =>
                             updateEmployee(

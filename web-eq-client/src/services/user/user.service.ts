@@ -22,6 +22,7 @@ export interface GetUsersAppointmentsParams {
     queue_id?: string;
     page?: number;
     limit?: number;
+    search?: string;
 }
 
 /** User detail (GET /users/{user_id}) */
@@ -59,13 +60,14 @@ export class UserService extends HttpClient {
      * Exactly one of business_id or queue_id must be provided.
      */
     async getUsersAppointments(params: GetUsersAppointmentsParams): Promise<UsersAppointmentsResponse> {
-        const { business_id, queue_id, page = 1, limit = 20 } = params;
+        const { business_id, queue_id, page = 1, limit = 20, search } = params;
         const searchParams = new URLSearchParams({
             page: String(page),
             limit: String(limit),
         });
         if (business_id) searchParams.set("business_id", business_id);
         if (queue_id) searchParams.set("queue_id", queue_id);
+        if (search) searchParams.set("search", search);
 
         const url = `/users/appointments?${searchParams.toString()}`;
         return await this.get<UsersAppointmentsResponse>(url);

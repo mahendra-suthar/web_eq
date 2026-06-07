@@ -135,7 +135,7 @@ export default function LandingPage() {
     desc:  t(`landing.step${i + 1}Desc`),
   })), [t]);
 
-  useScrollReveal([parentsLoading, featuredLoading, activeSuperTab, categoryRoots, activeFilter]);
+  useScrollReveal();
   const fetchCategoryTree = useCallback(async () => {
     setParentsLoading(true);
     setParentsError(null);
@@ -542,9 +542,9 @@ export default function LandingPage() {
                           </div>
                           <span className={`lp-today-status lp-today-status--${isInProgress ? "serving" : isScheduled ? "scheduled" : isActive ? "active" : "waiting"}`}>
                             {isInProgress
-                              ? (t("youreBeingServed") || "You're being served")
+                              ? (t("youreBeingServed"))
                               : isScheduled
-                              ? (t("statusScheduled") || "Scheduled")
+                              ? (t("statusScheduled"))
                               : isActive
                               ? t("landing.statusInProgress")
                               : t("landing.statusWaiting")}
@@ -564,7 +564,7 @@ export default function LandingPage() {
                               <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                               <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
                             </svg>
-                            {t("landing.conflictStrip") || "Overlaps another appointment — you can't make both"}
+                            {t("landing.conflictStrip")}
                           </div>
                         )}
 
@@ -590,7 +590,7 @@ export default function LandingPage() {
                               <div className="lp-today-stat">
                                 <span className="lp-today-stat-label">
                                   {appt.estimated_end_time
-                                    ? (t("landing.todayYourTurn") || "Your Turn")
+                                    ? (t("landing.todayYourTurn"))
                                     : t("landing.todayExpectedAt")}
                                 </span>
                                 <span className="lp-today-stat-value">
@@ -600,11 +600,26 @@ export default function LandingPage() {
                                 </span>
                                 <span className="lp-today-stat-sub">
                                   {appt.estimated_end_time
-                                    ? `${t("landing.todayDoneBy") || "Done"} ~${appt.estimated_end_time}`
+                                    ? `${t("landing.todayDoneBy")} ~${appt.estimated_end_time}`
                                     : t("landing.todayToday")}
                                 </span>
                               </div>
                             )}
+                          </div>
+                        )}
+
+                        {appt.spans_break && appt.break_during_label && (
+                          <div className="lp-today-break lp-today-break--spans" role="status">
+                            <span aria-hidden>⏸</span>{" "}
+                            {t("landing.todaySpansBreak", { time: appt.break_during_label })}
+                          </div>
+                        )}
+
+                        {appt.on_break_until &&
+                          (!appt.on_break_until_ts || appt.on_break_until_ts > Date.now()) && (
+                          <div className="lp-today-break" role="status">
+                            <span aria-hidden>☕</span>{" "}
+                            {t("landing.todayOnBreakUntil", { time: appt.on_break_until })}
                           </div>
                         )}
 
@@ -683,10 +698,10 @@ export default function LandingPage() {
       >
         <div className="lp-conflict-modal__icon" aria-hidden="true">⚠️</div>
         <h2 id="lp-conflict-title" className="lp-conflict-modal__title">
-          {t("landing.conflictTitle") || "Two appointments at the same time"}
+          {t("landing.conflictTitle")}
         </h2>
         <p className="lp-conflict-modal__sub">
-          {t("landing.conflictSub") || "You can't be in two places at once — you may want to cancel one."}
+          {t("landing.conflictSub")}
         </p>
         <ul className="lp-conflict-modal__list">
           {conflictingAppointments.map((a) => (
@@ -706,14 +721,14 @@ export default function LandingPage() {
             className="lp-conflict-modal__btn lp-conflict-modal__btn--ghost"
             onClick={() => setConflictModalOpen(false)}
           >
-            {t("landing.conflictKeepBoth") || "Keep both"}
+            {t("landing.conflictKeepBoth")}
           </button>
           <button
             type="button"
             className="lp-conflict-modal__btn lp-conflict-modal__btn--primary"
             onClick={() => { setConflictModalOpen(false); navigate("/profile?tab=appointments"); }}
           >
-            {t("landing.conflictManage") || "Manage appointments"}
+            {t("landing.conflictManage")}
           </button>
         </div>
       </Modal>

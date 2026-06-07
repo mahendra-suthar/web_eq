@@ -21,10 +21,10 @@ const initialValues: EmployeeOverviewValues = {
 function validate(values: EmployeeOverviewValues, t: (key: string) => string): EmployeeOverviewErrors {
     const errors: EmployeeOverviewErrors = {};
     if (!values.fullName?.trim()) {
-        errors.fullName = t("fullNameRequired") || "Full name is required";
+        errors.fullName = t("fullNameRequired");
     }
     if (values.email?.trim() && !emailRegex.test(values.email.trim())) {
-        errors.email = t("emailInvalid") || "Invalid email address";
+        errors.email = t("emailInvalid");
     }
     return errors;
 }
@@ -65,6 +65,7 @@ const EmployeeAdd = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (saving) return; // Guard against double submission
         const validationErrors = validate(values, t);
         if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
@@ -73,7 +74,7 @@ const EmployeeAdd = () => {
         setErrors({});
         setSubmitError("");
         if (!resolvedBusinessId) {
-            setSubmitError(t("businessIdRequired") || "Business ID is required");
+            setSubmitError(t("businessIdRequired"));
             return;
         }
         setSaving(true);
@@ -81,7 +82,7 @@ const EmployeeAdd = () => {
             const created = await employeeService.createEmployees(resolvedBusinessId, [
                 {
                     full_name: values.fullName.trim(),
-                    email: values.email?.trim() || undefined,
+                    email: values.email?.trim().toLowerCase() || undefined,
                     country_code: values.countryCode?.trim() || undefined,
                     phone_number: values.phoneNumber?.trim() || undefined,
                 },
@@ -97,12 +98,32 @@ const EmployeeAdd = () => {
                 );
             }
         } catch (err: unknown) {
-            const res = (err as { response?: { data?: { detail?: string | { message?: string } } } })?.response?.data?.detail;
-            const msg =
-                (typeof res === "string" ? res : res?.message) ||
-                (err as Error)?.message ||
-                t("failedToLoadEmployees");
-            setSubmitError(typeof msg === "string" ? msg : "Failed to add employee");
+            type DupExisting = { full_name?: string; email?: string | null; phone_number?: string | null };
+            type Detail =
+                | string
+                | {
+                      message?: string;
+                      error_code?: string;
+                      existing?: DupExisting[];
+                  };
+            const detail = (err as { response?: { data?: { detail?: Detail } } })?.response?.data?.detail;
+            const status = (err as { response?: { status?: number } })?.response?.status;
+
+            if (status === 409 && detail && typeof detail !== "string" && detail.error_code === "EMPLOYEE_DUPLICATE") {
+                const first = detail.existing?.[0];
+                const matchedBy = first?.email && first.email === values.email?.trim().toLowerCase()
+                    ? t("duplicateByEmail")
+                    : first?.phone_number && first.phone_number === values.phoneNumber?.trim()
+                        ? t("duplicateByPhone")
+                        : detail.message || t("duplicateEmployee");
+                setSubmitError(matchedBy);
+            } else {
+                const msg =
+                    (typeof detail === "string" ? detail : detail?.message) ||
+                    (err as Error)?.message ||
+                    t("failedToLoadEmployees");
+                setSubmitError(typeof msg === "string" ? msg : "Failed to add employee");
+            }
         } finally {
             setSaving(false);
         }
@@ -120,7 +141,7 @@ const EmployeeAdd = () => {
             <div className="employee-add-page">
                 <div className="content-card">
                     <div className="error-message">
-                        {t("businessIdRequired") || "Business ID is required to add an employee."}
+                        {t("businessIdRequired")}
                     </div>
                     <button type="button" className="btn btn-secondary btn-sm" onClick={handleCancel}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t("back")}
@@ -186,7 +207,7 @@ const EmployeeAdd = () => {
                     )}
                     <div className="profile-section">
                         <div className="section-header">
-                            <h2 className="section-title">{t("basicInformation") || "Basic information"}</h2>
+                            <h2 className="section-title">{t("basicInformation")}</h2>
                         </div>
                         <div className="section-content">
                             <div className="info-block employee-block">
@@ -206,7 +227,7 @@ const EmployeeAdd = () => {
                             {t("cancel")}
                         </button>
                         <button type="submit" className="btn btn-primary" disabled={saving}>
-                            {saving ? t("saving") || "Saving…" : t("saveChanges") || "Save"}
+                            {saving ? t("saving") : t("saveChanges")}
                         </button>
                     </div>
                 </form>

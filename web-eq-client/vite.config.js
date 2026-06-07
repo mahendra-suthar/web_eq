@@ -20,7 +20,15 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8008',
         changeOrigin: true,
-        ws: true, // proxies WebSocket upgrades too
+        ws: true,
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            // backend not running or restarted — log once, don't crash
+            if (err.code !== 'ECONNREFUSED' && err.message !== 'This socket has been ended by the other party') {
+              console.error('[proxy error]', err.message);
+            }
+          });
+        },
       },
     },
   },

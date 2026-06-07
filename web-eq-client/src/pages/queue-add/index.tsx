@@ -62,7 +62,7 @@ const QueueAdd = () => {
         setLoadingEmployees(true);
         employeeService
             .getEmployees(businessId, 1, 500, "")
-            .then(setEmployees)
+            .then((res) => setEmployees(res.items))
             .catch(() => setEmployees([]))
             .finally(() => setLoadingEmployees(false));
     }, [businessId, employeeService]);
@@ -103,11 +103,11 @@ const QueueAdd = () => {
         e.preventDefault();
         setError("");
         if (!name.trim()) {
-            setError(t("queueNameRequired") || "Queue name is required");
+            setError(t("queueNameRequired"));
             return;
         }
         if (!businessId) {
-            setError(t("businessIdRequired") || "Business ID is required");
+            setError(t("businessIdRequired"));
             return;
         }
         if (bookingMode !== "QUEUE") {
@@ -137,7 +137,7 @@ const QueueAdd = () => {
             });
         } catch (err: unknown) {
             const e = err as { response?: { data?: { detail?: string } }; message?: string };
-            setError(e?.response?.data?.detail || (e?.message as string) || t("failedToCreateQueue") || "Failed to create queue");
+            setError(e?.response?.data?.detail || (e?.message as string) || t("failedToCreateQueue"));
         } finally {
             setSaving(false);
         }
@@ -179,20 +179,20 @@ const QueueAdd = () => {
                             className="form-input"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
-                            placeholder={t("queueNamePlaceholder") || "Enter queue name"}
+                            placeholder={t("queueNamePlaceholder")}
                             disabled={saving}
                         />
                     </div>
 
                     <div className="form-block">
-                        <label className="form-label">{t("assignEmployee") || "Assign employee (optional)"}</label>
+                        <label className="form-label">{t("assignEmployee")}</label>
                         <select
                             className="form-select"
                             value={employeeId ?? ""}
                             onChange={(e) => setEmployeeId(e.target.value || null)}
                             disabled={saving || loadingEmployees}
                         >
-                            <option value="">— {t("none") || "None"} —</option>
+                            <option value="">— {t("none")} —</option>
                             {employees.map((emp) => (
                                 <option key={emp.uuid} value={emp.uuid}>
                                     {emp.full_name}
@@ -240,8 +240,8 @@ const QueueAdd = () => {
                     )}
 
                     <div className="form-block">
-                        <h3 className="form-block-title">{t("queueServices") || "Queue services"}</h3>
-                        <p className="form-hint">{t("addQueueServicesHint") || "Add one or more services to this queue."}</p>
+                        <h3 className="form-block-title">{t("queueServices")}</h3>
+                        <p className="form-hint">{t("addQueueServicesHint")}</p>
                         {loadingServices ? (
                             <p className="info-value">{t("loading")}</p>
                         ) : (
@@ -259,7 +259,7 @@ const QueueAdd = () => {
                                     }}
                                     disabled={saving}
                                 >
-                                    <option value="">+ {t("addService") || "Add service"}...</option>
+                                    <option value="">+ {t("addService")}...</option>
                                     {allServices
                                         .filter((s) => !selectedServices.some((x) => x.service_id === s.uuid))
                                         .map((s) => (
@@ -322,7 +322,7 @@ const QueueAdd = () => {
                             {t("cancel")}
                         </button>
                         <button type="submit" className="btn btn-primary" disabled={saving}>
-                            {saving ? t("saving") : t("createQueue") || "Create queue"}
+                            {saving ? t("saving") : t("createQueue")}
                         </button>
                     </div>
                 </form>

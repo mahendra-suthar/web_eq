@@ -786,6 +786,30 @@
 }
 
 // ── Service tags ──────────────────────────────────────────────────────────
+.lp-today-break {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-bottom: 14px;
+  padding: 9px 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: $radius-md;
+  color: #9a3412;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+
+  // "Your service spans a break" — amber/yellow palette distinguishes it from
+  // the orange "currently on break" notice, which uses the default palette above.
+  &--spans {
+    background: #fefce8;
+    border-color: #fde68a;
+    color: #78350f;
+  }
+}
+
 .lp-today-services {
   display: flex;
   flex-wrap: wrap;

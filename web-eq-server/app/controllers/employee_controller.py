@@ -6,7 +6,7 @@ from uuid import UUID
 from app.models.user import User
 from app.services.employee_service import EmployeeService
 from app.services.business_service import BusinessService
-from app.schemas.employee import BusinessEmployeesInput, EmployeeData, EmployeeUpdate
+from app.schemas.employee import BusinessEmployeesInput, EmployeeData, EmployeePageResponse, EmployeeUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +55,15 @@ class EmployeeController:
             logger.exception("Failed to update_my_profile (user_id=%s)", user.uuid)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
-    async def get_employees(self, business_id: UUID, page: int, limit: int, search: str | None) -> list[EmployeeData]:
+    async def get_employees(self, business_id: UUID, page: int, limit: int, search: str | None) -> EmployeePageResponse:
         try:
-            employees = self.employee_service.get_employees(business_id, page, limit, search)
-            return [EmployeeData.from_employee(emp) for emp in employees]
+            items, total, pages = self.employee_service.get_employees(business_id, page, limit, search)
+            return EmployeePageResponse(
+                items=[EmployeeData.from_employee(emp) for emp in items],
+                total=total,
+                page=page,
+                pages=pages,
+            )
         except HTTPException:
             raise
         except Exception:

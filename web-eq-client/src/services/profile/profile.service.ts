@@ -46,6 +46,13 @@ export interface EmployeeInfo {
   queue?: QueueInfo | null;
 }
 
+export interface ScheduleBreak {
+  uuid?: string;
+  schedule_id?: string;
+  break_start: string; // HH:MM
+  break_end: string;   // HH:MM
+}
+
 export interface ScheduleData {
   uuid: string;
   entity_id: string;
@@ -54,6 +61,7 @@ export interface ScheduleData {
   opening_time?: string;
   closing_time?: string;
   is_open: boolean;
+  breaks?: ScheduleBreak[];
 }
 
 export interface ScheduleInfo {

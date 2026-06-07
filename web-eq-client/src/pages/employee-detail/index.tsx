@@ -206,6 +206,10 @@ const EmployeeDetail = () => {
                     is_open: scheduleItem?.is_open || false,
                     opening_time: scheduleItem?.opening_time || "",
                     closing_time: scheduleItem?.closing_time || "",
+                    break_times: (scheduleItem?.breaks || []).map(b => ({
+                        break_start: b.break_start,
+                        break_end: b.break_end,
+                    })),
                 };
             });
             setScheduleData({
@@ -238,9 +242,9 @@ const EmployeeDetail = () => {
         setInvitationLoading(true);
         setInvitationError("");
         employeeService.getEmployees(businessId, 1, 200, "")
-            .then((list) => {
+            .then((res) => {
                 if (cancelled) return;
-                const emp = list.find((e) => e.uuid === employeeId);
+                const emp = res.items.find((e) => e.uuid === employeeId);
                 setInvitationCode(emp?.invitation_code ?? null);
                 setInvitationCodeExpiresAt(emp?.invitation_code_expires_at ?? null);
             })
@@ -394,6 +398,8 @@ const EmployeeDetail = () => {
                 is_open: d.is_open,
                 opening_time: d.is_open && d.opening_time ? d.opening_time : null,
                 closing_time: d.is_open && d.closing_time ? d.closing_time : null,
+                // Preserve breaks — omitting them would wipe existing break windows
+                break_times: d.is_open ? (d.break_times || []) : [],
             }));
             await businessService.upsertSchedules(employeeId, "EMPLOYEE", schedules, scheduleData.isAlwaysOpen);
             await fetchProfile();
@@ -419,7 +425,7 @@ const EmployeeDetail = () => {
         setQrError("");
         qrService.getEmployeeQR(employeeId)
             .then((blob: Blob) => setQrObjectUrl(URL.createObjectURL(blob)))
-            .catch(() => setQrError(t("failedToLoad") || "Failed to load QR code."))
+            .catch(() => setQrError(t("failedToLoad")))
             .finally(() => setQrLoading(false));
     }, [activeTab, queueDetail, employeeId, qrService, t]);
 
@@ -760,29 +766,78 @@ const EmployeeDetail = () => {
                                                     )}
                                                 </div>
                                                 {day.is_open ? (
-                                                    <div className="schedule-times">
+                                                    <div className="schedule-times-col">
+                                                        <div className="schedule-times">
+                                                            {editingSchedule ? (
+                                                                <>
+                                                                    <input type="time" className="time-input" value={day.opening_time || ""}
+                                                                        onChange={e => {
+                                                                            const next = [...scheduleData.schedule];
+                                                                            next[idx] = { ...day, opening_time: e.target.value };
+                                                                            setScheduleData(prev => ({ ...prev, schedule: next }));
+                                                                        }} />
+                                                                    <span className="time-separator">-</span>
+                                                                    <input type="time" className="time-input" value={day.closing_time || ""}
+                                                                        onChange={e => {
+                                                                            const next = [...scheduleData.schedule];
+                                                                            next[idx] = { ...day, closing_time: e.target.value };
+                                                                            setScheduleData(prev => ({ ...prev, schedule: next }));
+                                                                        }} />
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <span>{day.opening_time}</span>
+                                                                    <span className="time-separator">-</span>
+                                                                    <span>{day.closing_time}</span>
+                                                                </>
+                                                            )}
+                                                        </div>
                                                         {editingSchedule ? (
-                                                            <>
-                                                                <input type="time" className="time-input" value={day.opening_time || ""}
-                                                                    onChange={e => {
+                                                            <div className="schedule-breaks schedule-breaks--edit">
+                                                                {(day.break_times || []).map((b, bIdx) => (
+                                                                    <div key={bIdx} className="schedule-break-edit">
+                                                                        <input type="time" className="time-input time-input--sm" value={b.break_start}
+                                                                            onChange={e => {
+                                                                                const next = [...scheduleData.schedule];
+                                                                                const breaks = [...(day.break_times || [])];
+                                                                                breaks[bIdx] = { ...b, break_start: e.target.value };
+                                                                                next[idx] = { ...day, break_times: breaks };
+                                                                                setScheduleData(prev => ({ ...prev, schedule: next }));
+                                                                            }} />
+                                                                        <span className="time-separator">–</span>
+                                                                        <input type="time" className="time-input time-input--sm" value={b.break_end}
+                                                                            onChange={e => {
+                                                                                const next = [...scheduleData.schedule];
+                                                                                const breaks = [...(day.break_times || [])];
+                                                                                breaks[bIdx] = { ...b, break_end: e.target.value };
+                                                                                next[idx] = { ...day, break_times: breaks };
+                                                                                setScheduleData(prev => ({ ...prev, schedule: next }));
+                                                                            }} />
+                                                                        <button type="button" className="break-remove-btn" aria-label="Remove break"
+                                                                            onClick={() => {
+                                                                                const next = [...scheduleData.schedule];
+                                                                                next[idx] = { ...day, break_times: (day.break_times || []).filter((_, i) => i !== bIdx) };
+                                                                                setScheduleData(prev => ({ ...prev, schedule: next }));
+                                                                            }}>×</button>
+                                                                    </div>
+                                                                ))}
+                                                                <button type="button" className="break-add-btn"
+                                                                    onClick={() => {
                                                                         const next = [...scheduleData.schedule];
-                                                                        next[idx] = { ...day, opening_time: e.target.value };
+                                                                        next[idx] = { ...day, break_times: [...(day.break_times || []), { break_start: "12:00", break_end: "13:00" }] };
                                                                         setScheduleData(prev => ({ ...prev, schedule: next }));
-                                                                    }} />
-                                                                <span className="time-separator">-</span>
-                                                                <input type="time" className="time-input" value={day.closing_time || ""}
-                                                                    onChange={e => {
-                                                                        const next = [...scheduleData.schedule];
-                                                                        next[idx] = { ...day, closing_time: e.target.value };
-                                                                        setScheduleData(prev => ({ ...prev, schedule: next }));
-                                                                    }} />
-                                                            </>
+                                                                    }}>+ Add Break</button>
+                                                            </div>
                                                         ) : (
-                                                            <>
-                                                                <span>{day.opening_time}</span>
-                                                                <span className="time-separator">-</span>
-                                                                <span>{day.closing_time}</span>
-                                                            </>
+                                                            day.break_times && day.break_times.length > 0 && (
+                                                                <div className="schedule-breaks">
+                                                                    {day.break_times.map((b, i) => (
+                                                                        <span key={i} className="schedule-break-chip">
+                                                                            {t("break")} {b.break_start}–{b.break_end}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )
                                                         )}
                                                     </div>
                                                 ) : (
@@ -807,15 +862,14 @@ const EmployeeDetail = () => {
                                         className="btn btn-secondary btn-sm"
                                         onClick={() => {
                                             const msg =
-                                                t("confirmRemoveQueue") ||
-                                                "Remove this employee from the assigned queue?";
+                                                t("confirmRemoveQueue");
                                             if (window.confirm(msg)) {
                                                 handleRemoveQueue();
                                             }
                                         }}
                                         disabled={assigningQueue}
                                     >
-                                        {assigningQueue ? t("saving") : t("removeQueue") || "Remove queue"}
+                                        {assigningQueue ? t("saving") : t("removeQueue")}
                                     </button>
                                 )}
                             </div>

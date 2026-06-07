@@ -34,11 +34,11 @@ const Queues = () => {
                     (fetched.profile_type === ProfileType.BUSINESS && !fetched.business?.uuid) ||
                     (fetched.profile_type === ProfileType.EMPLOYEE && !fetched.employee?.business_id)
                 ) {
-                    setError(t("noBusinessFound") || "No business found for current user");
+                    setError(t("noBusinessFound"));
                 }
             } catch (err: unknown) {
                 console.error("Failed to fetch profile:", err);
-                setError(t("failedToLoadBusinessId") || "Failed to load business information");
+                setError(t("failedToLoadBusinessId"));
             } finally {
                 setLoadingProfile(false);
             }
@@ -58,7 +58,7 @@ const Queues = () => {
             } catch (err: unknown) {
                 const e = err as { response?: { data?: { detail?: { message?: string } } }; message?: string };
                 const msg =
-                    e?.response?.data?.detail?.message || (e?.message as string) || t("failedToLoadQueues") || "Failed to load queues";
+                    e?.response?.data?.detail?.message || (e?.message as string) || t("failedToLoadQueues");
                 setError(msg);
                 setQueues([]);
             } finally {
@@ -107,7 +107,7 @@ const Queues = () => {
                             }
                             disabled={loading || loadingProfile || !businessId}
                         >
-                            {t("addQueue") || "Add queue"}
+                            {t("addQueue")}
                         </button>
                     }
                 />
@@ -123,12 +123,12 @@ const Queues = () => {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>{t("queueName") || "Queue name"}</th>
-                                    <th>{t("status") || "Status"}</th>
-                                    <th>{t("isCounter") || "Is counter"}</th>
-                                    <th>{t("queueLimit") || "Limit"}</th>
-                                    <th>{t("createdAt") || "Created at"}</th>
-                                    <th>{t("actions") || "Actions"}</th>
+                                    <th>{t("queueName")}</th>
+                                    <th>{t("status")}</th>
+                                    <th>{t("isCounter")}</th>
+                                    <th>{t("queueLimit")}</th>
+                                    <th>{t("createdAt")}</th>
+                                    <th>{t("actions")}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -147,19 +147,19 @@ const Queues = () => {
                     ) : queues.length === 0 ? (
                         <div className="empty-state">
                             <div className="empty-state-icon">🗂️</div>
-                            <div className="empty-state-title">{t("noQueuesFound") || "No queues found"}</div>
+                            <div className="empty-state-title">{t("noQueuesFound")}</div>
                             <div className="empty-state-sub">Create your first queue to get started.</div>
                         </div>
                     ) : (
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>{t("queueName") || "Queue name"}</th>
-                                    <th>{t("status") || "Status"}</th>
-                                    <th>{t("isCounter") || "Is counter"}</th>
-                                    <th>{t("queueLimit") || "Limit"}</th>
-                                    <th>{t("createdAt") || "Created at"}</th>
-                                    <th>{t("actions") || "Actions"}</th>
+                                    <th>{t("queueName")}</th>
+                                    <th>{t("status")}</th>
+                                    <th>{t("isCounter")}</th>
+                                    <th>{t("queueLimit")}</th>
+                                    <th>{t("createdAt")}</th>
+                                    <th>{t("actions")}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -181,7 +181,7 @@ const Queues = () => {
                                                     {statusLabel}
                                                 </span>
                                             </td>
-                                            <td>{q.is_counter === true ? t("yes") || "Yes" : q.is_counter === false ? t("no") || "No" : t("notAvailable")}</td>
+                                            <td>{q.is_counter === true ? t("yes") : q.is_counter === false ? t("no") : t("notAvailable")}</td>
                                             <td>{q.limit != null ? String(q.limit) : "—"}</td>
                                             <td>{createdLabel}</td>
                                             <td>
@@ -189,8 +189,8 @@ const Queues = () => {
                                                     <button
                                                         type="button"
                                                         className="action-btn"
-                                                        title={t("view") || "View"}
-                                                        aria-label={t("view") || "View queue"}
+                                                        title={t("view")}
+                                                        aria-label={t("view")}
                                                         onClick={() => navigate(`${RouterConstant.ROUTERS_PATH.QUEUES}/${q.uuid}`)}
                                                     >
                                                         👁️

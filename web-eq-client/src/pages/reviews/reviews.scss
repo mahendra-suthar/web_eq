@@ -1,9 +1,27 @@
-@import "../../styles/admin-shared";
+@use "../../styles/admin-shared" as *;
 
 .reviews-page {
   display: flex;
   flex-direction: column;
   gap: 16px;
+
+  // Cancel the global content-card bottom margin — flex gap handles spacing
+  .content-card {
+    margin-bottom: 0;
+  }
+
+  // Align toolbar with card-header's 20px horizontal padding
+  .page-toolbar {
+    padding: 12px 20px 0;
+    margin-bottom: 0;
+  }
+
+  // Pagination as a card footer
+  .pagination {
+    margin-top: 0;
+    padding: 12px 20px;
+    border-top: 1px solid $sh-slate-100;
+  }
 }
 
 // ── Summary card ──────────────────────────────────────────────────────────────
@@ -50,7 +68,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px;
+  padding: 12px 20px 16px;
 }
 
 // ── Review card ───────────────────────────────────────────────────────────────
@@ -72,7 +90,6 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
 }
 
 .rv-user {
@@ -144,7 +161,7 @@
   font-size: 13px;
   color: $sh-slate-600;
   line-height: 1.55;
-  margin: 0;
+  margin: 8px 0 0;
   white-space: pre-line;
 }
 
@@ -196,6 +213,8 @@
   background-size: 800px 100%;
   animation: admin-shimmer 1.4s ease-in-out infinite;
 
+  &--rating  { height: 48px; width: 64px; border-radius: $sh-radius-sm; }
+  &--label   { height: 14px; width: 80px; }
   &--name    { height: 14px; width: 120px; }
   &--date    { height: 11px; width: 70px; margin-top: 4px; }
   &--stars   { height: 18px; width: 90px; }
