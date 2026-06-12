@@ -11,7 +11,7 @@ import { BookingService } from "../../services/booking/booking.service";
 import AppointmentActions from "../../components/appointment-actions";
 import LoadingSpinner from "../../components/loading-spinner";
 import ErrorMessage from "../../components/error-message";
-import { formatAppointmentTimeSummary, formatDelayMessage, formatTimeToDisplay, formatApptType, getInitials, getApiErrorMessage } from "../../utils/util";
+import { formatAppointmentTimeSummary, formatDelayMessage, formatDurationMinutes, formatTimeToDisplay, formatApptType, getInitials, getApiErrorMessage } from "../../utils/util";
 import { SUPPORT } from "../../utils/support";
 import "./profile.scss";
 
@@ -541,7 +541,7 @@ function AppointmentsSection() {
                                     : `${t("expectedAt")} ${item.estimated_appointment_time}`}
                                 </span>
                               ) : item.estimated_wait_minutes != null && item.estimated_wait_minutes > 0 ? (
-                                <span className="ac-live-bar__wait">~{item.estimated_wait_minutes} {t("minWait")}</span>
+                                <span className="ac-live-bar__wait">~{formatDurationMinutes(item.estimated_wait_minutes)}</span>
                               ) : null}
                             </>
                           )}

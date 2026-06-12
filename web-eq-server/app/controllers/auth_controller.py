@@ -16,7 +16,7 @@ from app.services.address_service import AddressService
 from app.services.schedule_service import ScheduleService
 from app.controllers.role_controller import RoleController
 from app.middleware.auth import detect_client_type, create_access_token, get_access_token_expires_time
-from app.core.config import RATE_LIMIT_PER_HOUR, OTP_EXPIRY_MINUTES, DEFAULT_OTP, SECRET_KEY, ALGORITHM
+from app.core.config import RATE_LIMIT_PER_HOUR, OTP_EXPIRY_MINUTES, DEFAULT_OTP, SECRET_KEY, ALGORITHM, ISSECURE, SAMESITE
 from app.services.firebase_service import verify_firebase_id_token
 from app.core.constants import BUSINESS_REGISTERED
 from app.models.user import User
@@ -297,6 +297,46 @@ class AuthController:
                 status_code=500,
                 detail={"message": "An unexpected error occurred. Please try again."},
             )
+
+    async def logout(self, request: Request, response: Response) -> None:
+        """Delete only the calling app's httpOnly cookie.
+
+        Decodes the JWT from the Authorization header (ignoring expiry so logout
+        works even after the token has expired) to determine user_type, then
+        deletes only that app's cookie. This prevents a customer logout from
+        wiping an open admin session in the same browser, and vice versa.
+        """
+        user_type: Optional[str] = None
+
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            raw_token = auth_header.split(" ", 1)[1]
+            try:
+                payload = jose_jwt.decode(
+                    raw_token,
+                    SECRET_KEY,
+                    algorithms=[ALGORITHM],
+                    options={"verify_exp": False},
+                )
+                user_type = (payload.get("user_type") or "").upper()
+            except JWTError:
+                pass
+
+        def _del(key: str) -> None:
+            response.delete_cookie(key=key, path="/", httponly=True, secure=ISSECURE, samesite=SAMESITE)
+
+        if user_type == "CUSTOMER":
+            _del("customer_access_token")
+        elif user_type in ("BUSINESS", "EMPLOYEE", "ADMIN"):
+            _del("access_token")
+        else:
+            # JWT missing or unreadable — fall back to deleting both.
+            # In normal flow this branch is never reached because the client
+            # always sends a valid (possibly expired) token in the Authorization header.
+            if request.cookies.get("customer_access_token"):
+                _del("customer_access_token")
+            if request.cookies.get("access_token"):
+                _del("access_token")
 
     def get_or_create_user_for_business_flow(
         self, country_code: str, phone_number: str, client_type: Optional[str]

@@ -5,10 +5,27 @@ import { ProfileType } from "./constants";
 
 const TOKEN_SS_KEY = "eq_admin_token";
 
+// Compute BEFORE the store is created so the initial render already has the
+// correct value. React fires child effects before parent effects, so setting
+// this inside useEffect (App mount) would be too late — Dashboard's data-fetch
+// effects would have already fired by then.
+function computeInitialSessionRestoring(): boolean {
+  try {
+    const raw = localStorage.getItem("web-eq-user");
+    if (!raw) return false;
+    const profileUuid = JSON.parse(raw)?.state?.profile?.user?.uuid;
+    if (!profileUuid) return false;
+    return !sessionStorage.getItem(TOKEN_SS_KEY);
+  } catch {
+    return false;
+  }
+}
+
 interface UserState {
   profile: UnifiedProfileResponse | null;
   nextStep: string | null;
   token: string | null;
+  sessionRestoring: boolean;
 
   impersonating: boolean;
   impersonatedBusinessName: string | null;
@@ -17,6 +34,7 @@ interface UserState {
   setProfile: (profile: UnifiedProfileResponse) => void;
   setNextStep: (step: string | null) => void;
   setToken: (token: string | null) => void;
+  setSessionRestoring: (restoring: boolean) => void;
   isAuthenticated: () => boolean;
   canAccessDashboard: () => boolean;
   getProfileType: () => ProfileType | null;
@@ -35,12 +53,14 @@ export const useUserStore = create(
       profile: null,
       nextStep: null,
       token: sessionStorage.getItem(TOKEN_SS_KEY) ?? null,
+      sessionRestoring: computeInitialSessionRestoring(),
       impersonating: false,
       impersonatedBusinessName: null,
       preImpersonationProfile: null,
 
       setProfile: (profile) => set({ profile }),
       setNextStep: (step) => set({ nextStep: step }),
+      setSessionRestoring: (restoring) => set({ sessionRestoring: restoring }),
       setToken: (token) => {
         if (token) sessionStorage.setItem(TOKEN_SS_KEY, token);
         else sessionStorage.removeItem(TOKEN_SS_KEY);
@@ -99,6 +119,7 @@ export const useUserStore = create(
           profile: null,
           nextStep: null,
           token: null,
+          sessionRestoring: false,
           impersonating: false,
           impersonatedBusinessName: null,
           preImpersonationProfile: null,

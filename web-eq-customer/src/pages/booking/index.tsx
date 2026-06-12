@@ -7,7 +7,7 @@ import { useQueueWebSocket } from "../../hooks/useQueueWebSocket";
 import { BookingService, type UpcomingAppointmentItem } from "../../services/booking/booking.service";
 import { BusinessService, type BusinessServiceData, type BusinessScheduleInfo } from "../../services/business/business.service";
 import { getNext7Days, getToday, isBusinessClosedOnDate } from "../../utils/booking.utils";
-import { isDateInPast, formatDateDisplay, formatDurationMinutes, formatTimeToDisplay } from "../../utils/util";
+import { isDateInPast, formatDateDisplay, formatDurationMinutes, formatWaitRange, formatTimeToDisplay } from "../../utils/util";
 import { HttpStatus } from "../../utils/constants";
 import { saveBookingReturnState, getBookingReturnState, clearBookingReturnState } from "../../utils/bookingReturnState";
 import "./booking.scss";
@@ -856,7 +856,7 @@ export default function BookingPage() {
                           <div className="bk-q-stat">
                             <div className="bk-q-stat-label">{t("bk.statEstWait")}</div>
                             <div className="bk-q-stat-value">{formatDurationMinutes(option.estimated_wait_minutes)}</div>
-                            {option.estimated_wait_range && <div className="bk-q-stat-sub">{option.estimated_wait_range}</div>}
+                            {option.estimated_wait_range && <div className="bk-q-stat-sub">{formatWaitRange(option.estimated_wait_range)}</div>}
                           </div>
                           <div className="bk-q-stat bk-q-stat--full">
                             <div className="bk-q-stat-label">{t("bk.statExpectedAt")}</div>
@@ -1146,7 +1146,7 @@ export default function BookingPage() {
                 <span className="bk-modal-label">{t("bk.statEstWait")}</span>
                 <span className="bk-modal-value">
                   {formatDurationMinutes(alreadyInQueueData.estimated_wait_minutes)}
-                  {alreadyInQueueData.estimated_wait_range && <span className="bk-modal-range"> ({alreadyInQueueData.estimated_wait_range})</span>}
+                  {alreadyInQueueData.estimated_wait_range && <span className="bk-modal-range"> ({formatWaitRange(alreadyInQueueData.estimated_wait_range)})</span>}
                 </span>
               </div>
               <div className="bk-modal-row"><span className="bk-modal-label">{t("bk.statExpectedAt")}</span><span className="bk-modal-value">{formatTimeToDisplay(alreadyInQueueData.estimated_appointment_time)}</span></div>

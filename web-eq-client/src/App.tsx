@@ -4,12 +4,13 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useSessionRestore } from "./hooks/useSessionRestore";
 import { useVisibilityRefresh } from "./hooks/useVisibilityRefresh";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { RouterConstant } from "./routers/index";
 import { PrivateRoute } from "./routers/privateRoute";
 import { RoleGuard } from "./routers/RoleGuard";
 import { SuperAdminGuard } from "./routers/SuperAdminGuard";
 import { AuthFailureHandler } from "./routers/AuthFailureHandler";
+import { useUserStore } from "./utils/userStore";
 import { Permission } from "./utils/permissions";
 import MainLayout from "./layouts/general-layout";
 import AdminLayout from "./layouts/admin-layout";
@@ -56,60 +57,79 @@ const withSuspense = (el: ReactElement) => (
   <Suspense fallback={<PageSpinner />}>{el}</Suspense>
 );
 
+function GuestOnlyRoute() {
+  const profile = useUserStore((s) => s.profile);
+  const nextStep = useUserStore((s) => s.nextStep);
+  if (profile?.user?.uuid && nextStep === "dashboard") {
+    return <Navigate to={ROUTERS_PATH.DASHBOARD} replace />;
+  }
+  return <Outlet />;
+}
+
 const App = () => {
   useSessionRestore();
   useVisibilityRefresh();
+  const sessionRestoring = useUserStore((s) => s.sessionRestoring);
   return (
-  <BrowserRouter>
-    <ToastContainer position="top-right" autoClose={3000} />
-    <AuthFailureHandler />
-    <Routes>
-      {/* Public / Auth routes */}
-      <Route element={<MainLayout />}>
-        <Route path={ROUTERS_PATH.ROOT_PATH} element={<SendOTP />} />
-        <Route path={ROUTERS_PATH.SENDOTP} element={<SendOTP />} />
-        <Route path={ROUTERS_PATH.VERIFYOTP} element={<VerifyOTP />} />
-        <Route path={ROUTERS_PATH.INVITATION_CODE} element={<InvitationCodePage />} />
-        <Route path={ROUTERS_PATH.USERPROFILE} element={<UserProfile />} />
-        <Route path={ROUTERS_PATH.BUSINESSREGISTRATION} element={<BusinessRegistration />} />
-      </Route>
+    <>
+      <AuthFailureHandler />
+      {sessionRestoring ? (
+        <div className="session-restoring" />
+      ) : (
+        <BrowserRouter>
+          <ToastContainer position="top-right" autoClose={3000} />
+          <Routes>
+            {/* Auth routes — redirect to dashboard if already logged in */}
+            <Route element={<MainLayout />}>
+              <Route element={<GuestOnlyRoute />}>
+                <Route path={ROUTERS_PATH.ROOT_PATH} element={<SendOTP />} />
+                <Route path={ROUTERS_PATH.SENDOTP} element={<SendOTP />} />
+                <Route path={ROUTERS_PATH.VERIFYOTP} element={<VerifyOTP />} />
+              </Route>
+              {/* Onboarding steps — always accessible during setup flow */}
+              <Route path={ROUTERS_PATH.INVITATION_CODE} element={<InvitationCodePage />} />
+              <Route path={ROUTERS_PATH.USERPROFILE} element={<UserProfile />} />
+              <Route path={ROUTERS_PATH.BUSINESSREGISTRATION} element={<BusinessRegistration />} />
+            </Route>
 
-      {/* Super Admin login (standalone, no layout) */}
-      <Route path={ROUTERS_PATH.SUPER_ADMIN_LOGIN} element={withSuspense(<SuperAdminLogin />)} />
+            {/* Super Admin login (standalone, no layout) */}
+            <Route path={ROUTERS_PATH.SUPER_ADMIN_LOGIN} element={withSuspense(<SuperAdminLogin />)} />
 
-      {/* Super Admin panel */}
-      <Route element={<SuperAdminGuard><SuperAdminLayout /></SuperAdminGuard>}>
-        <Route path={ROUTERS_PATH.SUPER_ADMIN} element={withSuspense(<SuperAdminDashboard />)} />
-        <Route path={ROUTERS_PATH.SUPER_ADMIN_CATEGORIES} element={withSuspense(<SuperAdminCategories />)} />
-        <Route path={ROUTERS_PATH.SUPER_ADMIN_SERVICES} element={withSuspense(<SuperAdminServices />)} />
-        <Route path={ROUTERS_PATH.SUPER_ADMIN_BUSINESSES} element={withSuspense(<SuperAdminBusinesses />)} />
-        <Route path={ROUTERS_PATH.SUPER_ADMIN_USERS} element={withSuspense(<SuperAdminUsers />)} />
-        <Route path={ROUTERS_PATH.SUPER_ADMIN_REVIEWS} element={withSuspense(<SuperAdminReviews />)} />
-      </Route>
+            {/* Super Admin panel */}
+            <Route element={<SuperAdminGuard><SuperAdminLayout /></SuperAdminGuard>}>
+              <Route path={ROUTERS_PATH.SUPER_ADMIN} element={withSuspense(<SuperAdminDashboard />)} />
+              <Route path={ROUTERS_PATH.SUPER_ADMIN_CATEGORIES} element={withSuspense(<SuperAdminCategories />)} />
+              <Route path={ROUTERS_PATH.SUPER_ADMIN_SERVICES} element={withSuspense(<SuperAdminServices />)} />
+              <Route path={ROUTERS_PATH.SUPER_ADMIN_BUSINESSES} element={withSuspense(<SuperAdminBusinesses />)} />
+              <Route path={ROUTERS_PATH.SUPER_ADMIN_USERS} element={withSuspense(<SuperAdminUsers />)} />
+              <Route path={ROUTERS_PATH.SUPER_ADMIN_REVIEWS} element={withSuspense(<SuperAdminReviews />)} />
+            </Route>
 
-      {/* Business / Employee admin panel */}
-      <Route element={<PrivateRoute><AdminLayout /></PrivateRoute>}>
-        <Route path={ROUTERS_PATH.DASHBOARD} element={<Dashboard />} />
-        <Route path={ROUTERS_PATH.ALLUSERS} element={<RoleGuard permission={Permission.VIEW_ALL_USERS}><AllUsers /></RoleGuard>} />
-        <Route path={`${ROUTERS_PATH.ALLUSERS}/:userId`} element={<RoleGuard permission={Permission.VIEW_ALL_USERS}><UserDetail /></RoleGuard>} />
-        <Route path={ROUTERS_PATH.EMPLOYEES} element={<RoleGuard permission={Permission.VIEW_EMPLOYEES}><Employees /></RoleGuard>} />
-        <Route path={`${ROUTERS_PATH.EMPLOYEES}/new`} element={<RoleGuard permission={Permission.VIEW_EMPLOYEES}><EmployeeAdd /></RoleGuard>} />
-        <Route path={`${ROUTERS_PATH.EMPLOYEES}/:employeeId`} element={<RoleGuard permission={Permission.VIEW_EMPLOYEES}><EmployeeDetail /></RoleGuard>} />
-        <Route path={ROUTERS_PATH.BUSINESSPROFILE} element={<BusinessProfile />} />
-        <Route path={ROUTERS_PATH.EMPLOYEEPROFILE} element={<EmployeeProfile />} />
-        <Route path={ROUTERS_PATH.QUEUES} element={<RoleGuard permission={Permission.VIEW_QUEUES}><Queues /></RoleGuard>} />
-        <Route path={`${ROUTERS_PATH.QUEUES}/new`} element={<RoleGuard permission={Permission.VIEW_QUEUES}><QueueAdd /></RoleGuard>} />
-        <Route path={`${ROUTERS_PATH.QUEUES}/:queueId`} element={<RoleGuard permission={Permission.VIEW_QUEUES}><QueueDetail /></RoleGuard>} />
-        <Route path={ROUTERS_PATH.LIVE_QUEUE} element={<RoleGuard permission={Permission.VIEW_LIVE_QUEUE}><LiveQueue /></RoleGuard>} />
-        <Route path={ROUTERS_PATH.QUEUEUSERS} element={<QueueUsers />} />
-        <Route path={`${ROUTERS_PATH.QUEUEUSERS}/:queueUserId`} element={<RoleGuard permission={Permission.VIEW_QUEUE_USERS}><QueueUserDetail /></RoleGuard>} />
-        <Route path={ROUTERS_PATH.REVIEWS} element={<RoleGuard permission={Permission.VIEW_REVIEWS}><ReviewsPage /></RoleGuard>} />
-      </Route>
+            {/* Business / Employee admin panel */}
+            <Route element={<PrivateRoute><AdminLayout /></PrivateRoute>}>
+              <Route path={ROUTERS_PATH.DASHBOARD} element={<Dashboard />} />
+              <Route path={ROUTERS_PATH.ALLUSERS} element={<RoleGuard permission={Permission.VIEW_ALL_USERS}><AllUsers /></RoleGuard>} />
+              <Route path={`${ROUTERS_PATH.ALLUSERS}/:userId`} element={<RoleGuard permission={Permission.VIEW_ALL_USERS}><UserDetail /></RoleGuard>} />
+              <Route path={ROUTERS_PATH.EMPLOYEES} element={<RoleGuard permission={Permission.VIEW_EMPLOYEES}><Employees /></RoleGuard>} />
+              <Route path={`${ROUTERS_PATH.EMPLOYEES}/new`} element={<RoleGuard permission={Permission.VIEW_EMPLOYEES}><EmployeeAdd /></RoleGuard>} />
+              <Route path={`${ROUTERS_PATH.EMPLOYEES}/:employeeId`} element={<RoleGuard permission={Permission.VIEW_EMPLOYEES}><EmployeeDetail /></RoleGuard>} />
+              <Route path={ROUTERS_PATH.BUSINESSPROFILE} element={<BusinessProfile />} />
+              <Route path={ROUTERS_PATH.EMPLOYEEPROFILE} element={<EmployeeProfile />} />
+              <Route path={ROUTERS_PATH.QUEUES} element={<RoleGuard permission={Permission.VIEW_QUEUES}><Queues /></RoleGuard>} />
+              <Route path={`${ROUTERS_PATH.QUEUES}/new`} element={<RoleGuard permission={Permission.VIEW_QUEUES}><QueueAdd /></RoleGuard>} />
+              <Route path={`${ROUTERS_PATH.QUEUES}/:queueId`} element={<RoleGuard permission={Permission.VIEW_QUEUES}><QueueDetail /></RoleGuard>} />
+              <Route path={ROUTERS_PATH.LIVE_QUEUE} element={<RoleGuard permission={Permission.VIEW_LIVE_QUEUE}><LiveQueue /></RoleGuard>} />
+              <Route path={ROUTERS_PATH.QUEUEUSERS} element={<QueueUsers />} />
+              <Route path={`${ROUTERS_PATH.QUEUEUSERS}/:queueUserId`} element={<RoleGuard permission={Permission.VIEW_QUEUE_USERS}><QueueUserDetail /></RoleGuard>} />
+              <Route path={ROUTERS_PATH.REVIEWS} element={<RoleGuard permission={Permission.VIEW_REVIEWS}><ReviewsPage /></RoleGuard>} />
+            </Route>
 
-      {/* Catch-all — redirect unknown paths to root */}
-      <Route path="*" element={<Navigate to={ROUTERS_PATH.ROOT_PATH} replace />} />
-    </Routes>
-  </BrowserRouter>
+            {/* Catch-all — redirect unknown paths to root */}
+            <Route path="*" element={<Navigate to={ROUTERS_PATH.ROOT_PATH} replace />} />
+          </Routes>
+        </BrowserRouter>
+      )}
+    </>
   );
 };
 

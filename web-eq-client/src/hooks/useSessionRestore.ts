@@ -5,22 +5,21 @@ import { useUserStore } from "../utils/userStore";
 
 /**
  * Runs once on app mount. If profile is persisted in localStorage but the
- * in-memory token is gone (page reload in a new tab, or browser reopen where
- * sessionStorage was cleared), silently calls POST /auth/token/refresh-business
- * (which uses the httpOnly cookie) to restore the token.
+ * in-memory token is gone (new tab / browser reopen), sets sessionRestoring=true
+ * so PrivateRoute holds off rendering pages — preventing API calls from firing
+ * before the token is back (eliminates the race that caused logout on tab open).
  *
- * On success : token is stored in sessionStorage + memory; all subsequent
- *              requests include the Authorization header automatically.
- * On 401/403 : session truly expired — delegates logout to AuthFailureHandler.
- * On network : leaves profile intact; the 401 interceptor will retry on the
- *              next API call using the same cookie.
+ * On success : token restored; sessionRestoring cleared; pages render normally.
+ * On 401/403 : session expired — clears sessionRestoring, delegates to AuthFailureHandler.
+ * On network : leaves profile intact; clears sessionRestoring so app is usable.
  */
 export function useSessionRestore(): void {
   useEffect(() => {
-    const { profile, token } = useUserStore.getState();
+    const { profile, token, setSessionRestoring } = useUserStore.getState();
 
-    // token already present (sessionStorage survived) — nothing to do
     if (!profile?.user?.uuid || token) return;
+
+    setSessionRestoring(true);
 
     axios
       .post(`${getApiUrl()}/auth/token/refresh-business`, {}, { withCredentials: true })
@@ -34,6 +33,9 @@ export function useSessionRestore(): void {
           window.dispatchEvent(new Event("auth:unauthorized"));
         }
         // Network/server errors: leave profile intact; interceptor handles retries
+      })
+      .finally(() => {
+        useUserStore.getState().setSessionRestoring(false);
       });
   }, []); // only on mount
 }
