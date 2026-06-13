@@ -11,6 +11,8 @@ from fastapi import HTTPException
 from app.models.employee import Employee
 from app.models.business import Business
 from app.models.queue import Queue, QueueService
+from app.models.review import Review
+from app.models.role import Role, UserRoles
 from app.schemas.employee import BusinessEmployeesInput, EmployeeUpdate
 from app.core.utils import generate_invitation_code, now_utc, normalize_email, normalize_phone, normalize_country_code
 from app.core.exceptions import handle_integrity_error
@@ -448,4 +450,37 @@ class EmployeeService:
         except Exception:
             self.db.rollback()
             logger.exception("Failed to activate_employee (employee_id=%s)", employee_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    def delete_employee(self, employee_id: UUID, business_id: UUID) -> bool:
+        employee = self.get_employee_by_uuid_and_business(employee_id, business_id)
+        if not employee:
+            return False
+
+        user_id = employee.user_id
+        try:
+            self.db.query(Review).filter(Review.employee_id == employee_id).update(
+                {Review.employee_id: None}, synchronize_session=False
+            )
+            self.db.delete(employee)
+
+            if user_id is not None:
+                other_employee_count = (
+                    self.db.query(Employee)
+                    .filter(Employee.user_id == user_id, Employee.uuid != employee_id)
+                    .count()
+                )
+                if other_employee_count == 0:
+                    employee_role = self.db.query(Role).filter(Role.name == "EMPLOYEE").first()
+                    if employee_role:
+                        self.db.query(UserRoles).filter(
+                            UserRoles.user_id == user_id,
+                            UserRoles.role_id == employee_role.uuid,
+                        ).delete(synchronize_session=False)
+
+            self.db.commit()
+            return True
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to delete_employee (employee_id=%s)", employee_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})

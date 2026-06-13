@@ -345,6 +345,15 @@ export class QueueService extends HttpClient {
         }
     }
 
+    async deleteQueue(queueId: string, businessId: string): Promise<void> {
+        try {
+            await this.delete(`/queue/${queueId}?business_id=${businessId}`);
+        } catch (error: any) {
+            console.error("Failed to delete queue:", error);
+            throw error;
+        }
+    }
+
     async getQueueUserDetail(queueUserId: string): Promise<QueueUserDetailResponse> {
         try {
             return await this.get<QueueUserDetailResponse>(`/queue/queue-user/${queueUserId}`);

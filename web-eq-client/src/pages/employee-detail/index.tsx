@@ -7,6 +7,9 @@ import { EmployeeService } from '../../services/employee/employee.service';
 import { BusinessService } from '../../services/business/business.service';
 import { Tabs } from '../../components/tabs/Tabs';
 import { EmployeeOverviewForm } from '../../components/employee/EmployeeOverviewForm';
+import { ConfirmModal } from '../../components/confirm-modal';
+import { useUserStore } from '../../utils/userStore';
+import { hasPermission, Permission } from '../../utils/permissions';
 import { RouterConstant } from '../../routers/index';
 import { backendDowToUiDow, emailRegex, formatDurationMinutes, getQueueStatusLabel, uiDowToBackendDow } from '../../utils/utils';
 import { toast } from 'react-toastify';
@@ -140,6 +143,9 @@ const EmployeeDetail = () => {
     const [invitationLoading, setInvitationLoading] = useState(false);
     const [invitationError, setInvitationError] = useState<string>("");
     const [codeCopied, setCodeCopied] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const canDelete = hasPermission(useUserStore((s) => s.getProfileType()), Permission.DELETE_EMPLOYEE);
 
     // UI convention: 0 = Monday, 6 = Sunday. Backend stores schedules as 0=Sunday..6=Saturday.
     const dayNames = useMemo(() => [
@@ -269,6 +275,21 @@ const EmployeeDetail = () => {
             setInvitationLoading(false);
         }
     }, [employeeId, businessId, employeeService]);
+
+    const handleDeleteEmployee = useCallback(async () => {
+        if (!employeeId || !businessId) return;
+        setDeleting(true);
+        try {
+            await employeeService.deleteEmployee(employeeId, businessId);
+            toast.success(t("deleteEmployeeSuccess"));
+            navigate(RouterConstant.ROUTERS_PATH.EMPLOYEES);
+        } catch (err: any) {
+            toast.error(err?.message || t("deleteEmployeeFailed"));
+            setShowDeleteConfirm(false);
+        } finally {
+            setDeleting(false);
+        }
+    }, [employeeId, businessId, employeeService, navigate, t]);
 
     const handleCopyCode = useCallback(async () => {
         if (!invitationCode) return;
@@ -487,6 +508,16 @@ const EmployeeDetail = () => {
                     <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(RouterConstant.ROUTERS_PATH.EMPLOYEES)}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>{t("back")}
                     </button>
+                    {canDelete && (
+                        <button
+                            type="button"
+                            className="btn btn-danger btn-sm"
+                            onClick={() => setShowDeleteConfirm(true)}
+                            disabled={deleting}
+                        >
+                            {t("deleteEmployee")}
+                        </button>
+                    )}
                 </div>
 
                 <Tabs
@@ -996,6 +1027,19 @@ const EmployeeDetail = () => {
                 </div>
                 </Tabs>
             </div>
+
+            {showDeleteConfirm && (
+                <ConfirmModal
+                    title={t("deleteEmployee")}
+                    message={t("confirmDeleteEmployee", { name: employeeDisplay.fullName || userDisplay.fullName })}
+                    confirmLabel={t("deletePermanently")}
+                    cancelLabel={t("cancel")}
+                    destructive
+                    loading={deleting}
+                    onConfirm={handleDeleteEmployee}
+                    onCancel={() => setShowDeleteConfirm(false)}
+                />
+            )}
         </div>
     );
 };

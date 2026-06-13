@@ -8,6 +8,10 @@ import {
 } from "../../services/queue/queue.service";
 import { ServiceService, ServiceData } from "../../services/service/service.service";
 import { EmployeeService, EmployeeResponse } from "../../services/employee/employee.service";
+import { ConfirmModal } from "../../components/confirm-modal";
+import { useUserStore } from "../../utils/userStore";
+import { hasPermission, Permission } from "../../utils/permissions";
+import { toast } from "react-toastify";
 import { RouterConstant } from "../../routers";
 import { formatDurationMinutes, getQueueStatusLabel } from "../../utils/utils";
 import "./queue-detail.scss";
@@ -35,6 +39,9 @@ const QueueDetail = () => {
     const [editMaxPerSlot, setEditMaxPerSlot] = useState<number | "">(1);
     const [savingQueue, setSavingQueue] = useState(false);
     const [queueSaveError, setQueueSaveError] = useState("");
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const canDelete = hasPermission(useUserStore((s) => s.getProfileType()), Permission.DELETE_QUEUE);
 
     const [addFee, setAddFee] = useState<number | "">("");
     const [addAvgTime, setAddAvgTime] = useState<number | "">("");
@@ -190,6 +197,22 @@ const QueueDetail = () => {
         setSavingService(false);
     };
 
+    const handleDeleteQueue = useCallback(async () => {
+        if (!queueId || !data?.business_id) return;
+        setDeleting(true);
+        try {
+            await queueService.deleteQueue(queueId, data.business_id);
+            toast.success(t("deleteQueueSuccess"));
+            navigate(RouterConstant.ROUTERS_PATH.QUEUES);
+        } catch (err: any) {
+            // Surface the server reason (e.g. 409 active customers) verbatim.
+            toast.error(err?.message || t("deleteQueueFailed"));
+            setShowDeleteConfirm(false);
+        } finally {
+            setDeleting(false);
+        }
+    }, [queueId, data?.business_id, queueService, navigate, t]);
+
     if (!queueId) {
         return (
             <div className="queue-detail-page">
@@ -247,9 +270,21 @@ const QueueDetail = () => {
                                 </button>
                             </>
                         ) : (
-                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingQueue(true)}>
-                                {t("edit")}
-                            </button>
+                            <>
+                                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingQueue(true)}>
+                                    {t("edit")}
+                                </button>
+                                {canDelete && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-danger btn-sm"
+                                        onClick={() => setShowDeleteConfirm(true)}
+                                        disabled={deleting}
+                                    >
+                                        {t("deleteQueue")}
+                                    </button>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>
@@ -554,6 +589,19 @@ const QueueDetail = () => {
                     </div>
                 </div>
             </div>
+
+            {showDeleteConfirm && (
+                <ConfirmModal
+                    title={t("deleteQueue")}
+                    message={t("confirmDeleteQueue", { name: data.name })}
+                    confirmLabel={t("deletePermanently")}
+                    cancelLabel={t("cancel")}
+                    destructive
+                    loading={deleting}
+                    onConfirm={handleDeleteQueue}
+                    onCancel={() => setShowDeleteConfirm(false)}
+                />
+            )}
         </div>
     );
 };

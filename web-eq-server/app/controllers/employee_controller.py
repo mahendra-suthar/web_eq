@@ -79,3 +79,14 @@ class EmployeeController:
         except Exception:
             logger.exception("Failed to regenerate_invitation_code (employee_id=%s)", employee_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    async def delete_employee(self, employee_id: UUID, business_id: UUID) -> None:
+        try:
+            ok = self.employee_service.delete_employee(employee_id, business_id)
+            if not ok:
+                raise HTTPException(status_code=404, detail={"message": "Employee not found"})
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to delete_employee (employee_id=%s)", employee_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})

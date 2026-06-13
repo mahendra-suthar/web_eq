@@ -62,3 +62,13 @@ async def get_employees(
 async def regenerate_invitation_code(employee_id: UUID, business_id: UUID, db: Session = Depends(get_db)):
     controller = EmployeeController(db)
     return await controller.regenerate_invitation_code(employee_id, business_id)
+
+
+@employee_router.delete(
+    "/{employee_id}",
+    dependencies=[Depends(require_roles(["BUSINESS"]))],
+)
+async def delete_employee(employee_id: UUID, business_id: UUID, db: Session = Depends(get_db)):
+    controller = EmployeeController(db)
+    await controller.delete_employee(employee_id, business_id)
+    return {"success": True}
