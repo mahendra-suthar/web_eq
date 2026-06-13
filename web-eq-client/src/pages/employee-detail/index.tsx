@@ -350,6 +350,17 @@ const EmployeeDetail = () => {
             setSaveError(t("emailInvalid"));
             return;
         }
+        const phone = employeePhoneNumber.trim();
+        if (phone) {
+            if (!/^\d{10}$/.test(phone)) {
+                setSaveError(t("employeePhoneInvalid"));
+                return;
+            }
+            if (!employeeCountryCode.trim()) {
+                setSaveError(t("countryCodeRequired"));
+                return;
+            }
+        }
         setSaveError("");
         setSaving(true);
         try {

@@ -84,45 +84,7 @@
         }
     }
 
-    .selected-services-list {
-        list-style: none;
-        padding: 0;
-        margin: 12px 0 0 0;
-    }
-
-    .selected-service-item {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 10px 12px;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        margin-bottom: 8px;
-
-        .service-name {
-            flex: 1;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .btn-ghost {
-            background: transparent;
-            border: none;
-            color: #64748b;
-            cursor: pointer;
-            font-size: 13px;
-
-            &:hover {
-                color: #dc2626;
-            }
-        }
-
-        .btn-sm {
-            padding: 4px 8px;
-            font-size: 12px;
-        }
-    }
+    // Queue service picker styles live in the shared QueueServicePicker component.
 
     .form-actions {
         display: flex;

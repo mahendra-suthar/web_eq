@@ -35,6 +35,7 @@
   "birthdateMinAge": "Business owner must be at least 18 years old",
   "errorSendingCode": "Error sending verification code",
   "invalidPhoneFormat": "Invalid phone number format",
+  "employeePhoneInvalid": "Enter a valid 10-digit phone number",
   "rateLimitExceeded": "Too many requests. Please try again later.",
   "phoneAlreadyExist": "Phone number already exists",
   "phoneDoesNotExist": "Phone number does not exist",

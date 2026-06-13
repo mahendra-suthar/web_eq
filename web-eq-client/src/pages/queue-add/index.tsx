@@ -5,16 +5,12 @@ import { QueueService } from "../../services/queue/queue.service";
 import { ServiceService, ServiceData } from "../../services/service/service.service";
 import { EmployeeService, EmployeeResponse } from "../../services/employee/employee.service";
 import { ProfileService } from "../../services/profile/profile.service";
+import { QueueServicePicker, validateQueueServices, type PickerService } from "../../components/queue/QueueServicePicker";
 import { useUserStore } from "../../utils/userStore";
 import { RouterConstant } from "../../routers";
 import "./queue-add.scss";
 
-interface SelectedService {
-    service_id: string;
-    service_name: string;
-    service_fee?: number;
-    avg_service_time?: number;
-}
+type SelectedService = PickerService;
 
 const QueueAdd = () => {
     const { t } = useTranslation();
@@ -40,6 +36,7 @@ const QueueAdd = () => {
     const [loadingServices, setLoadingServices] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+    const [serviceErrors, setServiceErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
         const load = async () => {
@@ -68,13 +65,14 @@ const QueueAdd = () => {
     }, [businessId, employeeService]);
 
     useEffect(() => {
+        if (!businessId) return;
         setLoadingServices(true);
         serviceService
-            .getAllServices()
+            .getServicesByBusiness(businessId)
             .then(setAllServices)
             .catch(() => setAllServices([]))
             .finally(() => setLoadingServices(false));
-    }, [serviceService]);
+    }, [businessId, serviceService]);
 
     const addService = (svc: ServiceData) => {
         if (selectedServices.some((s) => s.service_id === svc.uuid)) return;
@@ -97,6 +95,11 @@ const QueueAdd = () => {
         setSelectedServices((prev) =>
             prev.map((s) => (s.service_id === serviceId ? { ...s, [field]: value } : s))
         );
+        setServiceErrors((prev) => {
+            const next = { ...prev };
+            delete next[serviceId];
+            return next;
+        });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -113,10 +116,16 @@ const QueueAdd = () => {
         if (bookingMode !== "QUEUE") {
             const cap = maxPerSlot === "" ? NaN : Number(maxPerSlot);
             if (isNaN(cap) || cap < 1) {
-                setError("Max per slot must be at least 1");
+                setError(t("maxPerSlotRequired"));
                 return;
             }
         }
+        const svcErrs = validateQueueServices(selectedServices, t);
+        if (Object.keys(svcErrs).length > 0) {
+            setServiceErrors(svcErrs);
+            return;
+        }
+        setServiceErrors({});
         setSaving(true);
         try {
             const created = await queueService.createQueue({
@@ -136,8 +145,8 @@ const QueueAdd = () => {
                 state: { businessId },
             });
         } catch (err: unknown) {
-            const e = err as { response?: { data?: { detail?: string } }; message?: string };
-            setError(e?.response?.data?.detail || (e?.message as string) || t("failedToCreateQueue"));
+            const e = err as { message?: string };
+            setError(e?.message || t("failedToCreateQueue"));
         } finally {
             setSaving(false);
         }
@@ -245,75 +254,15 @@ const QueueAdd = () => {
                         {loadingServices ? (
                             <p className="info-value">{t("loading")}</p>
                         ) : (
-                            <>
-                                <select
-                                    className="form-select"
-                                    value=""
-                                    onChange={(e) => {
-                                        const id = e.target.value;
-                                        if (id) {
-                                            const svc = allServices.find((s) => s.uuid === id);
-                                            if (svc) addService(svc);
-                                            e.target.value = "";
-                                        }
-                                    }}
-                                    disabled={saving}
-                                >
-                                    <option value="">+ {t("addService")}...</option>
-                                    {allServices
-                                        .filter((s) => !selectedServices.some((x) => x.service_id === s.uuid))
-                                        .map((s) => (
-                                            <option key={s.uuid} value={s.uuid}>
-                                                {s.name}
-                                            </option>
-                                        ))}
-                                </select>
-                                {selectedServices.length > 0 && (
-                                    <ul className="selected-services-list">
-                                        {selectedServices.map((s) => (
-                                            <li key={s.service_id} className="selected-service-item">
-                                                <span className="service-name">{s.service_name}</span>
-                                                <input
-                                                    type="number"
-                                                    className="form-input small"
-                                                    placeholder={t("fee")}
-                                                    value={s.service_fee ?? ""}
-                                                    onChange={(e) =>
-                                                        updateSelectedService(
-                                                            s.service_id,
-                                                            "service_fee",
-                                                            e.target.value === "" ? undefined : Number(e.target.value)
-                                                        )
-                                                    }
-                                                    disabled={saving}
-                                                />
-                                                <input
-                                                    type="number"
-                                                    className="form-input small"
-                                                    placeholder={t("minutes")}
-                                                    value={s.avg_service_time ?? ""}
-                                                    onChange={(e) =>
-                                                        updateSelectedService(
-                                                            s.service_id,
-                                                            "avg_service_time",
-                                                            e.target.value === "" ? undefined : Number(e.target.value)
-                                                        )
-                                                    }
-                                                    disabled={saving}
-                                                />
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-ghost btn-sm"
-                                                    onClick={() => removeService(s.service_id)}
-                                                    disabled={saving}
-                                                >
-                                                    {t("remove")}
-                                                </button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </>
+                            <QueueServicePicker
+                                available={allServices}
+                                selected={selectedServices}
+                                errors={serviceErrors}
+                                disabled={saving}
+                                onAdd={addService}
+                                onRemove={removeService}
+                                onUpdate={updateSelectedService}
+                            />
                         )}
                     </div>
 

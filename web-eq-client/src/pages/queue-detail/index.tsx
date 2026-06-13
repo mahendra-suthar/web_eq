@@ -8,6 +8,7 @@ import {
 } from "../../services/queue/queue.service";
 import { ServiceService, ServiceData } from "../../services/service/service.service";
 import { EmployeeService, EmployeeResponse } from "../../services/employee/employee.service";
+import { QueueServicePicker, validateQueueServices, type PickerService, type PickerAvailableService } from "../../components/queue/QueueServicePicker";
 import { ConfirmModal } from "../../components/confirm-modal";
 import { useUserStore } from "../../utils/userStore";
 import { hasPermission, Permission } from "../../utils/permissions";
@@ -43,9 +44,8 @@ const QueueDetail = () => {
     const [deleting, setDeleting] = useState(false);
     const canDelete = hasPermission(useUserStore((s) => s.getProfileType()), Permission.DELETE_QUEUE);
 
-    const [addFee, setAddFee] = useState<number | "">("");
-    const [addAvgTime, setAddAvgTime] = useState<number | "">("");
-    const [addServiceError, setAddServiceError] = useState("");
+    const [pendingServices, setPendingServices] = useState<PickerService[]>([]);
+    const [pendingErrors, setPendingErrors] = useState<Record<string, string>>({});
     const [savingService, setSavingService] = useState(false);
     const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
     const [editSvcFee, setEditSvcFee] = useState<number | "">("");
@@ -120,42 +120,65 @@ const QueueDetail = () => {
         }
     };
 
-    const handleAddService = async (serviceId: string) => {
-        if (!queueId || !data) return;
-        setAddServiceError("");
-        const feeNum = addFee === "" ? NaN : Number(addFee);
-        const avgTimeNum = addAvgTime === "" ? NaN : Number(addAvgTime);
-        if (isNaN(feeNum) || feeNum < 0) {
-            setAddServiceError(t("addServiceFeeRequired"));
-            return;
-        }
-        if (isNaN(avgTimeNum) || avgTimeNum < 1) {
-            setAddServiceError(t("addServiceAvgTimeRequired"));
-            return;
-        }
-        setSavingService(true);
-        try {
-            await queueService.addServicesToQueue(queueId, data.business_id, [
-                {
-                    service_id: serviceId,
-                    service_fee: feeNum,
-                    avg_service_time: avgTimeNum,
-                },
-            ]);
-            setAddFee("");
-            setAddAvgTime("");
-            setAddServiceError("");
-            loadDetail();
-        } catch {
-            // keep form open on error
-        }
-        setSavingService(false);
+    const addPendingService = (svc: PickerAvailableService) => {
+        setPendingServices((prev) =>
+            prev.some((s) => s.service_id === svc.uuid)
+                ? prev
+                : [
+                      ...prev,
+                      {
+                          service_id: svc.uuid,
+                          service_name: svc.name,
+                          service_fee: svc.service_fee,
+                          avg_service_time: svc.avg_service_time,
+                      },
+                  ]
+        );
     };
 
-    const canAddService = (): boolean => {
-        const feeNum = addFee === "" ? NaN : Number(addFee);
-        const avgTimeNum = addAvgTime === "" ? NaN : Number(addAvgTime);
-        return !isNaN(feeNum) && feeNum >= 0 && !isNaN(avgTimeNum) && avgTimeNum >= 1;
+    const removePendingService = (serviceId: string) => {
+        setPendingServices((prev) => prev.filter((s) => s.service_id !== serviceId));
+        setPendingErrors((prev) => {
+            const next = { ...prev };
+            delete next[serviceId];
+            return next;
+        });
+    };
+
+    const updatePendingService = (serviceId: string, field: "service_fee" | "avg_service_time", value: number | undefined) => {
+        setPendingServices((prev) => prev.map((s) => (s.service_id === serviceId ? { ...s, [field]: value } : s)));
+        setPendingErrors((prev) => {
+            const next = { ...prev };
+            delete next[serviceId];
+            return next;
+        });
+    };
+
+    const handleAddPendingServices = async () => {
+        if (!queueId || !data || pendingServices.length === 0) return;
+        const errs = validateQueueServices(pendingServices, t);
+        if (Object.keys(errs).length > 0) {
+            setPendingErrors(errs);
+            return;
+        }
+        setPendingErrors({});
+        setSavingService(true);
+        try {
+            await queueService.addServicesToQueue(
+                queueId,
+                data.business_id,
+                pendingServices.map((s) => ({
+                    service_id: s.service_id,
+                    service_fee: s.service_fee as number,
+                    avg_service_time: s.avg_service_time as number,
+                }))
+            );
+            setPendingServices([]);
+            loadDetail();
+        } catch {
+            // keep staged rows on error so the user can retry
+        }
+        setSavingService(false);
     };
 
     const handleUpdateService = async (_svc: QueueServiceDetailData) => {
@@ -414,7 +437,10 @@ const QueueDetail = () => {
                                             <label className="info-label">{t("maxPerSlot")}</label>
                                             <div className="info-value">{data.max_per_slot != null ? String(data.max_per_slot) : "1"}</div>
                                         </div>
-                                        <p className="form-hint" style={{ gridColumn: "1 / -1" }}>{t("slotDurationHint")}</p>
+                                        <div className="queue-slot-hint" style={{ gridColumn: "1 / -1" }}>
+                                            <span className="queue-slot-hint__icon">ℹ</span>
+                                            {t("slotDurationHint")}
+                                        </div>
                                     </>
                                 )}
                                 {data.current_length != null && (
@@ -430,60 +456,31 @@ const QueueDetail = () => {
                     <div className="info-block queue-services-block">
                         <h3 className="info-block-title">{t("queueServices")}</h3>
 
-                        {/* Add Queue Service: services from business category as selectable buttons; selecting adds to queue */}
+                        {/* Add Queue Service: pick from the business catalog, set fee + duration per row, then commit. */}
                         {availableToAdd.length > 0 && (
                             <div className="add-queue-service-section">
-                                <p className="add-queue-service-intro">{t("addQueueServiceIntro")}</p>
-                                {addServiceError && (
-                                    <div className="add-service-error" role="alert">{addServiceError}</div>
-                                )}
-                                <div className="add-service-required-fields">
-                                    <div className="add-service-field">
-                                        <label className="form-label">{t("fee")} *</label>
-                                        <input
-                                            type="number"
-                                            className="form-input small"
-                                            placeholder={t("enterFee")}
-                                            value={addFee}
-                                            onChange={(e) => {
-                                                setAddFee(e.target.value === "" ? "" : Number(e.target.value));
-                                                setAddServiceError("");
-                                            }}
-                                            min={0}
-                                            step="0.01"
-                                            disabled={savingService}
-                                        />
-                                    </div>
-                                    <div className="add-service-field">
-                                        <label className="form-label">{t("averageServiceTime")} ({t("minutes")}) *</label>
-                                        <input
-                                            type="number"
-                                            className="form-input small"
-                                            placeholder="15"
-                                            value={addAvgTime}
-                                            onChange={(e) => {
-                                                setAddAvgTime(e.target.value === "" ? "" : Number(e.target.value));
-                                                setAddServiceError("");
-                                            }}
-                                            min={1}
-                                            disabled={savingService}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="service-buttons-grid">
-                                    {availableToAdd.map((s) => (
+                                <p className="add-queue-service-intro">{t("addQueueServicesHint")}</p>
+                                <QueueServicePicker
+                                    available={availableToAdd}
+                                    selected={pendingServices}
+                                    errors={pendingErrors}
+                                    disabled={savingService}
+                                    onAdd={addPendingService}
+                                    onRemove={removePendingService}
+                                    onUpdate={updatePendingService}
+                                />
+                                {pendingServices.length > 0 && (
+                                    <div className="add-queue-service-actions">
                                         <button
-                                            key={s.uuid}
                                             type="button"
-                                            className="btn btn-service-chip"
-                                            onClick={() => handleAddService(s.uuid)}
-                                            disabled={savingService || !canAddService()}
-                                            title={!canAddService() ? t("addQueueServiceIntro") : undefined}
+                                            className="btn btn-primary btn-sm"
+                                            onClick={handleAddPendingServices}
+                                            disabled={savingService}
                                         >
-                                            {s.name}
+                                            {savingService ? t("saving") : t("addToQueue")}
                                         </button>
-                                    ))}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
