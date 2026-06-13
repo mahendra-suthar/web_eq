@@ -60,6 +60,16 @@
             color: #6b7280;
         }
 
+        &.expired {
+            background-color: #fef9c3;
+            color: #713f12;
+        }
+
+        &.scheduled {
+            background-color: #ede9fe;
+            color: #5b21b6;
+        }
+
         &.unknown {
             background-color: #f3f4f6;
             color: #6b7280;

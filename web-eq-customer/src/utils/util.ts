@@ -2,6 +2,7 @@
  * Shared utilities for date formatting, address formatting, and map URLs.
  */
 
+import axios, { type AxiosError } from "axios";
 import type { AddressData } from "../services/business/business.service";
 
 /** Format a Date to YYYY-MM-DD string (local timezone). */
@@ -79,6 +80,19 @@ export function formatDurationMinutes(minutes: number): string {
   const h = Math.floor(m / 60);
   const rem = m % 60;
   return rem === 0 ? `${h}h` : `${h}h ${rem}m`;
+}
+
+/**
+ * Format a server wait-range string ("80–104 min", "119–153 min") into a
+ * human-readable form using hours when either bound reaches 60 minutes.
+ * "80–104 min" → "1h 20m–1h 44m"   "15–25 min" → "15m–25m"
+ * Returns the original string unchanged if it doesn't match the expected format.
+ */
+export function formatWaitRange(range: string | null | undefined): string {
+  if (!range) return "";
+  const match = range.match(/^(\d+)[–\-](\d+)\s*min$/i);
+  if (!match) return range;
+  return `${formatDurationMinutes(parseInt(match[1], 10))}–${formatDurationMinutes(parseInt(match[2], 10))}`;
 }
 
 /**
@@ -231,34 +245,61 @@ export function timeAgo(isoString: string): string {
 // API error handling
 // ============================================================================
 
-/** Extract user-facing message from API error (axios or similar). */
-export function getApiErrorMessage(
-  err: unknown,
+/**
+ * Resolve a user-facing message from an axios error, preferring the backend's
+ * {"detail": {"message": ...}} shape, then a string/array detail (FastAPI
+ * validation), then a top-level message, then network/timeout/status fallbacks.
+ * Never returns the raw "Request failed with status code N" axios string.
+ */
+export function resolveErrorMessage(
+  error: unknown,
   fallback: string = "Something went wrong. Please try again."
 ): string {
-  if (err == null) return fallback;
+  if (!axios.isAxiosError(error)) return fallback;
+  const e = error as AxiosError<unknown>;
 
-  type ApiError = {
-    response?: { data?: { detail?: string | string[] | { message?: string } } };
-    message?: string;
-  };
+  // No response → network drop or timeout.
+  if (!e.response) {
+    if (e.code === "ECONNABORTED") return "The request timed out. Please try again.";
+    return "Can't reach the server. Check your connection and try again.";
+  }
 
-  const detail = (err as ApiError)?.response?.data?.detail;
+  const data = e.response.data as
+    | { detail?: unknown; message?: unknown }
+    | undefined;
+  const detail = data?.detail;
 
   if (typeof detail === "string" && detail.trim()) return detail.trim();
 
   if (Array.isArray(detail)) {
-    const first = detail.find((d) => typeof d === "string" && d.trim());
-    if (first) return (first as string).trim();
-  }
-
-  if (detail !== null && typeof detail === "object" && "message" in detail) {
-    const msg = (detail as { message?: string }).message;
+    // FastAPI 422 validation: list of strings or {msg|message} objects.
+    for (const d of detail) {
+      if (typeof d === "string" && d.trim()) return d.trim();
+      const m = (d as { msg?: unknown; message?: unknown })?.msg ??
+        (d as { message?: unknown })?.message;
+      if (typeof m === "string" && m.trim()) return m.trim();
+    }
+  } else if (detail && typeof detail === "object") {
+    const msg = (detail as { message?: unknown }).message;
     if (typeof msg === "string" && msg.trim()) return msg.trim();
   }
 
-  const httpMsg = (err as ApiError)?.message;
-  if (typeof httpMsg === "string" && httpMsg.trim()) return fallback;
+  const topMsg = data?.message;
+  if (typeof topMsg === "string" && topMsg.trim()) return topMsg.trim();
 
+  const status = e.response.status;
+  if (status === 404) return "The requested item was not found.";
+  if (status === 403) return "You don't have permission to do that.";
   return fallback;
+}
+
+/**
+ * Extract user-facing message from API error.
+ * Thin wrapper over {@link resolveErrorMessage} kept for existing call sites.
+ */
+export function getApiErrorMessage(
+  err: unknown,
+  fallback: string = "Something went wrong. Please try again."
+): string {
+  return resolveErrorMessage(err, fallback);
 }

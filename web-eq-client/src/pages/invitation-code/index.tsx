@@ -24,7 +24,7 @@ export default function InvitationCodePage() {
   const handleVerify = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!code.trim()) {
-      setError(t("enterInvitationCode") || "Enter your invitation code");
+      setError(t("enterInvitationCode"));
       return;
     }
 
@@ -59,7 +59,7 @@ export default function InvitationCodePage() {
       setError(
         err?.response?.data?.detail?.message ||
           err?.customMessage ||
-          (t("failedToVerifyInvitationCode") || "Failed to verify invitation code")
+          (t("failedToVerifyInvitationCode"))
       );
     } finally {
       setLoading(false);
@@ -78,10 +78,10 @@ export default function InvitationCodePage() {
         </button>
         <div className="header-content">
           <h1 className="invitation-code-title">
-            {t("invitationCode") || "Invitation Code"}
+            {t("invitationCode")}
           </h1>
           <p className="invitation-code-subtitle">
-            {t("enterInvitationCodeSent") || "Enter the code shared by your business."}
+            {t("enterInvitationCodeSent")}
           </p>
         </div>
       </div>
@@ -96,7 +96,7 @@ export default function InvitationCodePage() {
                 setCode(e.target.value);
                 if (error) setError("");
               }}
-              placeholder={t("invitationCodePlaceholder") || "e.g. ABC123"}
+              placeholder={t("invitationCodePlaceholder")}
               autoFocus
               disabled={loading}
             />
@@ -107,7 +107,7 @@ export default function InvitationCodePage() {
         <div className="invitation-code-form-action">
           <Button
             type="submit"
-            text={loading ? (t("verifying") || "Verifying...") : t("verify")}
+            text={loading ? (t("verifying")) : t("verify")}
             color="blue"
             onClick={handleVerify}
             disabled={loading || !code.trim()}

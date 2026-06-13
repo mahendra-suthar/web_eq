@@ -53,7 +53,7 @@ from app.services.realtime.customer_queue_manager import customer_queue_manager
 from app.schemas.queue import (
     QueueCreate, QueueCreateBatch, QueueData, QueueDetailData, QueueServiceDetailData,
     QueueUpdate, QueueServicesAdd, QueueServiceUpdate,
-    QueueUserData, QueueUserDetailResponse,
+    QueueUserData, QueueUserDetailResponse, QueueUsersPageResponse,
     AvailableSlotData, BookingCreateInput, BookingData, BookingServiceData, BookingPreviewData,
     LiveQueueData,
     CustomerTodayAppointmentResponse,
@@ -200,6 +200,17 @@ class QueueController:
             logger.exception("Failed to delete_queue_service (queue_service_id=%s)", queue_service_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
+    async def delete_queue(self, queue_id: UUID, business_id: UUID) -> None:
+        try:
+            ok = self.queue_service.delete_queue(queue_id, business_id)
+            if not ok:
+                raise HTTPException(status_code=404, detail={"message": "Queue not found"})
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to delete_queue (queue_id=%s)", queue_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
     async def get_queue_user_detail(self, queue_user_id: UUID) -> QueueUserDetailResponse:
         try:
             queue_user = self.queue_service.get_queue_user_by_id_with_relations(queue_user_id)
@@ -236,17 +247,24 @@ class QueueController:
         page: int,
         limit: int,
         search: str | None,
-    ) -> list[QueueUserData]:
+        status: int | None,
+    ) -> QueueUsersPageResponse:
         try:
-            rows = self.queue_service.get_queue_users(
+            rows, total, pages = self.queue_service.get_queue_users(
                 business_id=business_id,
                 queue_id=queue_id,
                 employee_id=employee_id,
                 page=page,
                 limit=limit,
                 search=search,
+                status=status,
             )
-            return [QueueUserData.from_row(queue_user, user) for queue_user, user in rows]
+            return QueueUsersPageResponse(
+                items=[QueueUserData.from_row(queue_user, user) for queue_user, user in rows],
+                total=total,
+                page=page,
+                pages=pages,
+            )
         except HTTPException:
             raise
         except Exception:
@@ -263,13 +281,14 @@ class QueueController:
         search: str | None,
     ) -> tuple[BytesIO, str, str]:
         try:
-            rows_raw = self.queue_service.get_queue_users(
+            rows_raw, _, _ = self.queue_service.get_queue_users(
                 business_id=business_id,
                 queue_id=queue_id,
                 employee_id=employee_id,
                 page=1,
                 limit=MAX_EXPORT_ROWS,
                 search=search,
+                status=None,
             )
             columns = ["Name", "Email", "Phone", "Token No.", "Queue Date", "Enqueue Time", "Status", "Priority"]
             rows = [
@@ -342,16 +361,17 @@ class QueueController:
                 if svcs:
                     new_user_turn = float(sum(s.get("duration") or 0 for s in svcs) or 15.0)
 
-            # Get open_dt for the queue's operating hours
+            # Get open_dt + breaks for the queue's operating hours
             open_dt = None
+            breaks: list = []
             try:
-                open_time, _, _, _ = calc.get_employee_window(queue, booking_date)
+                open_time, _, breaks, _ = calc.get_employee_window(queue, booking_date)
                 open_dt = APP_TZ.localize(datetime.combine(booking_date, open_time))
             except Exception:
                 pass
 
             # Run the authoritative cursor algorithm on existing users
-            waits = calculate_queue_waits(queue_rows, now=now, open_dt=open_dt)
+            waits = calculate_queue_waits(queue_rows, now=now, open_dt=open_dt, breaks=breaks)
             ordered = waits["ordered_waiting"]
             wait_data = waits["wait_data"]
 
@@ -891,15 +911,16 @@ class QueueController:
                 today = today_app_date()
                 now_dt = now_app_tz() if slot_date == today else None
                 open_dt = None
+                breaks: list = []
                 try:
                     calc_svc = BookingCalculationService(self.db)
-                    open_time_val, _, _, _ = calc_svc.get_employee_window(queue, slot_date)
+                    open_time_val, _, breaks, _ = calc_svc.get_employee_window(queue, slot_date)
                     open_dt = APP_TZ.localize(datetime.combine(slot_date, open_time_val))
                 except Exception:
                     pass
                 if now_dt is None:
                     now_dt = open_dt or APP_TZ.localize(datetime.combine(slot_date, time(0, 0)))
-                waits = calculate_queue_waits(raw_rows, now=now_dt, open_dt=open_dt)
+                waits = calculate_queue_waits(raw_rows, now=now_dt, open_dt=open_dt, breaks=breaks)
                 ordered = waits["ordered_waiting"]
                 wait_data = waits["wait_data"]
                 queue_cursor_end_ms = None
@@ -1313,13 +1334,14 @@ class QueueController:
         self, queue: Any, queue_date: date, users_raw: list, employee_on_leave: bool = False
     ) -> LiveQueueData:
         open_dt = None
+        breaks: list = []
         try:
             calc = BookingCalculationService(self.db)
-            open_time, _, _, _ = calc.get_employee_window(queue, queue_date)
+            open_time, _, breaks, _ = calc.get_employee_window(queue, queue_date)
             open_dt = APP_TZ.localize(datetime.combine(queue_date, open_time))
         except Exception:
             pass
-        return LiveQueueData.from_build(queue, queue_date, users_raw, employee_on_leave, open_dt=open_dt)
+        return LiveQueueData.from_build(queue, queue_date, users_raw, employee_on_leave, open_dt=open_dt, breaks=breaks)
 
     def get_existing_booking(
         self,
@@ -1377,10 +1399,11 @@ class QueueController:
                         )
                         users_raw = build_live_queue_users_raw(rows, svc_by_user)
                         open_dt = None
+                        breaks: list = []
                         if qu.queue:
-                            open_time, _, _, _ = calc_service.get_employee_window(qu.queue, today)
+                            open_time, _, breaks, _ = calc_service.get_employee_window(qu.queue, today)
                             open_dt = app_tz.localize(datetime.combine(today, open_time))
-                        result = calculate_queue_waits(users_raw, open_dt=open_dt)
+                        result = calculate_queue_waits(users_raw, open_dt=open_dt, breaks=breaks)
                         waits_by_queue[qid] = result
                     except Exception:
                         waits_by_queue[qid] = {"current_token": None, "wait_data": {}}
@@ -1404,11 +1427,15 @@ class QueueController:
                 service_summary = " · ".join(service_names) if service_names else None
 
                 queue_waits = waits_by_queue.get(str(qu.queue_id), {})
+                on_break_until = queue_waits.get("on_break_until")
+                on_break_until_ts = queue_waits.get("on_break_until_ts")
                 wd = queue_waits.get("wait_data", {}).get(str(qu.uuid), {})
                 expected_at_ts = wd.get("expected_at_ts")
                 expected_end_ts = wd.get("expected_end_ts")
                 estimated_end_time = wd.get("estimated_end_time")
                 service_duration_minutes = wd.get("service_duration_minutes")
+                spans_break = wd.get("spans_break", False)
+                break_during_label = wd.get("break_during_label")
                 dynamic_appt_time = metrics.get("appointment_time") or wd.get("estimated_appointment_time")
                 live_wait = wd.get("estimated_wait_minutes")
                 if live_wait is not None:
@@ -1424,6 +1451,10 @@ class QueueController:
                         expected_end_ts=expected_end_ts,
                         estimated_end_time=estimated_end_time,
                         service_duration_minutes=service_duration_minutes,
+                        on_break_until=on_break_until,
+                        on_break_until_ts=on_break_until_ts,
+                        spans_break=spans_break,
+                        break_during_label=break_during_label,
                     )
                 )
             return CustomerTodayAppointmentsResponse(items=items)

@@ -6,8 +6,8 @@ import { ProfileService } from '../../services/profile/profile.service';
 import { EmployeeService, EmployeeResponse } from '../../services/employee/employee.service';
 import { useUserStore } from '../../utils/userStore';
 import { getInitials, getAvatarBackground } from '../../utils/utils';
-import { DEFAULT_PAGE, ProfileType } from '../../utils/constants';
-import Pagination from '../../components/common/Pagination';
+import { DEFAULT_PAGE, DEFAULT_PAGE_LIMIT, DEFAULT_DEBOUNCE_DELAY_MS, ProfileType } from '../../utils/constants';
+import Pagination from '../../components/pagination';
 import PageToolbar from '../../components/page-toolbar';
 import { ExportModal } from '../../components/export-modal';
 import { downloadBlob, todayFilename } from '../../utils/downloadUtils';
@@ -58,7 +58,9 @@ const AllUsers = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string>('');
     const [page, setPage] = useState(DEFAULT_PAGE);
-    const [limit, setLimit] = useState(20);
+    const [limit, setLimit] = useState(DEFAULT_PAGE_LIMIT);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [loadingProfile, setLoadingProfile] = useState(true);
     const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
     const [filterEmployeeId, setFilterEmployeeId] = useState<string>('');
@@ -100,9 +102,17 @@ const AllUsers = () => {
         if (!businessId || profile?.profile_type !== ProfileType.BUSINESS) return;
         employeeService
             .getEmployees(businessId, 1, 500, '')
-            .then(setEmployees)
+            .then((res) => setEmployees(res.items))
             .catch(() => setEmployees([]));
     }, [businessId, profile?.profile_type, employeeService]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setPage(DEFAULT_PAGE);
+        }, DEFAULT_DEBOUNCE_DELAY_MS);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     useEffect(() => {
         if (!params.hasContext) {
@@ -124,6 +134,7 @@ const AllUsers = () => {
                 queue_id: params.queueId,
                 page,
                 limit,
+                search: debouncedSearch || undefined,
             })
             .then((res) => {
                 setItems(res.items);
@@ -140,7 +151,7 @@ const AllUsers = () => {
                 setTotal(0);
             })
             .finally(() => setLoading(false));
-    }, [params.businessId, params.queueId, params.hasContext, isEmployee, page, limit, userService, t]);
+    }, [params.businessId, params.queueId, params.hasContext, isEmployee, page, limit, debouncedSearch, userService, t]);
 
     const handleExport = async (format: 'pdf' | 'xlsx') => {
         setExporting(format);
@@ -175,24 +186,34 @@ const AllUsers = () => {
             <div className="content-card">
                 <PageToolbar
                     filters={
-                        profile?.profile_type === ProfileType.BUSINESS && employees.length > 0 ? (
-                            <select
-                                className="filter-select"
-                                value={filterEmployeeId}
-                                onChange={(e) => {
-                                    setFilterEmployeeId(e.target.value);
-                                    setPage(DEFAULT_PAGE);
-                                }}
+                        <>
+                            <input
+                                type="text"
+                                className="filter-input"
+                                placeholder={t('searchUsers') || 'Search by name, email or phone…'}
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
                                 disabled={loading}
-                            >
-                                <option value="">{t('allQueues') || 'All queues'}</option>
-                                {employees.map((emp) => (
-                                    <option key={emp.uuid} value={emp.uuid}>
-                                        {emp.full_name}
-                                    </option>
-                                ))}
-                            </select>
-                        ) : undefined
+                            />
+                            {profile?.profile_type === ProfileType.BUSINESS && employees.length > 0 && (
+                                <select
+                                    className="filter-select"
+                                    value={filterEmployeeId}
+                                    onChange={(e) => {
+                                        setFilterEmployeeId(e.target.value);
+                                        setPage(DEFAULT_PAGE);
+                                    }}
+                                    disabled={loading}
+                                >
+                                    <option value="">{t('allQueues') || 'All queues'}</option>
+                                    {employees.map((emp) => (
+                                        <option key={emp.uuid} value={emp.uuid}>
+                                            {emp.full_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                        </>
                     }
                     actions={
                         <button
@@ -318,11 +339,12 @@ const AllUsers = () => {
 
                         {!loading && (
                             <Pagination
-                                page={page}
-                                limit={limit}
+                                currentPage={page}
+                                totalPages={Math.max(1, Math.ceil(total / limit))}
                                 total={total}
+                                limit={limit}
                                 onPageChange={setPage}
-                                onLimitChange={setLimit}
+                                onLimitChange={(l) => { setLimit(l); setPage(DEFAULT_PAGE); }}
                                 limitOptions={[10, 20, 50]}
                                 disabled={loading}
                             />

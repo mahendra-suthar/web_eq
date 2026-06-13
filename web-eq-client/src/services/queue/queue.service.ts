@@ -199,6 +199,8 @@ export interface LiveQueueData {
     users: LiveQueueUserItem[];   // ordered: completed → in_progress → waiting → scheduled
     upcoming_count?: number;      // count of SCHEDULED (pre-active) appointments
     employee_on_leave?: boolean;  // true when queue's employee has no schedule / closed exception for this date
+    on_break_until?: string | null;     // 12h label (e.g. "2:00 PM") when employee is currently on break
+    on_break_until_ts?: number | null;  // epoch ms of current break's end
 }
 
 export interface WalkInBookingPayload {
@@ -343,6 +345,15 @@ export class QueueService extends HttpClient {
         }
     }
 
+    async deleteQueue(queueId: string, businessId: string): Promise<void> {
+        try {
+            await this.delete(`/queue/${queueId}?business_id=${businessId}`);
+        } catch (error: any) {
+            console.error("Failed to delete queue:", error);
+            throw error;
+        }
+    }
+
     async getQueueUserDetail(queueUserId: string): Promise<QueueUserDetailResponse> {
         try {
             return await this.get<QueueUserDetailResponse>(`/queue/queue-user/${queueUserId}`);
@@ -358,8 +369,9 @@ export class QueueService extends HttpClient {
         employeeId?: string,
         page: number = 1,
         limit: number = 10,
-        search?: string
-    ): Promise<QueueUserData[]> {
+        search?: string,
+        status?: number
+    ): Promise<{ items: QueueUserData[]; total: number; pages: number; page: number }> {
         try {
             const params = new URLSearchParams({
                 page: page.toString(),
@@ -369,8 +381,11 @@ export class QueueService extends HttpClient {
             if (queueId) params.append("queue_id", queueId);
             if (employeeId) params.append("employee_id", employeeId);
             if (search) params.append("search", search);
+            if (status !== undefined) params.append("status", status.toString());
 
-            return await this.get<QueueUserData[]>(`/queue/get_users?${params.toString()}`);
+            return await this.get<{ items: QueueUserData[]; total: number; pages: number; page: number }>(
+                `/queue/get_users?${params.toString()}`
+            );
         } catch (error: any) {
             console.error("Failed to get queue users:", error);
             throw error;

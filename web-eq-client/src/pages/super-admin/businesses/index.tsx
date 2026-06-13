@@ -6,6 +6,7 @@ import { useAdminList } from "../../../hooks/useAdminList";
 import { ConfirmModal } from "../../../components/confirm-modal";
 import { useUserStore } from "../../../utils/userStore";
 import { ADMIN_LIST_LIMIT, BusinessStatus } from "../../../utils/constants";
+import Pagination from "../../../components/pagination";
 import { ROUTERS_PATH } from "../../../routers/routers";
 
 const svc = new SuperAdminService();
@@ -184,14 +185,13 @@ const SuperAdminBusinesses = () => {
             </tbody>
           </table>
         </div>
-        <div className="pagination-row">
-          <span>Showing {items.length} of {total}</span>
-          <div className="pagination-actions">
-            <button className="page-btn" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>←</button>
-            <span className="page-btn active">{page}</span>
-            <button className="page-btn" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>→</button>
-          </div>
-        </div>
+        <Pagination
+          currentPage={page}
+          totalPages={pages}
+          onPageChange={setPage}
+          total={total}
+          limit={ADMIN_LIST_LIMIT}
+        />
       </div>
 
       {statusTarget && (

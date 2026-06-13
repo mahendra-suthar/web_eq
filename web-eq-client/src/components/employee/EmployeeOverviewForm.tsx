@@ -1,4 +1,3 @@
-import React from "react";
 import { useTranslation } from "react-i18next";
 
 export interface EmployeeOverviewValues {
@@ -110,8 +109,9 @@ export function EmployeeOverviewForm({
                             type="tel"
                             className={`info-input ${errors.phoneNumber ? "input-error" : ""}`}
                             value={values.phoneNumber}
+                            maxLength={10}
                             onChange={(e) =>
-                                onChange("phoneNumber", e.target.value.replace(/\D/g, "").slice(0, 15))
+                                onChange("phoneNumber", e.target.value.replace(/\D/g, "").slice(0, 10))
                             }
                             placeholder={t("enterPhoneNumber")}
                             disabled={disabled}

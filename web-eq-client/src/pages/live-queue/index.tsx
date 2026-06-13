@@ -272,6 +272,7 @@ const LiveQueue: React.FC = () => {
   const queueName = liveData?.queue_name ?? "Live Queue";
   const queueStatus = liveData?.queue_status;
   const employeeOnLeave = liveData?.employee_on_leave ?? false;
+  const onBreakUntil = liveData?.on_break_until ?? null;
 
   const handleNext = useCallback(async () => {
     if (!selectedQueueId || nextLoading) return;
@@ -388,64 +389,50 @@ const LiveQueue: React.FC = () => {
         <header className="lq-header">
           <div className="lq-header__left">
             <div className="lq-header__title-row">
-              {showSelector ? (
-                <select
-                  className="lq-queue-select"
-                  value={selectedQueueId ?? ""}
-                  onChange={(e) => setSelectedQueueId(e.target.value)}
-                >
-                  {queues.map((q) => (
-                    <option key={String(q.uuid)} value={String(q.uuid)}>
-                      {q.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div className="lq-header__title">
-                  {loading && !liveData ? t("loading") : queueName}
-                </div>
-              )}
+              <div className="lq-header__title">
+                {loading && !liveData ? t("loading") : queueName}
+              </div>
               {isStopped && <span className="lq-badge lq-badge--stopped">{t("queueStatusStopped")}</span>}
               {isRunning && <span className="lq-badge lq-badge--running">{t("queueStatusRunning")}</span>}
               {isQueueRunningLate && (
                 <span className="lq-badge lq-badge--late">
-                  {t("runningLateQueue") || "Running late"}
+                  {t("runningLateQueue")}
                 </span>
               )}
               {employeeOnLeave && (
                 <span className="lq-badge lq-badge--onLeave">
-                  {t("employeeOnLeave") || "On leave"}
+                  {t("employeeOnLeave")}
                 </span>
               )}
             </div>
             <div className="lq-header__line2">
-              {t("today") || "Today"} · {todayLabel}
+              {t("today")} · {todayLabel}
               {current && (
                 <>
-                  {" · "}{t("currentServing") || "Serving"} <strong>{current.token}</strong>
+                  {" · "}{t("currentServing")} <strong>{current.token}</strong>
                   {current.position != null && (
-                    <>{" · "}{t("position") || "Position"} <strong>#{current.position}</strong></>
+                    <>{" · "}{t("position")} <strong>#{current.position}</strong></>
                   )}
                 </>
               )}
             </div>
             <div className="lq-header__counters">
               <span className="lq-counter lq-counter--progress">
-                {t("inProgress") || "In Progress"}: {inProgressCount}
+                {t("inProgress")}: {inProgressCount}
               </span>
               <span className="lq-sep" aria-hidden />
               <span className="lq-counter lq-counter--waiting">
-                {t("waiting") || "Waiting"}: {waitingCount}
+                {t("waiting")}: {waitingCount}
               </span>
               <span className="lq-sep" aria-hidden />
               <span className="lq-counter lq-counter--done">
-                {t("completed") || "Completed"}: {completedCount}
+                {t("completed")}: {completedCount}
               </span>
               {upcomingCount > 0 && (
                 <>
                   <span className="lq-sep" aria-hidden />
                   <span className="lq-counter lq-counter--upcoming">
-                    {t("upcoming") || "Upcoming"}: {upcomingCount}
+                    {t("upcoming")}: {upcomingCount}
                   </span>
                 </>
               )}
@@ -453,18 +440,35 @@ const LiveQueue: React.FC = () => {
                 <>
                   <span className="lq-sep" aria-hidden />
                   <span className="lq-counter lq-counter--ends">
-                    {t("endsAt") || "Ends"} ~{queueEndsAt}
+                    {t("endsAt")} ~{queueEndsAt}
                   </span>
                 </>
               )}
             </div>
+            {showSelector && (
+              <div className="lq-filter-bar">
+                <span className="lq-filter-bar__label">{t("queue")}:</span>
+                <select
+                  className="filter-select"
+                  value={selectedQueueId ?? ""}
+                  onChange={(e) => setSelectedQueueId(e.target.value)}
+                  aria-label={t("selectQueue")}
+                >
+                  {queues.map((q) => (
+                    <option key={String(q.uuid)} value={String(q.uuid)}>
+                      {q.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div className="lq-header__right">
             <button
               type="button"
               className="lq-iconAction"
-              aria-label={t("refresh") || "Refresh"}
-              title={t("refresh") || "Refresh"}
+              aria-label={t("refresh")}
+              title={t("refresh")}
               onClick={handleRefresh}
               disabled={loading}
             >
@@ -476,7 +480,7 @@ const LiveQueue: React.FC = () => {
               onClick={() => setShowAddCustomer(true)}
               disabled={!selectedQueueId || actionsDisabled}
             >
-              <span aria-hidden>+</span> {t("addCustomer") || "Add Customer"}
+              <span aria-hidden>+</span> {t("addCustomer")}
             </button>
             <button
               type="button"
@@ -484,7 +488,7 @@ const LiveQueue: React.FC = () => {
               onClick={handleStart}
               disabled={actionsDisabled || actionLoading || isRunning}
             >
-              <span aria-hidden>▶</span> {t("startQueue") || "Start Queue"}
+              <span aria-hidden>▶</span> {t("startQueue")}
             </button>
             <button
               type="button"
@@ -492,7 +496,7 @@ const LiveQueue: React.FC = () => {
               onClick={handleStop}
               disabled={actionsDisabled || actionLoading || isStopped}
             >
-              <span aria-hidden>■</span> {t("stopQueue") || "Stop Queue"}
+              <span aria-hidden>■</span> {t("stopQueue")}
             </button>
           </div>
         </header>
@@ -511,10 +515,20 @@ const LiveQueue: React.FC = () => {
               type="button"
               className="lq-action-error-dismiss"
               onClick={() => setActionError(null)}
-              aria-label={t("dismiss") || "Dismiss"}
+              aria-label={t("dismiss")}
             >
               ×
             </button>
+          </div>
+        )}
+
+        {/* On-break notice — employee is currently within a scheduled break */}
+        {!loading && liveData && !employeeOnLeave && onBreakUntil && (
+          <div className="lq-breakNotice" role="status">
+            <span className="lq-breakNotice__icon" aria-hidden>☕</span>
+            <span className="lq-breakNotice__text">
+              {t("onBreakUntil", { time: onBreakUntil }) || `On break · Service resumes at ${onBreakUntil}`}
+            </span>
           </div>
         )}
 
@@ -522,7 +536,7 @@ const LiveQueue: React.FC = () => {
         {!loading && liveData && (
           <section
             className={`lq-currentCard${!current ? " lq-currentCard--idle" : ""}${employeeOnLeave ? " lq-currentCard--onLeave" : ""}`}
-            aria-label={t("currentServing") || "Current Serving"}
+            aria-label={t("currentServing")}
           >
             <div className="lq-currentCard__bar" aria-hidden />
 
@@ -536,12 +550,12 @@ const LiveQueue: React.FC = () => {
                   <div className="lq-currentCard__info">
                     <div className="lq-currentCard__topRow">
                       <div className="lq-currentCard__name lq-currentCard__name--idle">
-                        {t("employeeOnLeaveTitle") || "You're on leave today"}
+                        {t("employeeOnLeaveTitle")}
                       </div>
                     </div>
                     <div className="lq-currentCard__subRow">
                       <span>
-                        {t("employeeOnLeaveHint") || "Queue is view-only. Start, Stop, and Next are disabled."}
+                        {t("employeeOnLeaveHint")}
                       </span>
                     </div>
                   </div>
@@ -561,7 +575,7 @@ const LiveQueue: React.FC = () => {
                         {appointmentTypeLabel(current.appointment_type, t)}
                       </span>
                       <span className="lq-badge lq-badge--progress">
-                        {t("inProgress") || "In Progress"}
+                        {t("inProgress")}
                       </span>
                     </div>
                     {current.est_remaining_label && (
@@ -573,7 +587,7 @@ const LiveQueue: React.FC = () => {
                       current.delay_minutes != null &&
                       current.delay_minutes > 0 && (
                         <div className="lq-currentCard__delay">
-                          {t("runningLate") || "Running"} ~{current.delay_minutes} {t("minLate") || "min late"}
+                          {t("runningLate")} ~{current.delay_minutes} {t("minLate")}
                         </div>
                       )}
                     {(() => {
@@ -591,13 +605,13 @@ const LiveQueue: React.FC = () => {
                       <span>{current.phone}</span>
                       <span className="lq-sep" aria-hidden />
                       <span>
-                        {t("tokenNumber") || "Token"} <strong>{current.token}</strong>
+                        {t("tokenNumber")} <strong>{current.token}</strong>
                       </span>
                       {current.expected_at_label && (
                         <>
                           <span className="lq-sep" aria-hidden />
                           <span>
-                            {t("expectedAt") || "Expected at"}{" "}
+                            {t("expectedAt")}{" "}
                             <strong>{current.expected_at_label}</strong>
                           </span>
                         </>
@@ -606,7 +620,7 @@ const LiveQueue: React.FC = () => {
                         <>
                           <span className="lq-sep" aria-hidden />
                           <span>
-                            {t("startedAt") || "Started"}{" "}
+                            {t("startedAt")}{" "}
                             <strong>{current.time_label}</strong>
                           </span>
                         </>
@@ -628,7 +642,7 @@ const LiveQueue: React.FC = () => {
                       <div className="lq-actionConfirm__btns">
                         <button type="button" className="lq-actionConfirm__cancel"
                           onClick={() => setShowNoShowConfirm(false)}>
-                          {t("cancel") || "Cancel"}
+                          {t("cancel")}
                         </button>
                         <button type="button" className="lq-actionConfirm__ok lq-actionConfirm__ok--danger"
                           onClick={handleNoShow} disabled={noShowLoading}>
@@ -644,7 +658,7 @@ const LiveQueue: React.FC = () => {
                       <div className="lq-actionConfirm__btns">
                         <button type="button" className="lq-actionConfirm__cancel"
                           onClick={() => setShowSkipConfirm(false)}>
-                          {t("cancel") || "Cancel"}
+                          {t("cancel")}
                         </button>
                         <button type="button" className="lq-actionConfirm__ok lq-actionConfirm__ok--warning"
                           onClick={handleSkip} disabled={skipLoading}>
@@ -678,7 +692,7 @@ const LiveQueue: React.FC = () => {
                         onClick={handleNext}
                         disabled={nextLoading || actionsDisabled}
                       >
-                        {nextLoading ? "…" : t("next") || "Next"}
+                        {nextLoading ? "…" : t("next")}
                       </button>
                     </div>
                   )}
@@ -696,17 +710,17 @@ const LiveQueue: React.FC = () => {
                       <div className="lq-currentCard__name lq-currentCard__name--idle">
                         {waiting.length > 0
                           ? isRunning
-                            ? t("readyToServe") || "Ready to serve next customer"
-                            : t("waitingToStart") || "Queue not started yet"
+                            ? t("readyToServe")
+                            : t("waitingToStart")
                           : completedCount > 0
-                          ? t("allServed") || "All customers have been served"
-                          : t("queueEmpty") || "Queue is empty"}
+                          ? t("allServed")
+                          : t("queueEmpty")}
                       </div>
                     </div>
                     <div className="lq-currentCard__subRow">
                       {waiting.length > 0 && isRunning && (
                         <span>
-                          {t("nextUp") || "Next up"}{" "}
+                          {t("nextUp")}{" "}
                           <strong>{waiting[0]?.token}</strong>
                           {" · "}
                           {waiting[0]?.full_name}
@@ -714,14 +728,14 @@ const LiveQueue: React.FC = () => {
                       )}
                       {waiting.length > 0 && !isRunning && (
                         <span>
-                          {t("startQueueHint") || "Start the queue to begin serving customers"}
+                          {t("startQueueHint")}
                         </span>
                       )}
                       {waiting.length === 0 && (
                         <span>
                           {completedCount > 0
-                            ? `${completedCount} ${t("customersServedToday") || "customer(s) served today"}`
-                            : t("noCustomersYet") || "No customers in queue"}
+                            ? `${completedCount} ${t("customersServedToday")}`
+                            : t("noCustomersYet")}
                         </span>
                       )}
                     </div>
@@ -736,7 +750,7 @@ const LiveQueue: React.FC = () => {
                       onClick={handleNext}
                       disabled={nextLoading}
                     >
-                      {nextLoading ? "…" : t("next") || "Next"}
+                      {nextLoading ? "…" : t("next")}
                     </button>
                   </div>
                 )}
@@ -749,7 +763,7 @@ const LiveQueue: React.FC = () => {
         {timelineItems.length > 0 && (
           <section
             className="lq-timeline"
-            aria-label={t("liveQueue") || "Live Queue"}
+            aria-label={t("liveQueue")}
           >
             <div className="lq-timeline__rail">
               {timelineItems.map((item) => (
@@ -783,13 +797,13 @@ const LiveQueue: React.FC = () => {
                             </span>
                             <span className={`lq-badge lq-badge--${item.status}`}>
                               {item.status === "done"
-                                ? t("completed") || "Completed"
+                                ? t("completed")
                                 : item.status === "progress"
-                                ? t("inProgress") || "In Progress"
-                                : t("waiting") || "Waiting"}
+                                ? t("inProgress")
+                                : t("waiting")}
                             </span>
                             {item.status === "waiting" && item.user.is_checked_in && (
-                              <span className="lq-badge lq-badge--arrived">{t("checkedIn") || "Here"}</span>
+                              <span className="lq-badge lq-badge--arrived">{t("checkedIn")}</span>
                             )}
                             {item.status === "waiting" && !item.user.is_checked_in && item.user.position === 1 && (
                               <span className="lq-badge lq-badge--not-arrived">{t("notCheckedIn")}</span>
@@ -809,7 +823,7 @@ const LiveQueue: React.FC = () => {
                                 <>
                                   <span className="lq-sep" aria-hidden />
                                   <span className="lq-row__delay">
-                                    ~{item.user.delay_minutes} {t("minLate") || "min late"}
+                                    ~{item.user.delay_minutes} {t("minLate")}
                                   </span>
                                 </>
                               )}
@@ -827,7 +841,7 @@ const LiveQueue: React.FC = () => {
                         })()}
                         {item.user.position != null && (
                           <span className="lq-row__position">
-                            {t("position") || "Position"} #{item.user.position}
+                            {t("position")} #{item.user.position}
                           </span>
                         )}
                         {item.status === "progress" && item.user.est_remaining_label && (
@@ -837,7 +851,7 @@ const LiveQueue: React.FC = () => {
                         )}
                         {item.status !== "progress" && (item.user.estimated_wait_label || item.user.service_duration_label) && (
                           <span className="lq-row__est">
-                            {item.user.estimated_wait_label && `${t("est") || "Est."} ${item.user.estimated_wait_label}`}
+                            {item.user.estimated_wait_label && `${t("est")} ${item.user.estimated_wait_label}`}
                             {item.user.estimated_wait_label && item.user.service_duration_label && " · "}
                             {item.user.service_duration_label}
                           </span>
@@ -848,7 +862,7 @@ const LiveQueue: React.FC = () => {
                           </span>
                         ) : item.user.expected_at_label ? (
                           <span className="lq-row__expected">
-                            {t("expectedAt") || "Expected at"} {item.user.expected_at_label}
+                            {t("expectedAt")} {item.user.expected_at_label}
                           </span>
                         ) : null}
                         {item.user.time_label && !item.user.expected_at_label && (
@@ -865,9 +879,9 @@ const LiveQueue: React.FC = () => {
 
         {/* Upcoming section — SCHEDULED appointments not yet active */}
         {upcoming.length > 0 && (
-          <section className="lq-upcoming-section" aria-label={t("upcoming") || "Upcoming"}>
+          <section className="lq-upcoming-section" aria-label={t("upcoming")}>
             <div className="lq-upcoming-header">
-              {t("upcoming") || "Upcoming"} · {upcoming.length}
+              {t("upcoming")} · {upcoming.length}
             </div>
             {upcoming.map((user) => {
               const scheduled = formatScheduledLabel(user);
@@ -884,7 +898,7 @@ const LiveQueue: React.FC = () => {
                         {appointmentTypeLabel(user.appointment_type, t)}
                       </span>
                       <span className="lq-badge lq-badge--scheduled">
-                        {t("statusScheduled") || "Scheduled"}
+                        {t("statusScheduled")}
                       </span>
                     </div>
                     <div className="lq-row__sub">

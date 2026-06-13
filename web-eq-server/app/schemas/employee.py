@@ -27,6 +27,13 @@ class BusinessEmployeesInput(BaseModel):
     employees: list[EmployeeCreate]
 
 
+class EmployeePageResponse(BaseModel):
+    items: list["EmployeeData"]
+    total: int
+    page: int
+    pages: int
+
+
 class EmployeeData(BaseModel):
     uuid: str
     business_id: str

@@ -1,12 +1,13 @@
 import logging
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from sqlalchemy import func, or_, cast, Float
 from fastapi import HTTPException
 from uuid import UUID
 from typing import List, Optional, Tuple
 
 from app.models.review import Review
 from app.models.business import Business
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -36,17 +37,25 @@ class ReviewService:
             logger.exception("Failed to create_review (user_id=%s business_id=%s)", user_id, data.get("business_id"))
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
-    def get_reviews_by_business(self, business_id: UUID, limit: int = 50, offset: int = 0) -> List[Review]:
+    def get_reviews_by_business(
+        self, business_id: UUID, limit: int = 50, offset: int = 0,
+        search: str | None = None, rating: int | None = None,
+    ) -> Tuple[List[Review], int]:
         try:
-            return (
+            query = (
                 self.db.query(Review)
+                .join(User, User.uuid == Review.user_id)
                 .options(joinedload(Review.user))
                 .filter(Review.business_id == business_id)
-                .order_by(Review.created_at.desc())
-                .offset(offset)
-                .limit(limit)
-                .all()
             )
+            if rating is not None:
+                query = query.filter(func.round(cast(Review.rating, Float)) == rating)
+            if search:
+                s = f"%{search}%"
+                query = query.filter(or_(User.full_name.ilike(s), Review.comment.ilike(s)))
+            total: int = query.count()
+            items = query.order_by(Review.created_at.desc()).offset(offset).limit(limit).all()
+            return items, total
         except Exception:
             logger.exception("Failed to get_reviews_by_business (business_id=%s)", business_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
@@ -112,17 +121,25 @@ class ReviewService:
             logger.exception("Failed to get_user_review_for_appointment (user_id=%s queue_user_id=%s)", user_id, queue_user_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
-    def get_reviews_by_employee(self, employee_id: UUID, limit: int = 10, offset: int = 0) -> List[Review]:
+    def get_reviews_by_employee(
+        self, employee_id: UUID, limit: int = 10, offset: int = 0,
+        search: str | None = None, rating: int | None = None,
+    ) -> Tuple[List[Review], int]:
         try:
-            return (
+            query = (
                 self.db.query(Review)
+                .join(User, User.uuid == Review.user_id)
                 .options(joinedload(Review.user))
                 .filter(Review.employee_id == employee_id)
-                .order_by(Review.created_at.desc())
-                .offset(offset)
-                .limit(limit)
-                .all()
             )
+            if rating is not None:
+                query = query.filter(func.round(cast(Review.rating, Float)) == rating)
+            if search:
+                s = f"%{search}%"
+                query = query.filter(or_(User.full_name.ilike(s), Review.comment.ilike(s)))
+            total: int = query.count()
+            items = query.order_by(Review.created_at.desc()).offset(offset).limit(limit).all()
+            return items, total
         except Exception:
             logger.exception("Failed to get_reviews_by_employee (employee_id=%s)", employee_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
@@ -144,16 +161,24 @@ class ReviewService:
             logger.exception("Failed to get_review_summary_by_employee (employee_id=%s)", employee_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
-    def get_all_reviews(self, limit: int = 10, offset: int = 0) -> List[Review]:
+    def get_all_reviews(
+        self, limit: int = 10, offset: int = 0,
+        search: str | None = None, rating: int | None = None,
+    ) -> Tuple[List[Review], int]:
         try:
-            return (
+            query = (
                 self.db.query(Review)
+                .join(User, User.uuid == Review.user_id)
                 .options(joinedload(Review.user), joinedload(Review.business))
-                .order_by(Review.created_at.desc())
-                .offset(offset)
-                .limit(limit)
-                .all()
             )
+            if rating is not None:
+                query = query.filter(func.round(cast(Review.rating, Float)) == rating)
+            if search:
+                s = f"%{search}%"
+                query = query.filter(or_(User.full_name.ilike(s), Review.comment.ilike(s)))
+            total: int = query.count()
+            items = query.order_by(Review.created_at.desc()).offset(offset).limit(limit).all()
+            return items, total
         except Exception:
             logger.exception("Failed to get_all_reviews")
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})

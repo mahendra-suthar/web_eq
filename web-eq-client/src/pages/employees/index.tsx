@@ -26,6 +26,7 @@ const Employees = () => {
     const [searchTerm, setSearchTerm] = useState<string>("");
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [totalPages, setTotalPages] = useState<number>(1);
+    const [total, setTotal] = useState<number>(0);
     const [limit] = useState<number>(10);
     const [debouncedSearch, setDebouncedSearch] = useState<string>("");
 
@@ -56,21 +57,22 @@ const Employees = () => {
             setError("");
 
             try {
-                const data = await employeeService.getEmployees(
+                const res = await employeeService.getEmployees(
                     resolvedBusinessId,
                     currentPage,
                     limit,
                     debouncedSearch
                 );
-                setEmployees(data);
-                // Note: Backend should return total count for proper pagination
-                // For now, we'll estimate based on returned data
-                // You may need to update the backend to return total count
-                if (data.length < limit) {
-                    setTotalPages(currentPage);
-                } else {
-                    setTotalPages(currentPage + 1); // Estimate - adjust when backend returns total
-                }
+                // Safety net: dedupe by uuid
+                const seen = new Set<string>();
+                const unique = (res.items ?? []).filter((emp) => {
+                    if (!emp?.uuid || seen.has(emp.uuid)) return false;
+                    seen.add(emp.uuid);
+                    return true;
+                });
+                setEmployees(unique);
+                setTotal(res.total ?? 0);
+                setTotalPages(res.pages ?? 1);
             } catch (err: any) {
                 console.error("Failed to fetch employees:", err);
                 let errorMessage = t("failedToLoadEmployees");
@@ -103,7 +105,7 @@ const Employees = () => {
             <div className="employees-page">
                 <div className="content-card">
                     <div className="error-message">
-                        {t("businessIdRequired") || "Business ID is required to view employees."}
+                        {t("businessIdRequired")}
                     </div>
                 </div>
             </div>
@@ -254,6 +256,8 @@ const Employees = () => {
                         totalPages={totalPages}
                         onPageChange={handlePageChange}
                         disabled={loading}
+                        total={total}
+                        limit={limit}
                     />
                 )}
             </div>

@@ -11,7 +11,7 @@ import { BookingService } from "../../services/booking/booking.service";
 import AppointmentActions from "../../components/appointment-actions";
 import LoadingSpinner from "../../components/loading-spinner";
 import ErrorMessage from "../../components/error-message";
-import { formatAppointmentTimeSummary, formatDelayMessage, formatTimeToDisplay, formatApptType, getInitials, getApiErrorMessage } from "../../utils/util";
+import { formatAppointmentTimeSummary, formatDelayMessage, formatDurationMinutes, formatTimeToDisplay, formatApptType, getInitials, getApiErrorMessage } from "../../utils/util";
 import { SUPPORT } from "../../utils/support";
 import "./profile.scss";
 
@@ -541,7 +541,7 @@ function AppointmentsSection() {
                                     : `${t("expectedAt")} ${item.estimated_appointment_time}`}
                                 </span>
                               ) : item.estimated_wait_minutes != null && item.estimated_wait_minutes > 0 ? (
-                                <span className="ac-live-bar__wait">~{item.estimated_wait_minutes} {t("minWait")}</span>
+                                <span className="ac-live-bar__wait">~{formatDurationMinutes(item.estimated_wait_minutes)}</span>
                               ) : null}
                             </>
                           )}
@@ -574,7 +574,7 @@ function AppointmentsSection() {
                           <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
                           <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                         </svg>
-                        Overlapping appointment — you may not be able to attend both
+                        Overlapping appointment, you may not be able to attend both
                       </div>
                     )}
 
@@ -622,7 +622,7 @@ function AppointmentsSection() {
                               <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                 <polyline points="20 6 9 17 4 12" />
                               </svg>
-                              {t("profile.servedAt") || "Served at"} {servedAt}
+                              {t("profile.servedAt")} {servedAt}
                             </div>
                           )}
                           {(cls === "cancelled" || cls === "expired") && item.cancellation_reason && (

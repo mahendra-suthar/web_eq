@@ -47,6 +47,7 @@ class UserController:
         queue_id: Optional[UUID] = None,
         page: int = 1,
         limit: int = 20,
+        search: Optional[str] = None,
     ) -> UsersAppointmentsResponse:
         if business_id is not None and queue_id is not None:
             raise HTTPException(
@@ -64,6 +65,7 @@ class UserController:
                 queue_id=queue_id,
                 page=page,
                 limit=limit,
+                search=search or None,
             )
             return UsersAppointmentsResponse(items=items, total=total, page=page, limit=limit)
         except HTTPException:

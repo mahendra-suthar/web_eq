@@ -53,12 +53,14 @@ async def get_featured_reviews(
 async def get_my_reviews(
     limit: int = Query(10, ge=1, le=50),
     offset: int = Query(0, ge=0),
+    search: str | None = Query(None, max_length=100),
+    rating: int | None = Query(None, ge=1, le=5),
     _: None = Depends(require_roles(["BUSINESS", "EMPLOYEE", "ADMIN"])),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MyReviewsResponse:
     user_type = get_user_type()
-    return ReviewController(db).get_my_reviews(current_user, user_type, limit, offset)
+    return ReviewController(db).get_my_reviews(current_user, user_type, limit, offset, search, rating)
 
 
 @review_router.get("/my_review", response_model=Optional[ReviewData])

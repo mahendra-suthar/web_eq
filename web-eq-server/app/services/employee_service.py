@@ -1,8 +1,9 @@
 import logging
+import math
 from uuid import UUID
 from datetime import timedelta
 from typing import List, Optional, Tuple
-from sqlalchemy import asc, or_
+from sqlalchemy import asc, desc, or_, and_
 from sqlalchemy.orm import Session, load_only, joinedload, selectinload
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
@@ -10,31 +11,151 @@ from fastapi import HTTPException
 from app.models.employee import Employee
 from app.models.business import Business
 from app.models.queue import Queue, QueueService
+from app.models.review import Review
+from app.models.role import Role, UserRoles
 from app.schemas.employee import BusinessEmployeesInput, EmployeeUpdate
-from app.core.utils import generate_invitation_code, now_utc, normalize_email
+from app.core.utils import generate_invitation_code, now_utc, normalize_email, normalize_phone, normalize_country_code
 from app.core.exceptions import handle_integrity_error
 from app.services.schedule_service import ScheduleService
 
 logger = logging.getLogger(__name__)
 
 
+def _describe_duplicate(emp: Employee) -> dict:
+    """Compact dict used in duplicate-error payloads. Avoids leaking row internals."""
+    return {
+        "full_name": emp.full_name,
+        "email": emp.email,
+        "phone_number": emp.phone_number,
+        "country_code": emp.country_code,
+    }
+
+
 class EmployeeService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _find_duplicates(
+        self,
+        business_id: UUID,
+        emails: set,
+        phones: set,
+        user_ids: set,
+        exclude_uuid: Optional[UUID] = None,
+    ) -> List[Employee]:
+        """Return existing employees in this business that match any of the
+        given email/phone/user_id values. Comparison is case-insensitive
+        for email and considers (country_code, phone_number) as a pair."""
+        if not (emails or phones or user_ids):
+            return []
+
+        conditions = []
+        if emails:
+            conditions.append(Employee.email.in_(emails))
+        if phones:
+            phone_conds = [
+                and_(
+                    Employee.phone_number == phone,
+                    (Employee.country_code == cc) if cc else Employee.country_code.is_(None),
+                )
+                for cc, phone in phones
+            ]
+            conditions.extend(phone_conds)
+        if user_ids:
+            conditions.append(Employee.user_id.in_(user_ids))
+
+        query = self.db.query(Employee).filter(
+            Employee.business_id == business_id,
+            or_(*conditions),
+        )
+        if exclude_uuid is not None:
+            query = query.filter(Employee.uuid != exclude_uuid)
+        return query.all()
+
     def add_employees(self, data: BusinessEmployeesInput) -> Tuple[List[Employee], List[str]]:
+        # Normalize incoming data so duplicate detection is consistent
+        # (lowercased emails, trimmed phones, trimmed names).
+        normalized = []
+        for emp in data.employees:
+            normalized.append({
+                "full_name": (emp.full_name or "").strip(),
+                "email": normalize_email(emp.email),
+                "phone_number": normalize_phone(emp.phone_number),
+                "country_code": normalize_country_code(emp.country_code),
+                "profile_picture": emp.profile_picture,
+                "user_id": emp.user_id if emp.user_id else None,
+            })
+
+        # Detect duplicates within the incoming payload itself
+        seen_emails: set = set()
+        seen_phones: set = set()
+        seen_users: set = set()
+        in_payload_dups: List[dict] = []
+        deduped_rows: List[dict] = []
+        for row in normalized:
+            email_key = row["email"]
+            phone_key = (row["country_code"], row["phone_number"]) if row["phone_number"] else None
+            user_key = str(row["user_id"]) if row["user_id"] else None
+            if (
+                (email_key and email_key in seen_emails)
+                or (phone_key and phone_key in seen_phones)
+                or (user_key and user_key in seen_users)
+            ):
+                in_payload_dups.append({
+                    "full_name": row["full_name"],
+                    "email": row["email"],
+                    "phone_number": row["phone_number"],
+                    "country_code": row["country_code"],
+                })
+                continue
+            if email_key:
+                seen_emails.add(email_key)
+            if phone_key:
+                seen_phones.add(phone_key)
+            if user_key:
+                seen_users.add(user_key)
+            deduped_rows.append(row)
+
+        # Detect duplicates against existing rows in the business
+        phone_pairs = {
+            (row["country_code"], row["phone_number"])
+            for row in deduped_rows if row["phone_number"]
+        }
+        existing_matches = self._find_duplicates(
+            business_id=data.business_id,
+            emails=seen_emails,
+            phones=phone_pairs,
+            user_ids={row["user_id"] for row in deduped_rows if row["user_id"]},
+        )
+
+        if existing_matches or in_payload_dups:
+            existing_payload = [_describe_duplicate(e) for e in existing_matches]
+            logger.info(
+                "add_employees blocked %d existing + %d in-payload duplicates (business_id=%s)",
+                len(existing_payload), len(in_payload_dups), data.business_id,
+            )
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "Some employees already exist for this business.",
+                    "error_code": "EMPLOYEE_DUPLICATE",
+                    "existing": existing_payload,
+                    "duplicates_in_request": in_payload_dups,
+                },
+            )
+
         employees = [
             Employee(
                 business_id=data.business_id,
-                full_name=emp.full_name,
-                email=normalize_email(emp.email),
-                phone_number=emp.phone_number,
-                country_code=emp.country_code,
-                profile_picture=emp.profile_picture,
-                user_id=emp.user_id if emp.user_id else None,
-                is_verified=bool(emp.user_id),
+                full_name=row["full_name"],
+                email=row["email"],
+                phone_number=row["phone_number"],
+                country_code=row["country_code"],
+                profile_picture=row["profile_picture"],
+                user_id=row["user_id"],
+                is_verified=bool(row["user_id"]),
             )
-            for emp in data.employees
+            for row in deduped_rows
         ]
 
         try:
@@ -83,11 +204,54 @@ class EmployeeService:
             employee = self.db.query(Employee).filter(Employee.uuid == employee_id).first()
             if not employee:
                 raise ValueError(f"Employee with id {employee_id} not found")
+
             update_data = data.model_dump(exclude_unset=True)
+
+            # Normalize before duplicate check so comparisons match storage.
+            if "email" in update_data:
+                update_data["email"] = normalize_email(update_data["email"])
+            if "phone_number" in update_data:
+                update_data["phone_number"] = normalize_phone(update_data["phone_number"])
+            if "country_code" in update_data:
+                update_data["country_code"] = normalize_country_code(update_data["country_code"])
+            if "full_name" in update_data and update_data["full_name"]:
+                update_data["full_name"] = update_data["full_name"].strip()
+
+            # Pre-check uniqueness within the same business when contact info changes.
+            new_email = update_data.get("email", employee.email)
+            new_phone = update_data.get("phone_number", employee.phone_number)
+            new_country = update_data.get("country_code", employee.country_code)
+
+            emails = {new_email} if new_email and new_email != employee.email else set()
+            phones = (
+                {(new_country, new_phone)}
+                if new_phone and (new_phone != employee.phone_number or new_country != employee.country_code)
+                else set()
+            )
+            if emails or phones:
+                conflicts = self._find_duplicates(
+                    business_id=employee.business_id,
+                    emails=emails,
+                    phones=phones,
+                    user_ids=set(),
+                    exclude_uuid=employee.uuid,
+                )
+                if conflicts:
+                    logger.info(
+                        "update_employee blocked duplicate for employee_id=%s in business_id=%s",
+                        employee_id, employee.business_id,
+                    )
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "message": "Another employee in this business already uses this email or phone.",
+                            "error_code": "EMPLOYEE_DUPLICATE",
+                            "existing": [_describe_duplicate(c) for c in conflicts],
+                        },
+                    )
+
             for field, value in update_data.items():
                 if hasattr(employee, field):
-                    if field == "email":
-                        value = normalize_email(value)
                     setattr(employee, field, value)
             self.db.commit()
             self.db.refresh(employee)
@@ -125,9 +289,11 @@ class EmployeeService:
                     )
                 )
 
+            total: int = query.count()
+            pages: int = math.ceil(total / limit) if total else 1
             offset = (page - 1) * limit
-            query = query.order_by(asc(Employee.created_at))
-            return query.offset(offset).limit(limit).all()
+            items = query.order_by(desc(Employee.created_at)).offset(offset).limit(limit).all()
+            return items, total, pages
 
         except Exception:
             logger.exception("Failed to get_employees (business_id=%s)", business_id)
@@ -284,4 +450,37 @@ class EmployeeService:
         except Exception:
             self.db.rollback()
             logger.exception("Failed to activate_employee (employee_id=%s)", employee_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    def delete_employee(self, employee_id: UUID, business_id: UUID) -> bool:
+        employee = self.get_employee_by_uuid_and_business(employee_id, business_id)
+        if not employee:
+            return False
+
+        user_id = employee.user_id
+        try:
+            self.db.query(Review).filter(Review.employee_id == employee_id).update(
+                {Review.employee_id: None}, synchronize_session=False
+            )
+            self.db.delete(employee)
+
+            if user_id is not None:
+                other_employee_count = (
+                    self.db.query(Employee)
+                    .filter(Employee.user_id == user_id, Employee.uuid != employee_id)
+                    .count()
+                )
+                if other_employee_count == 0:
+                    employee_role = self.db.query(Role).filter(Role.name == "EMPLOYEE").first()
+                    if employee_role:
+                        self.db.query(UserRoles).filter(
+                            UserRoles.user_id == user_id,
+                            UserRoles.role_id == employee_role.uuid,
+                        ).delete(synchronize_session=False)
+
+            self.db.commit()
+            return True
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to delete_employee (employee_id=%s)", employee_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})

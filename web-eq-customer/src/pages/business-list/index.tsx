@@ -21,14 +21,13 @@ export default function BusinessListPage() {
   const [category, setCategory] = useState<CategoryWithServicesData | null>(null);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [categoryLoading, setCategoryLoading] = useState(!!categoryId);
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [businessError, setBusinessError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>("recommended");
 
   const error = categoryError || businessError;
 
-  useScrollReveal([loading || categoryLoading]);
+  useScrollReveal();
 
   useEffect(() => {
     setCategoryError(null);
@@ -39,7 +38,6 @@ export default function BusinessListPage() {
   useEffect(() => {
     if (!categoryId) return;
     let cancelled = false;
-    setCategoryLoading(true);
     (async () => {
       try {
         const svc = new CategoryService();
@@ -47,8 +45,6 @@ export default function BusinessListPage() {
         if (!cancelled) setCategory(found);
       } catch {
         if (!cancelled) setCategoryError(t("bl.failedLoadCategory"));
-      } finally {
-        if (!cancelled) setCategoryLoading(false);
       }
     })();
     return () => { cancelled = true; };

@@ -27,6 +27,48 @@ function isTransientError(error: any): boolean {
   );
 }
 
+// Resolve a user-facing message from an axios error, preferring the backend's
+// {"detail": {"message": ...}} shape, then a string detail, then status/network
+// fallbacks. Never returns the raw "Request failed with status code N" string.
+export function resolveErrorMessage(
+  error: unknown,
+  fallback = "Something went wrong. Please try again."
+): string {
+  if (!axios.isAxiosError(error)) return fallback;
+  const e = error as AxiosError<any>;
+
+  // No response → network/timeout
+  if (!e.response) {
+    if (e.code === "ECONNABORTED") return "The request timed out. Please try again.";
+    return "Can't reach the server. Check your connection and try again.";
+  }
+
+  const detail = e.response.data?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail.trim();
+
+  if (Array.isArray(detail)) {
+    // FastAPI 422 validation: list of {loc, msg, type} or {message} objects.
+    for (const d of detail) {
+      if (typeof d === "string" && d.trim()) return d.trim();
+      const m = (d as { msg?: unknown; message?: unknown })?.msg ??
+        (d as { message?: unknown })?.message;
+      if (typeof m === "string" && m.trim()) return m.trim();
+    }
+  } else if (detail && typeof detail === "object") {
+    const msg = (detail as { message?: unknown }).message;
+    if (typeof msg === "string" && msg.trim()) return msg.trim();
+  }
+
+  const topMsg = (e.response.data as { message?: unknown })?.message;
+  if (typeof topMsg === "string" && topMsg.trim()) return topMsg.trim();
+
+  const status = e.response.status;
+  if (status === 404) return "The requested item was not found.";
+  if (status === 403) return "You don't have permission to do that.";
+  if (status >= 500) return fallback;
+  return fallback;
+}
+
 // Silent refresh with its own transient retry. Returns a fresh token on success,
 // { authFailed: true } only on a real 401/403 (→ log out), or {} on transient
 // failure (→ keep the session; a cold-start must never force a logout).
@@ -168,6 +210,11 @@ class HttpClient {
       } else {
         console.error("Request error:", e.message, e.response?.data);
       }
+      // Normalize a user-friendly message onto error.message so the many call
+      // sites that fall back to `err.message` never surface the raw axios string
+      // ("Request failed with status code 500"). Original axios message is logged
+      // above for debugging.
+      error.message = resolveErrorMessage(e);
     }
     throw error;
   }

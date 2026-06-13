@@ -105,12 +105,14 @@ export class EmployeeService extends HttpClient {
 
     async getEmployees(
         businessId: string, page: number = 1, limit: number = 10, search: string = ""
-    ): Promise<EmployeeResponse[]> {
+    ): Promise<{ items: EmployeeResponse[]; total: number; pages: number; page: number }> {
         try {
             const params = new URLSearchParams({
                 page: page.toString(), limit: limit.toString(), search: search,
             });
-            return await this.get<EmployeeResponse[]>(`/employee/get_employees/${businessId}?${params.toString()}`);
+            return await this.get<{ items: EmployeeResponse[]; total: number; pages: number; page: number }>(
+                `/employee/get_employees/${businessId}?${params.toString()}`
+            );
         } catch (error: any) {
             console.error("Failed to get employees:", error);
             const errorMessage = error?.response?.data?.detail?.message || "Failed to get employees";
@@ -132,6 +134,15 @@ export class EmployeeService extends HttpClient {
             const customError: any = new Error(errorMessage);
             customError.errorCode = error?.response?.data?.detail?.error_code;
             throw customError;
+        }
+    }
+
+    async deleteEmployee(employeeId: string, businessId: string): Promise<void> {
+        try {
+            await this.delete(`/employee/${employeeId}?business_id=${businessId}`);
+        } catch (error: any) {
+            console.error("Failed to delete employee:", error);
+            throw error;
         }
     }
 

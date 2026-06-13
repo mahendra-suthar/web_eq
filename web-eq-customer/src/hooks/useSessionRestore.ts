@@ -14,11 +14,11 @@ import { AuthService } from "../services/auth/auth.service";
  */
 export function useSessionRestore(): void {
   useEffect(() => {
-    // Read state directly — avoids stale closure from reactive selectors,
-    // and skips unnecessary re-renders since this runs only once on mount.
-    const { userInfo, token } = useAuthStore.getState();
+    const { userInfo, token, setSessionRestoring } = useAuthStore.getState();
 
     if (!userInfo?.uuid || token) return;
+
+    setSessionRestoring(true);
 
     new AuthService()
       .refresh()
@@ -28,10 +28,12 @@ export function useSessionRestore(): void {
       .catch((err) => {
         const status = (err as any)?.response?.status;
         if (status === 401 || status === 403) {
-          // Session truly expired — delegate logout + redirect to AuthFailureHandler
           window.dispatchEvent(new Event("auth:unauthorized"));
         }
         // Network/server errors: leave userInfo intact; cookie fallback keeps API calls alive
+      })
+      .finally(() => {
+        useAuthStore.getState().setSessionRestoring(false);
       });
   }, []); // only on mount
 }

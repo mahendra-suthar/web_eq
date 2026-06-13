@@ -20,7 +20,15 @@ export interface MyReviewsResponse {
 }
 
 export class ReviewService extends HttpClient {
-  async getMyReviews(limit = 10, offset = 0): Promise<MyReviewsResponse> {
-    return this.get<MyReviewsResponse>(`/review/my_reviews?limit=${limit}&offset=${offset}`);
+  async getMyReviews(
+    limit = 10,
+    offset = 0,
+    search?: string,
+    rating?: number,
+  ): Promise<MyReviewsResponse> {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (search) params.set('search', search);
+    if (rating !== undefined) params.set('rating', String(rating));
+    return this.get<MyReviewsResponse>(`/review/my_reviews?${params.toString()}`);
   }
 }

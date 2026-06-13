@@ -7,6 +7,7 @@ import axios, {
 } from "axios";
 import { getApiUrl } from '../../configs/config';
 import { useAuthStore } from '../../store/auth.store';
+import { resolveErrorMessage } from '../../utils/util';
 
 type RefreshResult = { token?: string; authFailed?: boolean };
 
@@ -164,13 +165,16 @@ class HttpClient {
   }
 
   private handleError(error: any): never {
-    if (import.meta.env.DEV && axios.isAxiosError(error)) {
+    if (axios.isAxiosError(error)) {
       const e = error as AxiosError;
-      console.error("Axios Error Details:", {
-        message: e.message,
-        code: e.code,
-        response: e.response,
-      });
+      if (import.meta.env.DEV) {
+        console.error("Axios Error Details:", {
+          message: e.message,
+          code: e.code,
+          response: e.response,
+        });
+      }
+      error.message = resolveErrorMessage(e);
     }
     throw error;
   }

@@ -95,6 +95,15 @@ $sh-shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
   flex-wrap: wrap;
 }
 
+.toolbar-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
 .filter-input {
   flex: 1;
   min-width: 180px;

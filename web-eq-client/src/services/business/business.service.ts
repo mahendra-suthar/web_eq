@@ -46,11 +46,17 @@ export interface BusinessData {
   country_code: string;
 }
 
+export interface BreakTimeInput {
+  break_start: string; // HH:MM format
+  break_end: string;   // HH:MM format
+}
+
 export interface ScheduleInput {
   day_of_week: number; // 0-6 (Monday-Sunday)
   opening_time?: string | null; // HH:MM format
   closing_time?: string | null; // HH:MM format
   is_open: boolean;
+  break_times?: BreakTimeInput[];
 }
 
 export interface ScheduleCreateInput {

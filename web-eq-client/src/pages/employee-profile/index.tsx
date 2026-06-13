@@ -194,7 +194,7 @@ const EmployeeProfile = () => {
             .then(setQueueDetail)
             .catch((err: unknown) => {
                 const e = err as { response?: { data?: { detail?: string } }; message?: string };
-                setQueueDetailError(e?.response?.data?.detail || (e?.message as string) || t("failedToLoadQueue") || "Failed to load queue");
+                setQueueDetailError(e?.response?.data?.detail || (e?.message as string) || t("failedToLoadQueue"));
                 setQueueDetail(null);
             })
             .finally(() => setQueueDetailLoading(false));
@@ -207,7 +207,7 @@ const EmployeeProfile = () => {
         setQrError("");
         qrService.getMyEmployeeQR()
             .then((blob: Blob) => setQrObjectUrl(URL.createObjectURL(blob)))
-            .catch(() => setQrError(t("failedToLoad") || "Failed to load QR code."))
+            .catch(() => setQrError(t("failedToLoad")))
             .finally(() => setQrLoading(false));
     }, [activeTab, queueId, qrService, t]);
 
@@ -573,7 +573,7 @@ const EmployeeProfile = () => {
                             </div>
                             <div className="section-content">
                                 {!queueId ? (
-                                    <p className="info-value">{t("noQueueAssigned") || "No queue assigned."}</p>
+                                    <p className="info-value">{t("noQueueAssigned")}</p>
                                 ) : queueDetailLoading ? (
                                     <div className="loading-state" style={{ padding: "1.5rem", textAlign: "center" }}>
                                         {t("loading")}
@@ -605,18 +605,18 @@ const EmployeeProfile = () => {
                                             </div>
                                         </div>
                                         <div className="info-block queue-services-block">
-                                            <h3 className="info-block-title">{t("queueServices") || "Queue services"}</h3>
+                                            <h3 className="info-block-title">{t("queueServices")}</h3>
                                             {!queueDetail.services || queueDetail.services.length === 0 ? (
-                                                <p className="info-value">{t("noServicesAssigned") || "No services assigned to this queue."}</p>
+                                                <p className="info-value">{t("noServicesAssigned")}</p>
                                             ) : (
                                                 <div className="queue-services-table-wrap">
                                                     <table className="data-table queue-services-table">
                                                         <thead>
                                                             <tr>
                                                                 <th>{t("serviceName")}</th>
-                                                                <th>{t("serviceDescription") || "Description"}</th>
+                                                                <th>{t("serviceDescription")}</th>
                                                                 <th>{t("fee")}</th>
-                                                                <th>{t("averageServiceTime") || "Avg. time"}</th>
+                                                                <th>{t("averageServiceTime")}</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -647,7 +647,7 @@ const EmployeeProfile = () => {
                             <div className="section-content">
                                 {!queueId ? (
                                     <p className="info-value">
-                                        {t("noQueueAssigned") || "No queue assigned. Ask your business admin to assign a queue to you."}
+                                        {t("noQueueAssigned")}
                                     </p>
                                 ) : (
                                     <>

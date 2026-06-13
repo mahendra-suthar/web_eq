@@ -7,7 +7,7 @@ import { useQueueWebSocket } from "../../hooks/useQueueWebSocket";
 import { BookingService, type UpcomingAppointmentItem } from "../../services/booking/booking.service";
 import { BusinessService, type BusinessServiceData, type BusinessScheduleInfo } from "../../services/business/business.service";
 import { getNext7Days, getToday, isBusinessClosedOnDate } from "../../utils/booking.utils";
-import { isDateInPast, formatDateDisplay, formatDurationMinutes, formatTimeToDisplay } from "../../utils/util";
+import { isDateInPast, formatDateDisplay, formatDurationMinutes, formatWaitRange, formatTimeToDisplay } from "../../utils/util";
 import { HttpStatus } from "../../utils/constants";
 import { saveBookingReturnState, getBookingReturnState, clearBookingReturnState } from "../../utils/bookingReturnState";
 import "./booking.scss";
@@ -803,7 +803,7 @@ export default function BookingPage() {
                   const isFull = !option.available;
                   const disabled = isFull || isBooked;
                   const tagClass = isBooked ? "bk-tag--booked" : isFull ? "bk-tag--full" : option.is_recommended ? "bk-tag--available" : option.position <= 2 ? "bk-tag--limited" : "bk-tag--available";
-                  const tagLabel = isBooked ? (t("bk.tagBooked") || "Booked") : isFull ? t("bk.tagFull") : option.unavailability_reason === "employee_not_available" ? t("bk.tagNA") : option.is_recommended ? t("bk.tagRecommended") : t("bk.tagAvailable");
+                  const tagLabel = isBooked ? (t("bk.tagBooked")) : isFull ? t("bk.tagFull") : option.unavailability_reason === "employee_not_available" ? t("bk.tagNA") : option.is_recommended ? t("bk.tagRecommended") : t("bk.tagAvailable");
                   return (
                     <div
                       key={option.queue_id}
@@ -823,11 +823,11 @@ export default function BookingPage() {
                           <div className="bk-queue-booked-line">
                             {(option.your_position ?? 1) === 1 ? (
                               <span className="bk-queue-booked-pos bk-queue-booked-pos--next">
-                                ⚡ #1 · {t("bk.nextUp") || "Next up"}
+                                ⚡ #1 · {t("bk.nextUp")}
                               </span>
                             ) : (
                               <span className="bk-queue-booked-pos">
-                                #{option.your_position} {t("bk.inLine") || "in line"}
+                                #{option.your_position} {t("bk.inLine")}
                               </span>
                             )}
                             {option.your_appointment_time && (
@@ -841,7 +841,7 @@ export default function BookingPage() {
                             className="bk-queue-booked-btn"
                             onClick={(e) => { e.stopPropagation(); navigate("/profile?tab=appointments"); }}
                           >
-                            {t("bk.viewMyAppointment") || "View my appointment"} →
+                            {t("bk.viewMyAppointment")} →
                           </button>
                         </div>
                       ) : option.unavailability_reason === "employee_not_available" ? (
@@ -856,7 +856,7 @@ export default function BookingPage() {
                           <div className="bk-q-stat">
                             <div className="bk-q-stat-label">{t("bk.statEstWait")}</div>
                             <div className="bk-q-stat-value">{formatDurationMinutes(option.estimated_wait_minutes)}</div>
-                            {option.estimated_wait_range && <div className="bk-q-stat-sub">{option.estimated_wait_range}</div>}
+                            {option.estimated_wait_range && <div className="bk-q-stat-sub">{formatWaitRange(option.estimated_wait_range)}</div>}
                           </div>
                           <div className="bk-q-stat bk-q-stat--full">
                             <div className="bk-q-stat-label">{t("bk.statExpectedAt")}</div>
@@ -1146,7 +1146,7 @@ export default function BookingPage() {
                 <span className="bk-modal-label">{t("bk.statEstWait")}</span>
                 <span className="bk-modal-value">
                   {formatDurationMinutes(alreadyInQueueData.estimated_wait_minutes)}
-                  {alreadyInQueueData.estimated_wait_range && <span className="bk-modal-range"> ({alreadyInQueueData.estimated_wait_range})</span>}
+                  {alreadyInQueueData.estimated_wait_range && <span className="bk-modal-range"> ({formatWaitRange(alreadyInQueueData.estimated_wait_range)})</span>}
                 </span>
               </div>
               <div className="bk-modal-row"><span className="bk-modal-label">{t("bk.statExpectedAt")}</span><span className="bk-modal-value">{formatTimeToDisplay(alreadyInQueueData.estimated_appointment_time)}</span></div>

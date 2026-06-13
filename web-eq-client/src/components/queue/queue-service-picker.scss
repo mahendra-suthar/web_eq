@@ -1,0 +1,97 @@
+.queue-service-picker {
+    .queue-service-picker__select {
+        width: 100%;
+        max-width: 320px;
+    }
+
+    .form-input.small {
+        width: 110px;
+        flex-shrink: 0;
+    }
+
+    .selected-services-list {
+        list-style: none;
+        padding: 0;
+        margin: 12px 0 0 0;
+    }
+
+    .selected-service-item {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 10px 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        transition: border-color 0.15s;
+
+        &--error {
+            border-color: #fca5a5;
+            background: #fff8f8;
+        }
+
+        .service-item-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .service-name {
+            flex: 1;
+            min-width: 120px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #1e293b;
+        }
+
+        .service-item-error {
+            font-size: 12px;
+            color: #dc2626;
+            margin: 0;
+            padding: 0 2px;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            border: none;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 13px;
+            white-space: nowrap;
+
+            &:hover:not(:disabled) {
+                color: #dc2626;
+            }
+
+            &:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+        }
+    }
+
+    @media (max-width: 600px) {
+        .queue-service-picker__select {
+            max-width: 100%;
+        }
+
+        .selected-service-item {
+            .service-item-row {
+                gap: 8px;
+                row-gap: 8px;
+
+                .service-name {
+                    flex: 0 0 100%;
+                }
+
+                .form-input.small {
+                    flex: 1;
+                    width: auto;
+                    min-width: 0;
+                }
+            }
+        }
+    }
+}

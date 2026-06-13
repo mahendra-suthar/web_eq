@@ -10,7 +10,7 @@ from app.controllers.queue_controller import QueueController
 from app.schemas.queue import (
     QueueCreate, QueueCreateBatch, QueueData, QueueDetailData, QueueServiceDetailData,
     QueueUpdate, QueueServicesAdd, QueueServiceUpdate,
-    QueueUserData, QueueUserDetailResponse,
+    QueueUserData, QueueUserDetailResponse, QueueUsersPageResponse,
     AvailableSlotData, BookingCreateInput, BookingData, BookingPreviewData,
     LiveQueueData,
     SlotsListResponse,
@@ -55,6 +55,16 @@ async def update_queue(
     return await controller.update_queue(queue_id, business_id, payload)
 
 
+@queue_router.delete(
+    "/{queue_id}",
+    dependencies=[Depends(require_roles(["BUSINESS"]))],
+)
+async def delete_queue(queue_id: UUID, business_id: UUID, db: Session = Depends(get_db)):
+    controller = QueueController(db)
+    await controller.delete_queue(queue_id, business_id)
+    return {"success": True}
+
+
 @queue_router.post("/add_services_to_queue/{queue_id}", response_model=List[QueueServiceDetailData])
 async def add_services_to_queue(
     queue_id: UUID, business_id: UUID, payload: QueueServicesAdd, db: Session = Depends(get_db),
@@ -90,11 +100,12 @@ async def get_business_services(business_id: UUID, db: Session = Depends(get_db)
     return await controller.get_business_services(business_id)
 
 
-@queue_router.get("/get_users", response_model=List[QueueUserData])
+@queue_router.get("/get_users", response_model=QueueUsersPageResponse)
 async def get_queue_users(
     business_id: UUID | None = None,
     queue_id: UUID | None = None,
     employee_id: UUID | None = None,
+    status: int | None = None,
     page: int = 1,
     limit: int = 10,
     search: str | None = None,
@@ -105,6 +116,7 @@ async def get_queue_users(
         business_id=business_id,
         queue_id=queue_id,
         employee_id=employee_id,
+        status=status,
         page=page,
         limit=limit,
         search=search,

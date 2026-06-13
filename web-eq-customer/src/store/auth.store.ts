@@ -23,24 +23,39 @@ interface AuthState {
   userInfo: UserInfo | null;
   profileType: string | null;
   token: string | null;
+  sessionRestoring: boolean;
 
   setUserInfo: (info: UserInfo) => void;
   setProfileType: (type: string | null) => void;
   setToken: (token: string | null) => void;
+  setSessionRestoring: (restoring: boolean) => void;
   isAuthenticated: () => boolean;
   resetUser: () => void;
 }
 
 const TOKEN_SS_KEY = 'eq_customer_token';
 
+function computeInitialSessionRestoring(): boolean {
+  try {
+    const raw = localStorage.getItem("web-eq-customer-user");
+    if (!raw) return false;
+    const userUuid = JSON.parse(raw)?.state?.userInfo?.uuid;
+    if (!userUuid) return false;
+    return !sessionStorage.getItem(TOKEN_SS_KEY);
+  } catch {
+    return false;
+  }
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       userInfo: null,
       profileType: null,
-      // Bootstrap token from sessionStorage so it survives page reloads
       token: sessionStorage.getItem(TOKEN_SS_KEY) ?? null,
+      sessionRestoring: computeInitialSessionRestoring(),
 
+      setSessionRestoring: (restoring) => set({ sessionRestoring: restoring }),
       setToken: (token) => {
         if (token) sessionStorage.setItem(TOKEN_SS_KEY, token);
         else sessionStorage.removeItem(TOKEN_SS_KEY);
@@ -64,7 +79,7 @@ export const useAuthStore = create<AuthState>()(
 
       resetUser: () => {
         sessionStorage.removeItem(TOKEN_SS_KEY);
-        set({ userInfo: null, profileType: null, token: null });
+        set({ userInfo: null, profileType: null, token: null, sessionRestoring: false });
       },
     }),
     {
