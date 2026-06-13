@@ -86,6 +86,27 @@
 
     // Queue service picker styles live in the shared QueueServicePicker component.
 
+    @media (max-width: 600px) {
+        .form-block {
+            .form-select {
+                max-width: 100%;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-actions {
+            flex-wrap: wrap;
+
+            .btn {
+                flex: 1;
+                text-align: center;
+            }
+        }
+    }
+
     .form-actions {
         display: flex;
         gap: 12px;
