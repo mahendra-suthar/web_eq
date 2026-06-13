@@ -85,15 +85,21 @@ class BusinessService:
             raise
 
     def update_registration_state(
-        self, business_id: UUID, *, current_step: Optional[int] = None, status: Optional[int] = None, 
+        self, business_id: UUID, *, current_step: Optional[int] = None, status: Optional[int] = None,
         is_always_open: Optional[bool] = None
     ) -> None:
         updates: dict = {}
         if current_step is not None: updates["current_step"] = current_step
-        if status is not None: updates["status"] = status
         if is_always_open is not None: updates["is_always_open"] = is_always_open
-        if not updates: return
-        self.db.query(Business).filter(Business.uuid == business_id).update(updates)
+        if updates:
+            self.db.query(Business).filter(Business.uuid == business_id).update(updates)
+        if status is not None:
+            self.db.query(Business).filter(
+                Business.uuid == business_id,
+                Business.status < status,
+            ).update({"status": status})
+        if not updates and status is None:
+            return
         try:
             self.db.commit()
         except Exception:

@@ -750,14 +750,15 @@ class QueueService:
                 {Employee.queue_id: None}, synchronize_session=False
             )
 
-            # Remove children with no DB-level cascade (each cascades its own
-            # QueueUserService rows). AppointmentSlots cascade on queue delete.
             self.db.query(QueueServiceModel).filter(
                 QueueServiceModel.queue_id == queue_id
             ).delete(synchronize_session=False)
             self.db.query(QueueUser).filter(QueueUser.queue_id == queue_id).delete(
                 synchronize_session=False
             )
+            self.db.query(AppointmentSlot).filter(
+                AppointmentSlot.queue_id == queue_id
+            ).delete(synchronize_session=False)
 
             self.db.delete(queue)
             self.db.commit()

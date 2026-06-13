@@ -400,7 +400,10 @@ const QueueDetail = () => {
                                                 disabled={savingQueue}
                                             />
                                         </div>
-                                        <p className="form-hint">{t("slotDurationHint")}</p>
+                                        <div className="queue-slot-hint">
+                                            <span className="queue-slot-hint__icon">ℹ</span>
+                                            {t("slotDurationHint")}
+                                        </div>
                                     </>
                                 )}
                             </div>
@@ -501,11 +504,11 @@ const QueueDetail = () => {
                                     <tbody>
                                         {services.map((svc) => (
                                             <tr key={svc.uuid}>
-                                                <td>{svc.service_name ?? t("notAvailable")}</td>
-                                                <td>{svc.description ?? t("notAvailable")}</td>
+                                                <td data-label={t("serviceName")}>{svc.service_name ?? t("notAvailable")}</td>
+                                                <td data-label={t("serviceDescription")}>{svc.description ?? t("notAvailable")}</td>
                                                 {editingServiceId === svc.uuid ? (
                                                     <>
-                                                        <td>
+                                                        <td data-label={t("fee")}>
                                                             {editServiceError && (
                                                                 <div className="edit-service-error-inline" role="alert">{editServiceError}</div>
                                                             )}
@@ -523,7 +526,7 @@ const QueueDetail = () => {
                                                                 placeholder={t("fee")}
                                                             />
                                                         </td>
-                                                        <td>
+                                                        <td data-label={t("averageServiceTime")}>
                                                             <input
                                                                 type="number"
                                                                 className="form-input small"
@@ -537,7 +540,7 @@ const QueueDetail = () => {
                                                                 placeholder={t("minutes")}
                                                             />
                                                         </td>
-                                                        <td>
+                                                        <td data-label={t("actions")}>
                                                             <div className="svc-edit-actions">
                                                                 <button type="button" className="btn btn-primary btn-sm" onClick={() => handleUpdateService(svc)} disabled={savingService}>
                                                                     {t("save")}
@@ -550,9 +553,9 @@ const QueueDetail = () => {
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <td>{svc.service_fee != null ? String(svc.service_fee) : t("notAvailable")}</td>
-                                                        <td>{svc.avg_service_time != null ? formatDurationMinutes(svc.avg_service_time) : t("notAvailable")}</td>
-                                                        <td>
+                                                        <td data-label={t("fee")}>{svc.service_fee != null ? String(svc.service_fee) : t("notAvailable")}</td>
+                                                        <td data-label={t("averageServiceTime")}>{svc.avg_service_time != null ? formatDurationMinutes(svc.avg_service_time) : t("notAvailable")}</td>
+                                                        <td data-label={t("actions")}>
                                                             <button
                                                                 type="button"
                                                                 className="btn btn-ghost btn-sm"

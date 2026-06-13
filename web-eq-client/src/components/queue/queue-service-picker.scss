@@ -1,10 +1,12 @@
 .queue-service-picker {
     .queue-service-picker__select {
+        width: 100%;
         max-width: 320px;
     }
 
     .form-input.small {
         width: 110px;
+        flex-shrink: 0;
     }
 
     .selected-services-list {
@@ -32,13 +34,13 @@
         .service-item-row {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
             flex-wrap: wrap;
         }
 
         .service-name {
             flex: 1;
-            min-width: 100px;
+            min-width: 120px;
             font-size: 14px;
             font-weight: 500;
             color: #1e293b;
@@ -57,6 +59,7 @@
             color: #64748b;
             cursor: pointer;
             font-size: 13px;
+            white-space: nowrap;
 
             &:hover:not(:disabled) {
                 color: #dc2626;
@@ -65,6 +68,29 @@
             &:disabled {
                 opacity: 0.6;
                 cursor: not-allowed;
+            }
+        }
+    }
+
+    @media (max-width: 600px) {
+        .queue-service-picker__select {
+            max-width: 100%;
+        }
+
+        .selected-service-item {
+            .service-item-row {
+                gap: 8px;
+                row-gap: 8px;
+
+                .service-name {
+                    flex: 0 0 100%;
+                }
+
+                .form-input.small {
+                    flex: 1;
+                    width: auto;
+                    min-width: 0;
+                }
             }
         }
     }
