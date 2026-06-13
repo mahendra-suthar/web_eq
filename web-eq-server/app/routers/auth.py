@@ -128,9 +128,6 @@ async def refresh_business_token(request: Request, response: Response, db: Sessi
 
 
 @auth_router.post("/logout", status_code=204)
-async def logout(request: Request, response: Response):
-    """Clear the auth cookie for whichever app type is calling (customer or business/employee)."""
-    if request.cookies.get("customer_access_token"):
-        response.delete_cookie(key="customer_access_token", path="/")
-    if request.cookies.get("access_token"):
-        response.delete_cookie(key="access_token", path="/")
+async def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Clear only the calling app's auth cookie (customer or business/admin)."""
+    await AuthController(db).logout(request, response)

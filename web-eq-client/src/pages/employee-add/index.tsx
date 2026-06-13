@@ -26,6 +26,14 @@ function validate(values: EmployeeOverviewValues, t: (key: string) => string): E
     if (values.email?.trim() && !emailRegex.test(values.email.trim())) {
         errors.email = t("emailInvalid");
     }
+    const phone = values.phoneNumber?.trim();
+    if (phone) {
+        if (!/^\d{10}$/.test(phone)) {
+            errors.phoneNumber = t("employeePhoneInvalid");
+        } else if (!values.countryCode?.trim()) {
+            errors.countryCode = t("countryCodeRequired");
+        }
+    }
     return errors;
 }
 

@@ -18,6 +18,8 @@ export const Permission = {
   VIEW_BUSINESS_PROFILE: "VIEW_BUSINESS_PROFILE",
   VIEW_EMPLOYEE_PROFILE: "VIEW_EMPLOYEE_PROFILE",
   VIEW_REVIEWS: "VIEW_REVIEWS",
+  DELETE_EMPLOYEE: "DELETE_EMPLOYEE",
+  DELETE_QUEUE: "DELETE_QUEUE",
   // Super Admin panel
   VIEW_SUPER_ADMIN: "VIEW_SUPER_ADMIN",
   MANAGE_CATEGORIES: "MANAGE_CATEGORIES",
@@ -40,6 +42,8 @@ export const ROLE_PERMISSIONS: Record<PermissionKey, ProfileType[]> = {
   [Permission.VIEW_BUSINESS_PROFILE]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   [Permission.VIEW_EMPLOYEE_PROFILE]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
   [Permission.VIEW_REVIEWS]: [ProfileType.BUSINESS, ProfileType.EMPLOYEE],
+  [Permission.DELETE_EMPLOYEE]: [ProfileType.BUSINESS],
+  [Permission.DELETE_QUEUE]: [ProfileType.BUSINESS],
   // Super Admin
   [Permission.VIEW_SUPER_ADMIN]: [ProfileType.ADMIN],
   [Permission.MANAGE_CATEGORIES]: [ProfileType.ADMIN],

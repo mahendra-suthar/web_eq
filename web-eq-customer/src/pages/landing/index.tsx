@@ -26,6 +26,7 @@ import { getCategoryEmoji } from "../../utils/category-emoji";
 import { useScrollReveal } from "../../hooks/useScrollReveal";
 import {
   formatDurationMinutes,
+  formatWaitRange,
   formatAppointmentTimeSummary,
   formatDelayMessage,
   getApiErrorMessage,
@@ -583,7 +584,7 @@ export default function LandingPage() {
                               <div className="lp-today-stat">
                                 <span className="lp-today-stat-label">{t("landing.todayEstWait")}</span>
                                 <span className="lp-today-stat-value">{formatDurationMinutes(appt.estimated_wait_minutes)}</span>
-                                {appt.estimated_wait_range && <span className="lp-today-stat-sub">{appt.estimated_wait_range}</span>}
+                                {appt.estimated_wait_range && <span className="lp-today-stat-sub">{formatWaitRange(appt.estimated_wait_range)}</span>}
                               </div>
                             )}
                             {timeSummary && (

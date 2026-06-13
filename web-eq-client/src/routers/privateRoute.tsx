@@ -13,7 +13,11 @@ interface PrivateRouteProps {
  */
 export function PrivateRoute({ children }: PrivateRouteProps) {
   const location = useLocation();
-  const { isAuthenticated, canAccessDashboard, nextStep, getProfileType, resetUser } = useUserStore();
+  const { isAuthenticated, canAccessDashboard, nextStep, getProfileType, resetUser, sessionRestoring } = useUserStore();
+
+  if (sessionRestoring) {
+    return <div className="session-restoring" />;
+  }
 
   if (!isAuthenticated()) {
     return <Navigate to={ROUTERS_PATH.SENDOTP} state={{ from: location }} replace />;

@@ -137,6 +137,15 @@ export class EmployeeService extends HttpClient {
         }
     }
 
+    async deleteEmployee(employeeId: string, businessId: string): Promise<void> {
+        try {
+            await this.delete(`/employee/${employeeId}?business_id=${businessId}`);
+        } catch (error: any) {
+            console.error("Failed to delete employee:", error);
+            throw error;
+        }
+    }
+
     /**
      * Verify employee invitation code. After verification, backend returns next_step = dashboard.
      */

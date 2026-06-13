@@ -55,6 +55,16 @@ async def update_queue(
     return await controller.update_queue(queue_id, business_id, payload)
 
 
+@queue_router.delete(
+    "/{queue_id}",
+    dependencies=[Depends(require_roles(["BUSINESS"]))],
+)
+async def delete_queue(queue_id: UUID, business_id: UUID, db: Session = Depends(get_db)):
+    controller = QueueController(db)
+    await controller.delete_queue(queue_id, business_id)
+    return {"success": True}
+
+
 @queue_router.post("/add_services_to_queue/{queue_id}", response_model=List[QueueServiceDetailData])
 async def add_services_to_queue(
     queue_id: UUID, business_id: UUID, payload: QueueServicesAdd, db: Session = Depends(get_db),

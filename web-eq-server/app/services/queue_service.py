@@ -14,6 +14,7 @@ from app.models.service import Service
 from app.models.employee import Employee
 from app.models.user import User
 from app.models.business import Business
+from app.models.review import Review
 from app.schemas.queue import (
     QueueCreate,
     QueueCreateItem,
@@ -705,6 +706,65 @@ class QueueService:
             )
         except Exception:
             logger.exception("Failed to get_queue_by_id_and_business (queue_id=%s business_id=%s)", queue_id, business_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
+    def delete_queue(self, queue_id: UUID, business_id: UUID) -> bool:
+        queue = self.get_queue_by_id_and_business(queue_id, business_id)
+        if not queue:
+            return False
+
+        active_count = (
+            self.db.query(func.count(QueueUser.uuid))
+            .filter(
+                QueueUser.queue_id == queue_id,
+                QueueUser.status.in_(
+                    [QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_SCHEDULED]
+                ),
+            )
+            .scalar()
+            or 0
+        )
+        if active_count > 0:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": (
+                        f"Cannot delete this queue, {active_count} customer(s) are still active. "
+                        "Clear or cancel them from Live Queue first."
+                    )
+                },
+            )
+
+        try:
+            # Preserve reviews: unlink from the queue and its queue-users.
+            queue_user_ids = select(QueueUser.uuid).where(QueueUser.queue_id == queue_id)
+            self.db.query(Review).filter(Review.queue_id == queue_id).update(
+                {Review.queue_id: None}, synchronize_session=False
+            )
+            self.db.query(Review).filter(Review.queue_user_id.in_(queue_user_ids)).update(
+                {Review.queue_user_id: None}, synchronize_session=False
+            )
+
+            # Unassign employees (Employee.queue_id has no cascade — FK would block).
+            self.db.query(Employee).filter(Employee.queue_id == queue_id).update(
+                {Employee.queue_id: None}, synchronize_session=False
+            )
+
+            # Remove children with no DB-level cascade (each cascades its own
+            # QueueUserService rows). AppointmentSlots cascade on queue delete.
+            self.db.query(QueueServiceModel).filter(
+                QueueServiceModel.queue_id == queue_id
+            ).delete(synchronize_session=False)
+            self.db.query(QueueUser).filter(QueueUser.queue_id == queue_id).delete(
+                synchronize_session=False
+            )
+
+            self.db.delete(queue)
+            self.db.commit()
+            return True
+        except Exception:
+            self.db.rollback()
+            logger.exception("Failed to delete_queue (queue_id=%s)", queue_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
     def get_queue_service_avg_times(self, queue_id: UUID) -> List[int]:

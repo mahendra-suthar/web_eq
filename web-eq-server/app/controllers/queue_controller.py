@@ -200,6 +200,17 @@ class QueueController:
             logger.exception("Failed to delete_queue_service (queue_service_id=%s)", queue_service_id)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
+    async def delete_queue(self, queue_id: UUID, business_id: UUID) -> None:
+        try:
+            ok = self.queue_service.delete_queue(queue_id, business_id)
+            if not ok:
+                raise HTTPException(status_code=404, detail={"message": "Queue not found"})
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Failed to delete_queue (queue_id=%s)", queue_id)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
     async def get_queue_user_detail(self, queue_user_id: UUID) -> QueueUserDetailResponse:
         try:
             queue_user = self.queue_service.get_queue_user_by_id_with_relations(queue_user_id)
