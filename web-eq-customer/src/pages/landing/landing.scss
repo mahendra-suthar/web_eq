@@ -1175,9 +1175,23 @@
 .lp-super-tabs {
   display: flex;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 40px;
   flex-wrap: wrap;
+
+  // Horizontal scroll strip on tablet/mobile — adapts to any number of categories
+  @media (max-width: $breakpoint-lg) {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;       // Firefox
+    padding-bottom: 8px;         // keep box-shadow from clipping
+    margin-bottom: 32px;
+
+    &::-webkit-scrollbar { display: none; }  // Chrome/Safari
+  }
 }
 
 // Color palette: 0=forest, 1=beauty-rose, 2=gold, 3=jade
@@ -1202,8 +1216,16 @@ $_tab-colors: (
   font-weight: 500;
   cursor: pointer;
   transition: all 0.28s cubic-bezier(0.34, 1.3, 0.64, 1);
+  flex-shrink: 0;            // never compress chips inside the scroll strip
+  scroll-snap-align: start;  // snap each chip to the left edge on scroll
 
   &:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(14, 74, 53, 0.1); }
+
+  @media (max-width: $breakpoint-lg) {
+    padding: 10px 18px;
+    font-size: 13px;
+    &__icon { font-size: 18px; }
+  }
 
   &__icon { font-size: 20px; line-height: 1; }
   &__label { white-space: nowrap; }
@@ -1497,8 +1519,9 @@ $_tab-colors: (
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   }
 
-  @media (max-width: $breakpoint-sm) {
+  @media (max-width: $breakpoint-md) {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
 }
 
