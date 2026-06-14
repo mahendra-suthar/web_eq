@@ -278,3 +278,47 @@
     &:hover { background: var(--foam); transform: none; box-shadow: none; }
   }
 }
+
+// ── Responsive ──────────────────────────────────────────────────────────────────
+// The card lives in fluid grids that can squeeze it to ~240px on phones. Scale the
+// type/image down a touch on small screens, and (critically) let the footer stack
+// so the price and CTA can never collide or overflow on the narrowest devices.
+@media (max-width: $breakpoint-lg) {
+  .biz-card { border-radius: 18px; }
+
+  .biz-card-img { height: 162px; }
+  .biz-card-img-letter { font-size: 56px !important; }
+
+  .biz-card-name { font-size: 17px !important; }
+
+  .biz-card-body { padding: 14px 16px 16px; }
+
+  .biz-card-price-value { font-size: 19px !important; }
+}
+
+@media (max-width: $breakpoint-md) {
+  // Cards are full-width (single column) here — give the image a bit more presence
+  // and drop the CTA to its own full-width row for a large, thumb-friendly target.
+  .biz-card-img { height: 172px; }
+
+  .biz-card-footer {
+    flex-wrap: wrap;
+    row-gap: 12px;
+  }
+
+  .biz-card-price { flex: 1 1 100%; }
+
+  .biz-card-book-btn {
+    flex: 1 0 100%;
+    padding: 12px 18px;
+    text-align: center;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: $breakpoint-sm) {
+  .biz-card-img { height: 156px; }
+  .biz-card-img-bottom { padding: 12px 14px; }
+  .biz-card-name { font-size: 16px !important; }
+  .biz-card-body { padding: 13px 14px 15px; gap: 7px; }
+}

@@ -68,6 +68,7 @@ export default function LandingPage() {
 
   const howItWorksRef = useRef<HTMLElement>(null);
   const categoriesRef = useRef<HTMLElement>(null);
+  const tabsScrollRef = useRef<HTMLDivElement>(null);
 
   const [categoryRoots, setCategoryRoots] = useState<CategoryTreeNode[]>([]);
   const [parentsLoading, setParentsLoading] = useState(true);
@@ -135,6 +136,14 @@ export default function LandingPage() {
     title: t(`landing.step${i + 1}Title`),
     desc:  t(`landing.step${i + 1}Desc`),
   })), [t]);
+
+  // Scroll the active category tab into view whenever the selection changes.
+  useEffect(() => {
+    const container = tabsScrollRef.current;
+    if (!container) return;
+    const active = container.querySelector<HTMLElement>('[aria-selected="true"]');
+    active?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+  }, [activeSuperTab]);
 
   useScrollReveal();
   const fetchCategoryTree = useCallback(async () => {
@@ -760,7 +769,7 @@ export default function LandingPage() {
           {!parentsLoading && !parentsError && categoryRoots.length > 0 && (
             <>
               {/* Parent category tabs */}
-              <div className="lp-super-tabs" role="tablist" aria-label="Category groups">
+              <div className="lp-super-tabs" role="tablist" aria-label="Category groups" ref={tabsScrollRef}>
                 {categoryRoots.map((cat, idx) => (
                   <button
                     key={cat.uuid}
