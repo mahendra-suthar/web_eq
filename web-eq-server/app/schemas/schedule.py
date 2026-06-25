@@ -4,6 +4,7 @@ from datetime import time, date
 from uuid import UUID
 
 from app.models.schedule import Schedule
+from app.core.constants import LEAVE_STATUS_PENDING, LEAVE_STATUS_APPROVED
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -149,12 +150,13 @@ class ScheduleData(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ScheduleExceptionCreate(BaseModel):
-    """Create a date-specific override for a schedule (holiday, special hours)."""
+    """Create a date-specific override for a schedule (leave, holiday, special hours)."""
     schedule_id: UUID
     exception_date: date
     special_opening_time: Optional[time] = None
     special_closing_time: Optional[time] = None
     is_closed: bool = False
+    reason: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_special_times(self):
@@ -165,6 +167,129 @@ class ScheduleExceptionCreate(BaseModel):
         return self
 
 
+class ScheduleExceptionByDateCreate(BaseModel):
+    """Create an exception by entity + date. The server resolves the correct
+    weekday schedule row, so callers don't need to know the schedule_id (and
+    can't get it wrong via a client-side weekday calculation)."""
+    entity_id: UUID
+    entity_type: str
+    exception_date: date
+    special_opening_time: Optional[time] = None
+    special_closing_time: Optional[time] = None
+    is_closed: bool = False
+    reason: Optional[str] = None
+
+    @field_validator("entity_type")
+    @classmethod
+    def validate_entity_type(cls, v: str) -> str:
+        if v.upper() not in ["BUSINESS", "EMPLOYEE"]:
+            raise ValueError("entity_type must be either 'BUSINESS' or 'EMPLOYEE'")
+        return v.upper()
+
+    @model_validator(mode="after")
+    def validate_special_times(self):
+        if not self.is_closed:
+            if self.special_opening_time and self.special_closing_time:
+                if self.special_opening_time >= self.special_closing_time:
+                    raise ValueError("special_opening_time must be before special_closing_time")
+        return self
+
+
+class ScheduleExceptionRangeCreate(BaseModel):
+    """Create leave across a date range (one row per working day, sharing a group).
+
+    Resolves each day's schedule row server-side. is_closed=True → full-day off;
+    otherwise special_opening_time/closing_time set custom hours for each day.
+    """
+    entity_id: UUID
+    entity_type: str
+    start_date: date
+    end_date: date
+    is_closed: bool = False
+    special_opening_time: Optional[time] = None
+    special_closing_time: Optional[time] = None
+    reason: str
+
+    @field_validator("entity_type")
+    @classmethod
+    def validate_entity_type(cls, v: str) -> str:
+        if v.upper() not in ["BUSINESS", "EMPLOYEE"]:
+            raise ValueError("entity_type must be either 'BUSINESS' or 'EMPLOYEE'")
+        return v.upper()
+
+    @field_validator("reason")
+    @classmethod
+    def validate_reason(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("A reason is required")
+        return v[:120]
+
+    @model_validator(mode="after")
+    def validate_range(self):
+        if self.end_date < self.start_date:
+            raise ValueError("end_date must be on or after start_date")
+        if (self.end_date - self.start_date).days > 92:
+            raise ValueError("Leave range cannot exceed 92 days")
+        if not self.is_closed and self.special_opening_time and self.special_closing_time:
+            if self.special_opening_time >= self.special_closing_time:
+                raise ValueError("special_opening_time must be before special_closing_time")
+        return self
+
+
+class LeaveBatchResult(BaseModel):
+    """Outcome of a range create: which dates were created and which were skipped."""
+    leave_group_id: str
+    status: str
+    created: List[date] = []
+    skipped_non_working: List[date] = []
+    skipped_existing: List[date] = []
+    skipped_booked: List[date] = []
+
+
+class ScheduleExceptionReview(BaseModel):
+    """Business approves or rejects a pending leave/exception request."""
+    approve: bool
+
+
+class PendingLeaveData(BaseModel):
+    """A pending leave request enriched with the requesting employee's identity,
+    for the business approval inbox."""
+    uuid: str
+    schedule_id: str
+    employee_id: str
+    employee_name: str
+    exception_date: date
+    is_closed: bool
+    special_opening_time: Optional[str] = None
+    special_closing_time: Optional[str] = None
+    reason: Optional[str] = None
+    status: str
+    created_by_role: Optional[str] = None
+    leave_group_id: Optional[str] = None
+
+    @classmethod
+    def from_row(cls, exc, employee) -> "PendingLeaveData":
+        def _fmt(t) -> Optional[str]:
+            return t.strftime("%H:%M") if t else None
+
+        group_id = getattr(exc, "leave_group_id", None)
+        return cls(
+            uuid=str(exc.uuid),
+            schedule_id=str(exc.schedule_id),
+            employee_id=str(employee.uuid),
+            employee_name=employee.full_name,
+            exception_date=exc.exception_date,
+            is_closed=bool(exc.is_closed),
+            special_opening_time=_fmt(exc.special_opening_time),
+            special_closing_time=_fmt(exc.special_closing_time),
+            reason=getattr(exc, "reason", None),
+            status=getattr(exc, "status", None) or LEAVE_STATUS_PENDING,
+            created_by_role=getattr(exc, "created_by_role", None),
+            leave_group_id=str(group_id) if group_id else None,
+        )
+
+
 class ScheduleExceptionData(BaseModel):
     """Schedule exception row returned from the API."""
     uuid: str
@@ -173,12 +298,19 @@ class ScheduleExceptionData(BaseModel):
     special_opening_time: Optional[str] = None
     special_closing_time: Optional[str] = None
     is_closed: bool
+    status: str
+    created_by_role: Optional[str] = None
+    reason: Optional[str] = None
+    reviewed_at: Optional[str] = None
+    leave_group_id: Optional[str] = None
 
     @classmethod
     def from_orm(cls, obj) -> "ScheduleExceptionData":
         def _fmt(t) -> Optional[str]:
             return t.strftime("%H:%M") if t else None
 
+        reviewed_at = getattr(obj, "reviewed_at", None)
+        group_id = getattr(obj, "leave_group_id", None)
         return cls(
             uuid=str(obj.uuid),
             schedule_id=str(obj.schedule_id),
@@ -186,6 +318,11 @@ class ScheduleExceptionData(BaseModel):
             special_opening_time=_fmt(obj.special_opening_time),
             special_closing_time=_fmt(obj.special_closing_time),
             is_closed=bool(obj.is_closed),
+            status=getattr(obj, "status", None) or LEAVE_STATUS_APPROVED,
+            created_by_role=getattr(obj, "created_by_role", None),
+            reason=getattr(obj, "reason", None),
+            reviewed_at=reviewed_at.isoformat() if reviewed_at else None,
+            leave_group_id=str(group_id) if group_id else None,
         )
 
     class Config:

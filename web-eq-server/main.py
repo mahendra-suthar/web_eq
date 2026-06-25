@@ -32,6 +32,27 @@ Base.metadata.create_all(bind=engine)
 logger = logging.getLogger(__name__)
 
 
+def run_schema_upgrades() -> None:
+    """Idempotent additive schema tweaks that create_all can't apply to existing
+    tables (it only creates missing tables). Safe to run on every startup."""
+    from sqlalchemy import text
+    statements = [
+        "ALTER TABLE schedule_exceptions ADD COLUMN IF NOT EXISTS leave_group_id UUID",
+        "CREATE INDEX IF NOT EXISTS ix_schedule_exceptions_leave_group_id "
+        "ON schedule_exceptions (leave_group_id)",
+    ]
+    db = SessionLocal()
+    try:
+        for stmt in statements:
+            db.execute(text(stmt))
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Schema upgrade job failed")
+    finally:
+        db.close()
+
+
 def run_migration_job() -> None:
     """One-time startup migration: convert existing Fixed/Approximate REGISTERED appointments to SCHEDULED.
     Idempotent — safe to run on every startup."""
@@ -101,6 +122,7 @@ def run_eta_notification_job() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    run_schema_upgrades()
     run_migration_job()
     run_expiry_job()
     run_activate_scheduled_job()

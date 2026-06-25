@@ -1,0 +1,10 @@
+# Public pages (home, /search, /categories/*, /business/*) are crawlable by default.
+User-agent: *
+# Private / authenticated pages — keep out of search
+Disallow: /profile
+Disallow: /orders
+Disallow: /settings
+Disallow: /send-otp
+Disallow: /verify-otp
+
+Sitemap: https://app.easequeue.com/sitemap.xml

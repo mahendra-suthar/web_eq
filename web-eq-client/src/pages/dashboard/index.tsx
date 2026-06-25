@@ -11,6 +11,7 @@ import { UserService } from '../../services/user/user.service';
 import type { UnifiedProfileResponse } from '../../services/profile/profile.service';
 import { getInitials, getAvatarBackground } from '../../utils/utils';
 import { RouterConstant } from '../../routers';
+import LeaveApprovalTasks from '../../components/leave-approvals';
 import './dashboard.scss';
 
 interface BusinessData {
@@ -457,6 +458,11 @@ const Dashboard = () => {
               <p>{approvalBannerBody(bizStatus)}</p>
             </div>
           </div>
+        )}
+
+        {/* Pending employee leave requests awaiting the owner's approval */}
+        {businessId && (
+          <LeaveApprovalTasks businessId={businessId} />
         )}
 
         {/* Partial error (stale data visible) */}

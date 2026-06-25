@@ -77,6 +77,21 @@ QUEUE_USER_SCHEDULED = 8        # Fixed/Approximate: pre-active, not yet in live
 # Minutes before scheduled_start when a SCHEDULED appointment activates into the live queue
 SCHEDULED_ACTIVATION_LEAD_MINUTES = 15
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Schedule exception / leave approval
+# A leave (or special-hours override) is a ScheduleException row. Only APPROVED
+# rows affect bookings; PENDING rows are visible to the business for review but
+# do NOT block customers until approved. Existing rows default to APPROVED so
+# historical behaviour is preserved.
+LEAVE_STATUS_PENDING = "PENDING"
+LEAVE_STATUS_APPROVED = "APPROVED"
+LEAVE_STATUS_REJECTED = "REJECTED"
+LEAVE_STATUSES = {LEAVE_STATUS_PENDING, LEAVE_STATUS_APPROVED, LEAVE_STATUS_REJECTED}
+
+# Who created the exception (drives the default status: business → auto-approved).
+LEAVE_ROLE_EMPLOYEE = "EMPLOYEE"
+LEAVE_ROLE_BUSINESS = "BUSINESS"
+
 # Customer API defaults (appointments list pagination)
 CUSTOMER_APPOINTMENTS_DEFAULT_LIMIT = 5
 CUSTOMER_APPOINTMENTS_MAX_LIMIT = 100

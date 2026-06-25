@@ -1,10 +1,11 @@
 import uuid
-from sqlalchemy import Column, Integer, Time, Boolean, Enum, Date, ForeignKey
+from sqlalchemy import Column, Integer, Time, Boolean, Enum, Date, ForeignKey, String, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import enum
 
 from app.models.base import BaseModel
+from app.core.constants import LEAVE_STATUS_APPROVED
 
 
 class ScheduleEntityType(str, enum.Enum):
@@ -65,5 +66,12 @@ class ScheduleException(BaseModel):
     special_opening_time = Column(Time, nullable=True)
     special_closing_time = Column(Time, nullable=True)
     is_closed = Column(Boolean, default=False, nullable=False)
+
+    status = Column(String, default=LEAVE_STATUS_APPROVED, nullable=False)
+    created_by_role = Column(String, nullable=True)   # "EMPLOYEE" | "BUSINESS"
+    leave_group_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    reason = Column(String, nullable=True)
+    reviewed_by = Column(UUID(as_uuid=True), nullable=True)   # user who approved/rejected
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
     schedule = relationship("Schedule", back_populates="exceptions")
