@@ -5,7 +5,8 @@ from contextlib import asynccontextmanager
 from datetime import date
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from xml.sax.saxutils import escape
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.exc import IntegrityError
 
@@ -14,7 +15,9 @@ from app.db.database import engine, Base, SessionLocal
 from app.middleware.auth_middleware import AuthMiddleware
 from app.services.queue_service import QueueService
 from app.controllers.queue_controller import QueueController
-from app.core.config import CORS_ORIGINS
+from app.core.config import CORS_ORIGINS, CUSTOMER_APP_URL
+from app.controllers.business_controller import BusinessController
+from app.controllers.category_controller import CategoryController
 from app.core.utils import today_app_date, current_time_app_tz
 from app.core.constants import QUEUE_USER_SCHEDULED, APPOINTMENT_TYPE_FIXED, APPOINTMENT_TYPE_APPROXIMATE
 
@@ -30,6 +33,27 @@ from app.models import (
 Base.metadata.create_all(bind=engine)
 
 logger = logging.getLogger(__name__)
+
+
+def run_schema_upgrades() -> None:
+    """Idempotent additive schema tweaks that create_all can't apply to existing
+    tables (it only creates missing tables). Safe to run on every startup."""
+    from sqlalchemy import text
+    statements = [
+        "ALTER TABLE schedule_exceptions ADD COLUMN IF NOT EXISTS leave_group_id UUID",
+        "CREATE INDEX IF NOT EXISTS ix_schedule_exceptions_leave_group_id "
+        "ON schedule_exceptions (leave_group_id)",
+    ]
+    db = SessionLocal()
+    try:
+        for stmt in statements:
+            db.execute(text(stmt))
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Schema upgrade job failed")
+    finally:
+        db.close()
 
 
 def run_migration_job() -> None:
@@ -101,6 +125,7 @@ def run_eta_notification_job() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    run_schema_upgrades()
     run_migration_job()
     run_expiry_job()
     run_activate_scheduled_job()
@@ -147,6 +172,52 @@ app.add_middleware(
 
 app.add_middleware(AuthMiddleware)
 app.include_router(routers, prefix="/api")
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap() -> Response:
+    """Public SEO sitemap: static pages + one URL per business.
+
+    Served at root (outside the /api prefix) and whitelisted in
+    UNPROTECTED_ROUTE_PATHS. Fronted by a Vercel rewrite so crawlers fetch it at
+    app.easequeue.com/sitemap.xml and always see the freshest set of businesses.
+    """
+    base = (CUSTOMER_APP_URL).rstrip("/")
+    urls = [(f"{base}/", "daily", "1.0"), (f"{base}/search", "daily", "0.7")]
+    try:
+        db = SessionLocal()
+        try:
+            businesses = BusinessController(db).get_businesses()
+            urls.extend((f"{base}/business/{b.uuid}", "weekly", "0.8") for b in businesses)
+            # Category landing pages — only those with businesses (skip thin/empty pages).
+            categories = CategoryController(db).get_all_categories()
+            urls.extend(
+                (f"{base}/categories/{c.uuid}", "weekly", "0.7")
+                for c in categories
+                if c.has_businesses
+            )
+        finally:
+            db.close()
+    except Exception:
+        # Never 500 a crawler — fall back to the static entries.
+        logger.exception("Sitemap generation failed; serving static entries only")
+
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for loc, changefreq, priority in urls:
+        lines.append(
+            f"  <url><loc>{escape(loc)}</loc>"
+            f"<changefreq>{changefreq}</changefreq>"
+            f"<priority>{priority}</priority></url>"
+        )
+    lines.append("</urlset>")
+    return Response(
+        content="\n".join(lines),
+        media_type="application/xml",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 @app.exception_handler(IntegrityError)

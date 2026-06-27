@@ -619,6 +619,23 @@ class QueueService:
             logger.exception("Failed to count_active_users_in_queue (queue_id=%s date=%s)", queue_id, queue_date)
             raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
 
+    def count_active_bookings_for_date(self, queue_id: UUID, queue_date: date) -> int:
+        try:
+            return (
+                self.db.query(func.count(QueueUser.uuid))
+                .filter(
+                    QueueUser.queue_id == queue_id,
+                    QueueUser.queue_date == queue_date,
+                    QueueUser.status.in_(
+                        [QUEUE_USER_REGISTERED, QUEUE_USER_IN_PROGRESS, QUEUE_USER_SCHEDULED]
+                    ),
+                )
+                .scalar() or 0
+            )
+        except Exception:
+            logger.exception("Failed to count_active_bookings_for_date (queue_id=%s date=%s)", queue_id, queue_date)
+            raise HTTPException(status_code=500, detail={"message": "An unexpected error occurred. Please try again."})
+
     def cancel_appointment(self, queue_user: QueueUser, reason: str = "customer_cancelled") -> QueueUser:
         try:
             queue_user.status = QUEUE_USER_CANCELLED  # type: ignore[assignment]

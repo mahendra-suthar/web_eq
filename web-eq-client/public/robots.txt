@@ -1,0 +1,4 @@
+# Business/employee admin panel — entirely behind authentication.
+# Must never appear in search results.
+User-agent: *
+Disallow: /

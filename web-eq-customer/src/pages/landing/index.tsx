@@ -21,6 +21,7 @@ import LoadingSpinner from "../../components/loading-spinner";
 import EmptyState from "../../components/empty-state";
 import ErrorMessage from "../../components/error-message";
 import Modal from "../../components/modal";
+import Seo, { SEO_BASE_URL } from "../../components/Seo";
 import { computeConflicts } from "../../utils/conflicts";
 import { getCategoryEmoji } from "../../utils/category-emoji";
 import { useScrollReveal } from "../../hooks/useScrollReveal";
@@ -326,6 +327,11 @@ export default function LandingPage() {
 
   return (
     <div className="landing-page">
+      <Seo
+        title="EaseQueue | Join Queues & Book Appointments Online"
+        description="Skip the wait. Find local businesses, join queues, and book appointments instantly from your browser — no app download needed."
+        canonical={`${SEO_BASE_URL}/`}
+      />
 
       <section className="lp-hero">
         <div className="lp-hero-bg" aria-hidden="true" />

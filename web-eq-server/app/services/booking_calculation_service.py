@@ -91,7 +91,9 @@ class BookingCalculationService:
                 exception = (
                     exception_map.get(schedule.uuid)
                     if exception_map is not None
-                    else self.schedule.get_exception_for_date(schedule.uuid, booking_date)
+                    else self.schedule.get_exception_for_date(
+                        schedule.uuid, booking_date, only_approved=True
+                    )
                 )
                 if exception:
                     if exception.is_closed:
@@ -226,7 +228,7 @@ class BookingCalculationService:
             employee_ids, ScheduleEntityType.EMPLOYEE, day_of_week
         )
         exception_map = self.schedule.get_exceptions_for_schedules_batch(
-            list(schedule_map.keys()), booking_date
+            list(schedule_map.keys()), booking_date, only_approved=True
         )
 
         if booking_date == today:

@@ -3,6 +3,7 @@ import CustomerLayout from "./layouts/customer-layout";
 import AuthLayout from "./layouts/auth-layout";
 import { AuthFailureHandler } from "./components/AuthFailureHandler";
 import ScrollToTop from "./components/ScrollToTop";
+import Analytics from "./components/Analytics";
 import { useSessionRestore } from "./hooks/useSessionRestore";
 import { useVisibilityRefresh } from "./hooks/useVisibilityRefresh";
 import { GuestOnlyRoute } from "./components/GuestOnlyRoute";
@@ -29,6 +30,7 @@ function App() {
       ) : (
         <BrowserRouter>
           <ScrollToTop />
+          <Analytics />
           <Routes>
             <Route element={<CustomerLayout />}>
               <Route path="/" element={<LandingPage />} />

@@ -1,0 +1,325 @@
+@use "../../styles/admin-shared" as *;
+
+.leave-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  // Flex gap handles spacing between cards.
+  .content-card {
+    margin-bottom: 0;
+  }
+
+  // ── Avatar (approvals + roster) ──────────────────────────────────────────────
+  .leave-avatar {
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: $sh-teal-light;
+    color: $sh-teal-dark;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  // Type icon that anchors each "My leave" row.
+  .leave-type-ico {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: $sh-teal-light;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1;
+
+    &--hours { background: #eef2ff; }
+  }
+
+  // ── "Source" tag ─────────────────────────────────────────────────────────────
+  .leave-by {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+
+    &--employee { background: #ecfeff; color: #0e7490; border: 1px solid #a5f3fc; }
+    &--business { background: $sh-slate-100; color: $sh-slate-600; border: 1px solid $sh-slate-200; }
+  }
+
+  // ── Leave list rows (approvals + my-leave) ───────────────────────────────────
+  .leave-list { display: flex; flex-direction: column; }
+
+  .leave-request {
+    align-items: center;
+    gap: 12px;
+    padding: 12px 8px;
+    border-radius: 10px;
+    transition: background 0.12s;
+
+    &:hover { background: $sh-slate-50; }
+    & + & { border-top: 1px solid $sh-slate-100; }
+
+    &__info { flex: 1; }
+
+    &__meta {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      color: $sh-slate-500;
+      white-space: nowrap;
+
+      // Keep the whole line together; truncate gracefully if the row is tight.
+      min-width: 0;
+      .leave-request__type { overflow: hidden; text-overflow: ellipsis; }
+    }
+    &__meta--lead .leave-request__date { color: $sh-slate-900; font-weight: 600; }
+    &__rel { color: $sh-teal-dark; font-weight: 500; }
+    .leave-dot { color: $sh-slate-300; }
+
+    &__name .leave-chip { margin-left: 8px; }
+  }
+
+  // Day-count chip for multi-day (range) leave.
+  .leave-chip {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: $sh-teal-light;
+    color: $sh-teal-dark;
+    font-size: 11px;
+    font-weight: 600;
+    vertical-align: middle;
+  }
+
+  .leave-sk-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+  }
+
+  // ── Roster controls ──────────────────────────────────────────────────────────
+  .leave-scope {
+    display: inline-flex;
+    background: $sh-slate-100;
+    border-radius: $sh-radius-md;
+    padding: 3px;
+    gap: 2px;
+
+    &__btn {
+      border: none;
+      background: transparent;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: $sh-slate-500;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+
+      &:hover { color: $sh-slate-900; }
+      &.is-active { background: #fff; color: $sh-teal-dark; box-shadow: $sh-shadow-sm; }
+    }
+  }
+
+  .leave-filters-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    // It's a second header strip below the title row.
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  // ── Roster table cells ───────────────────────────────────────────────────────
+  .leave-cell-emp {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+    color: $sh-slate-900;
+  }
+
+  .leave-cell-date {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
+
+    .leave-cell-rel { font-size: 12px; color: $sh-slate-400; }
+  }
+
+  .leave-cell-reason {
+    max-width: 280px;
+    color: $sh-slate-600;
+    font-style: italic;
+  }
+
+  .empty-state--compact { padding: 32px 20px; }
+
+  .leave-card-body {
+    padding: 16px 20px;
+  }
+
+  .leave-muted {
+    margin: 0;
+    color: $sh-slate-500;
+    font-size: 14px;
+  }
+
+  .leave-hint {
+    margin: 10px 0 0;
+    color: $sh-slate-500;
+    font-size: 12.5px;
+  }
+
+  // ── Pending approvals list (reuses .leave-request markup from leave-approvals.scss)
+  .leave-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  // ── Mark-leave form ──────────────────────────────────────────────────────────
+  .leave-mark-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .leave-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 170px;
+
+    &--grow { flex: 1; min-width: 200px; }
+
+    .info-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: $sh-slate-500;
+    }
+    .leave-field-opt { color: $sh-slate-400; font-weight: 400; }
+
+    .info-input {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid $sh-slate-200;
+      border-radius: $sh-radius-md;
+      font-size: 14px;
+      color: $sh-slate-900;
+      background: #fff;
+
+      &::placeholder { color: $sh-slate-400; }
+      &:focus {
+        outline: none;
+        border-color: $sh-teal;
+        box-shadow: 0 0 0 2px rgba(0, 105, 92, 0.18);
+      }
+    }
+  }
+
+  // Type toggle + custom-hours + submit, on one wrapping row (its own section).
+  .leave-type-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid $sh-slate-100;
+
+    > .info-label { font-size: 12px; font-weight: 600; color: $sh-slate-500; }
+    .leave-submit { margin-left: auto; }
+  }
+
+  .leave-hours {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px 4px 10px;
+    background: $sh-slate-50;
+    border: 1px solid $sh-slate-200;
+    border-radius: $sh-radius-md;
+
+    .info-input { width: auto; min-width: 110px; padding: 7px 9px; border-color: transparent; background: #fff; }
+    &__sep { font-size: 13px; color: $sh-slate-500; }
+  }
+
+  @media (max-width: 640px) {
+    .leave-mark-form {
+      .leave-field,
+      .leave-field--grow { flex: 1 0 100%; min-width: 0; }
+    }
+    .leave-type-row {
+      .leave-submit { margin-left: 0; flex: 1 0 100%; }
+      .leave-hours { flex: 1 0 100%; .info-input { flex: 1; } }
+      .leave-scope { flex: 1 0 100%; .leave-scope__btn { flex: 1; } }
+    }
+  }
+
+  // ── Roster ───────────────────────────────────────────────────────────────────
+  .leave-roster-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .leave-row-actions {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  // Keep the roster readable on small screens: scroll instead of crush.
+  .data-table { min-width: 760px; }
+
+  // ── Responsive ───────────────────────────────────────────────────────────────
+  @media (max-width: 720px) {
+    .leave-roster-header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .leave-scope {
+      width: 100%;
+      &__btn { flex: 1; text-align: center; }
+    }
+
+    .leave-filters-row {
+      flex-direction: column;
+      .filter-select { width: 100%; }
+    }
+  }
+
+  @media (max-width: 560px) {
+    .leave-card-body { padding: 14px 16px; }
+
+    // Approvals rows stack: identity on top, actions full-width below.
+    .leave-request {
+      flex-wrap: wrap;
+      &__actions {
+        flex: 1 0 100%;
+        justify-content: flex-end;
+        margin-top: 4px;
+      }
+      // Too narrow for one line — let the meta wrap instead of overflowing.
+      &__meta {
+        flex-wrap: wrap;
+        white-space: normal;
+      }
+    }
+  }
+}

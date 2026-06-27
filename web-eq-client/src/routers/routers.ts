@@ -17,6 +17,7 @@ export const ROUTERS_PATH = {
   QUEUES: "/admin/queues",
   QUEUE_DETAIL: "/admin/queues/:queueId",
   LIVE_QUEUE: "/admin/live-queue",
+  LEAVE: "/admin/leave",
   REVIEWS: "/admin/reviews",
   // Super Admin
   SUPER_ADMIN: "/super-admin",
