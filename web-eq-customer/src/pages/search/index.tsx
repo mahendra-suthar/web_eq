@@ -5,6 +5,7 @@ import { BusinessService } from "../../services/business/business.service";
 import BusinessCard from "../../components/business-card";
 import EmptyState from "../../components/empty-state";
 import LoadingSpinner from "../../components/loading-spinner";
+import Seo, { SEO_BASE_URL } from "../../components/Seo";
 import type { Business } from "../../types/business";
 import "./search.scss";
 
@@ -84,6 +85,11 @@ export default function SearchPage() {
 
   return (
     <div className="sp-page">
+      <Seo
+        title="Search Businesses | EaseQueue"
+        description="Search local businesses on EaseQueue — find services, compare wait times, and book appointments instantly."
+        canonical={`${SEO_BASE_URL}/search`}
+      />
       {/* Header */}
       <div className="sp-header">
         <div className="sp-header-inner">

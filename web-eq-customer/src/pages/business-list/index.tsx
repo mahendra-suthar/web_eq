@@ -8,6 +8,8 @@ import { BusinessService } from "../../services/business/business.service";
 import { CategoryService, type CategoryWithServicesData, type ServiceData } from "../../services/category/category.service";
 import { getCategoryEmoji } from "../../utils/category-emoji";
 import { useScrollReveal } from "../../hooks/useScrollReveal";
+import Seo, { SEO_BASE_URL } from "../../components/Seo";
+import { categorySeoTitle, categorySeoDescription, categoryCanonical } from "./seo";
 import type { Business } from "../../types/business";
 import "./business-list.scss";
 
@@ -130,6 +132,12 @@ export default function BusinessListPage() {
   if (!categoryId) {
     return (
       <div className="bl-page">
+        <Seo
+          title="Category not found | EaseQueue"
+          description="This category could not be found on EaseQueue."
+          canonical={`${SEO_BASE_URL}/search`}
+          noindex
+        />
         <EmptyState title={t("bl.notFoundTitle")} hint={t("bl.notFoundHint")} />
       </div>
     );
@@ -137,6 +145,13 @@ export default function BusinessListPage() {
 
   return (
     <div className="bl-page">
+      {category && (
+        <Seo
+          title={categorySeoTitle(category)}
+          description={categorySeoDescription(category)}
+          canonical={categoryCanonical(categoryId)}
+        />
+      )}
 
       <div className="bl-hero">
         <div className="bl-hero-inner">

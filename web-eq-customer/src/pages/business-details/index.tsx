@@ -27,6 +27,13 @@ import LoadingSpinner from "../../components/loading-spinner";
 import ErrorMessage from "../../components/error-message";
 import ReviewModal from "../../components/review-modal";
 import StarRating from "../../components/star-rating";
+import Seo from "../../components/Seo";
+import {
+  businessSeoTitle,
+  businessSeoDescription,
+  businessCanonical,
+  buildBusinessJsonLd,
+} from "./seo";
 import "./business-details.scss";
 
 const TABS = ["Overview", "Services", "Hours", "Location", "Reviews"] as const;
@@ -213,6 +220,12 @@ export default function BusinessDetailsPage() {
   if (error || !business) {
     return (
       <div className="bdp-page">
+        <Seo
+          title="Business not found | EaseQueue"
+          description="This business page could not be found on EaseQueue."
+          canonical={businessCanonical(businessId ?? "")}
+          noindex
+        />
         <div className="bdp-state-center">
           <ErrorMessage>{error ?? t("bd.businessNotFound")}</ErrorMessage>
         </div>
@@ -226,8 +239,16 @@ export default function BusinessDetailsPage() {
   const categoryEmoji = business.category_name ? getCategoryEmoji(business.category_name) : "";
   const categoryId = passedCategoryId ?? business.category_id ?? "";
   const categoryName = passedCategoryName ?? business.category_name ?? "";
+  const canonical = businessCanonical(businessId ?? business.uuid);
   return (
     <div className="bdp-page">
+      <Seo
+        title={businessSeoTitle(business)}
+        description={businessSeoDescription(business)}
+        canonical={canonical}
+        image={business.profile_picture ?? undefined}
+        jsonLd={buildBusinessJsonLd(business, reviewSummary, canonical)}
+      />
       <div className="bdp-hero">
         <div className="bdp-hero-bg" aria-hidden="true" />
         <div className="bdp-hero-deco bdp-hero-deco-1" aria-hidden="true" />

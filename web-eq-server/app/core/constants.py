@@ -3,6 +3,7 @@ from enum import Enum
 
 UNPROTECTED_ROUTE_PATHS = [
     "/healthz",                           # Render / load balancer health checks
+    "/sitemap.xml",                       # Public SEO sitemap (served at root, behind Vercel rewrite)
     # ── Auth ─────────────────────────────────────────────────────────────────
     "/api/auth/send-otp",
     "/api/auth/verify-otp",
